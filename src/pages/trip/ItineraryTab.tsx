@@ -31,14 +31,22 @@ function formatTimeDisplay(t: string): string {
 }
 
 // 計算行程天數
+function parseLocalDate(d: string): Date {
+  const s = d.includes('T') ? d.slice(0, 10) : d;
+  const [y, m, day] = s.split('-').map(Number);
+  return new Date(y, m - 1, day);
+}
 function getTripDays(start: string, end: string): Array<{ day: number; date: string }> {
   const days: Array<{ day: number; date: string }> = [];
-  const s = new Date(start);
-  const e = new Date(end);
+  const s = parseLocalDate(start);
+  const e = parseLocalDate(end);
   let cur = new Date(s);
   let day = 1;
   while (cur <= e) {
-    days.push({ day, date: cur.toISOString().slice(0, 10) });
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    days.push({ day, date: `${y}-${m}-${d}` });
     cur.setDate(cur.getDate() + 1);
     day++;
   }

@@ -61,13 +61,18 @@ export default function HomePage() {
 
   const getDuration = (start: string, end: string) => {
     if (!start || !end) return '';
-    const days = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1;
+    // 直接解析 YYYY-MM-DD 避免 UTC 時區偏移問題
+    const parseDate = (d: string) => { const s = d.includes('T') ? d.slice(0, 10) : d; const [y, m, day] = s.split('-').map(Number); return new Date(y, m - 1, day); };
+    const days = Math.round((parseDate(end).getTime() - parseDate(start).getTime()) / 86400000) + 1;
     return `${days} 天`;
   };
 
   const formatDate = (d: string) => {
     if (!d) return '';
-    return new Date(d).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
+    // 直接解析 YYYY-MM-DD 避免 UTC 時區偏移問題
+    const dateStr = d.includes('T') ? d.slice(0, 10) : d;
+    const [y, m, day] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const activeTrips = trips.filter(t => t.Status !== 'Deleted');

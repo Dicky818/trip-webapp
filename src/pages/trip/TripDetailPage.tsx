@@ -72,7 +72,10 @@ export default function TripDetailPage() {
 
   const formatDate = (d: string) => {
     if (!d) return '';
-    return new Date(d).toLocaleDateString('zh-TW', { year: 'numeric', month: 'short', day: 'numeric' });
+    // normalizeDateStr 已在 API 層處理，這裡直接解析 YYYY-MM-DD
+    const dateStr = d.includes('T') ? d.slice(0, 10) : d;
+    const [y, m, day] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString('zh-TW', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   if (loading) {

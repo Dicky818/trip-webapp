@@ -162,12 +162,30 @@ export interface Settlement {
   settlements: Array<{ from: string; to: string; amount: number }>;
 }
 
+// ── 日期正規化工具函數 ─────────────────────────────────────
+export function normalizeDateStr(d: string | null | undefined): string {
+  if (!d) return '';
+  if (d.includes('T')) return d.slice(0, 10);
+  return d;
+}
+function normalizeTrip(trip: Trip): Trip {
+  return { ...trip, Start_Date: normalizeDateStr(trip.Start_Date), End_Date: normalizeDateStr(trip.End_Date) };
+}
+
 // ── API Functions ──────────────────────────────────────────
 
 export const api = {
   // Trips
-  getTrips: () => callGas<{ success: boolean; data: Trip[] }>({ action: 'getTrips' }),
-  getTripById: (tripId: string) => callGas<{ success: boolean; data: Trip }>({ action: 'getTripById', tripId }),
+  getTrips: async () => {
+    const res = await callGas<{ success: boolean; data: Trip[] }>({ action: 'getTrips' });
+    if (res.success && res.data) res.data = res.data.map(normalizeTrip);
+    return res;
+  },
+  getTripById: async (tripId: string) => {
+    const res = await callGas<{ success: boolean; data: Trip }>({ action: 'getTripById', tripId });
+    if (res.success && res.data) res.data = normalizeTrip(res.data);
+    return res;
+  },
   createTrip: (body: Partial<Trip>) => callGas<{ success: boolean; data: Trip }>({ action: 'createTrip' }, body),
   updateTrip: (tripId: string, body: Partial<Trip>) => callGas<{ success: boolean; data: Trip }>({ action: 'updateTrip', tripId }, body),
   deleteTrip: (tripId: string) => callGas<{ success: boolean }>({ action: 'deleteTrip', tripId }),
