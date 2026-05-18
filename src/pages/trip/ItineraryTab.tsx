@@ -13,26 +13,19 @@ import { useApp } from '../../context/AppContext';
 
 interface Props { trip: Trip; }
 
-// 格式化時間為 xxhxxm（如 09:30 → 9h30m）
-// Google Sheets 將時間以 UTC 儲存，需加 +8 小時轉換為 HKT
+// 格式化時間為 xxhxxm（如 09:30 → 9h30m，9:00 → 9h）
+// GAS 已直接回傳 HH:MM 格式，無需 UTC 轉換
 function formatTimeDisplay(t: string): string {
   if (!t) return '';
-  let h = 0, m = 0;
+  // 如果還是 ISO 格式（舊資料相容），取 UTC 時間部分
+  let timeStr = t;
   if (t.includes('T')) {
-    // ISO 格式（如 1899-12-30T01:00:00.000Z）：UTC 時間需加 +8
-    const timePart = t.split('T')[1] || '';
-    const parts = timePart.split(':');
-    const utcH = parseInt(parts[0] || '0', 10);
-    m = parseInt(parts[1] || '0', 10);
-    h = (utcH + 8) % 24; // 轉換為 HKT (UTC+8)
-  } else if (t.includes(':')) {
-    // HH:MM 格式（前端直接輸入，無需轉換）
-    const parts = t.split(':');
-    h = parseInt(parts[0] || '0', 10);
-    m = parseInt(parts[1] || '0', 10);
-  } else {
-    return t;
+    timeStr = t.split('T')[1] || '';
   }
+  if (!timeStr.includes(':')) return t;
+  const parts = timeStr.split(':');
+  const h = parseInt(parts[0] || '0', 10);
+  const m = parseInt(parts[1] || '0', 10);
   if (m === 0) return `${h}h`;
   return `${h}h${String(m).padStart(2, '0')}m`;
 }
