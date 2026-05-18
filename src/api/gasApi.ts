@@ -1,6 +1,7 @@
 // ============================================================
 // GAS API 統一呼叫層
-// GAS_URL 從環境變數讀取，或在 localStorage 中設定
+// 所有請求均使用 GET + payload 參數，避免 CORS 問題
+// GAS_URL 從 localStorage 中設定
 // ============================================================
 
 const GAS_URL_KEY = 'trip_webapp_gas_url';
@@ -20,11 +21,12 @@ async function callGas<T>(params: Record<string, string>, body?: object): Promis
   const url = new URL(baseUrl);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const options: RequestInit = body
-    ? { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }
-    : { method: 'GET' };
+  // 所有請求均使用 GET，body 透過 payload 參數傳遞（解決 GAS CORS 限制）
+  if (body) {
+    url.searchParams.set('payload', JSON.stringify(body));
+  }
 
-  const response = await fetch(url.toString(), options);
+  const response = await fetch(url.toString(), { method: 'GET' });
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
   const data = await response.json();
@@ -162,7 +164,6 @@ export interface Settlement {
 
 // ── API Functions ──────────────────────────────────────────
 
-// Trips
 export const api = {
   // Trips
   getTrips: () => callGas<{ success: boolean; data: Trip[] }>({ action: 'getTrips' }),
