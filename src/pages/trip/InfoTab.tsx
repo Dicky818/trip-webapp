@@ -14,18 +14,20 @@ function formatDateOnly(d: string): string {
   return d.includes('T') ? d.slice(0, 10) : d;
 }
 
-// 格式化時間為 xxhxxm（如 09:30 → 9h30m，1899-12-30T01:23:18.000Z → 1h23m）
+// 格式化時間為 xxhxxm（如 09:30 → 9h30m）
+// Google Sheets 將時間以 UTC 儲存，需加 +8 小時轉換為 HKT
 function formatTimeDisplay(t: string): string {
   if (!t) return '';
   let h = 0, m = 0;
   if (t.includes('T')) {
-    // ISO 格式：取時間部分
+    // ISO 格式（如 1899-12-30T01:00:00.000Z）：UTC 時間需加 +8
     const timePart = t.split('T')[1] || '';
     const parts = timePart.split(':');
-    h = parseInt(parts[0] || '0', 10);
+    const utcH = parseInt(parts[0] || '0', 10);
     m = parseInt(parts[1] || '0', 10);
+    h = (utcH + 8) % 24; // 轉換為 HKT (UTC+8)
   } else if (t.includes(':')) {
-    // HH:MM 格式
+    // HH:MM 格式（前端直接輸入，無需轉換）
     const parts = t.split(':');
     h = parseInt(parts[0] || '0', 10);
     m = parseInt(parts[1] || '0', 10);
