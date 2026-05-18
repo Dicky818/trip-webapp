@@ -13,6 +13,26 @@ import { useApp } from '../../context/AppContext';
 
 interface Props { trip: Trip; }
 
+// 格式化時間為 xxhxxm（如 09:30 → 9h30m，1899-12-30T01:23:18.000Z → 1h23m）
+function formatTimeDisplay(t: string): string {
+  if (!t) return '';
+  let h = 0, m = 0;
+  if (t.includes('T')) {
+    const timePart = t.split('T')[1] || '';
+    const parts = timePart.split(':');
+    h = parseInt(parts[0] || '0', 10);
+    m = parseInt(parts[1] || '0', 10);
+  } else if (t.includes(':')) {
+    const parts = t.split(':');
+    h = parseInt(parts[0] || '0', 10);
+    m = parseInt(parts[1] || '0', 10);
+  } else {
+    return t;
+  }
+  if (m === 0) return `${h}h`;
+  return `${h}h${String(m).padStart(2, '0')}m`;
+}
+
 // 計算行程天數
 function getTripDays(start: string, end: string): Array<{ day: number; date: string }> {
   const days: Array<{ day: number; date: string }> = [];
@@ -44,7 +64,7 @@ function SortableItem({ item, onEdit, onDelete }: {
         <GripVertical size={16} />
       </button>
       {item.Time && (
-        <span className="text-xs font-mono text-slate-500 w-12 flex-shrink-0">{item.Time}</span>
+        <span className="text-xs font-mono text-slate-500 w-12 flex-shrink-0">{formatTimeDisplay(item.Time)}</span>
       )}
       <span className="flex-1 text-sm text-slate-800">{item.Activity}</span>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

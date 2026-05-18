@@ -7,6 +7,35 @@ import { useApp } from '../../context/AppContext';
 const FLIGHT_STATUS = ['', '準時', '延誤', '取消', '已完成'];
 const BOOKING_TYPES = ['', '餐廳', '門票', '活動', '交通', '其他'];
 
+// 只取日期部分，去除 ISO 時間戳（如 2026-08-12T16:00:00.000Z → 2026-08-12）
+function formatDateOnly(d: string): string {
+  if (!d) return '';
+  // 若包含 T，只取前 10 碼（YYYY-MM-DD）
+  return d.includes('T') ? d.slice(0, 10) : d;
+}
+
+// 格式化時間為 xxhxxm（如 09:30 → 9h30m，1899-12-30T01:23:18.000Z → 1h23m）
+function formatTimeDisplay(t: string): string {
+  if (!t) return '';
+  let h = 0, m = 0;
+  if (t.includes('T')) {
+    // ISO 格式：取時間部分
+    const timePart = t.split('T')[1] || '';
+    const parts = timePart.split(':');
+    h = parseInt(parts[0] || '0', 10);
+    m = parseInt(parts[1] || '0', 10);
+  } else if (t.includes(':')) {
+    // HH:MM 格式
+    const parts = t.split(':');
+    h = parseInt(parts[0] || '0', 10);
+    m = parseInt(parts[1] || '0', 10);
+  } else {
+    return t;
+  }
+  if (m === 0) return `${h}h`;
+  return `${h}h${String(m).padStart(2, '0')}m`;
+}
+
 interface Props { trip: Trip; }
 
 export default function InfoTab({ trip }: Props) {
@@ -194,12 +223,12 @@ export default function InfoTab({ trip }: Props) {
                     <span className="flex items-center gap-1"><MapPin size={12} />{f.Departure_Location || '?'}</span>
                     <span>→</span>
                     <span>{f.Arrival_Location || '?'}</span>
-                    {f.Flight_Date && <span className="text-slate-400">· {f.Flight_Date}</span>}
+                    {f.Flight_Date && <span className="text-slate-400">· {formatDateOnly(f.Flight_Date)}</span>}
                   </div>
                   {(f.Departure_Time || f.Arrival_Time) && (
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                       <Clock size={11} />
-                      <span>{f.Departure_Time} — {f.Arrival_Time}</span>
+                      <span>{formatTimeDisplay(f.Departure_Time)} — {formatTimeDisplay(f.Arrival_Time)}</span>
                       {f.Duration && <span>({f.Duration})</span>}
                     </div>
                   )}
@@ -246,8 +275,8 @@ export default function InfoTab({ trip }: Props) {
                   <p className="font-semibold text-slate-900 mb-1">{a.Name}</p>
                   {a.Address && <p className="text-sm text-slate-500 flex items-center gap-1"><MapPin size={12} />{a.Address}</p>}
                   <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                    {a.Check_In_Date && <span>入住：{a.Check_In_Date}</span>}
-                    {a.Check_Out_Date && <span>退房：{a.Check_Out_Date}</span>}
+                    {a.Check_In_Date && <span>入住：{formatDateOnly(a.Check_In_Date)}</span>}
+                    {a.Check_Out_Date && <span>退房：{formatDateOnly(a.Check_Out_Date)}</span>}
                     {a.Price && <span>· {trip.Base_Currency} {Number(a.Price).toLocaleString()}</span>}
                   </div>
                   {a.Attachment && (
@@ -296,7 +325,7 @@ export default function InfoTab({ trip }: Props) {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-500">
                     {b.Location && <span className="flex items-center gap-1"><MapPin size={11} />{b.Location}</span>}
-                    {b.Date && <span>日期：{b.Date}</span>}
+                    {b.Date && <span>日期：{formatDateOnly(b.Date)}</span>}
                     {b.Price && <span>· {trip.Base_Currency} {Number(b.Price).toLocaleString()}</span>}
                   </div>
                   {b.Attachment && (
