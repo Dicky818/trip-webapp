@@ -13,21 +13,20 @@ import { useApp } from '../../context/AppContext';
 
 interface Props { trip: Trip; }
 
-// 格式化時間為 xxhxxm（如 09:30 → 9h30m，9:00 → 9h）
+// 格式化時間為 hh:mm（如 09:30 → 09:30，9:00 → 09:00）
 // GAS 已直接回傳 HH:MM 格式，無需 UTC 轉換
 function formatTimeDisplay(t: string): string {
   if (!t) return '';
-  // 如果還是 ISO 格式（舊資料相容），取 UTC 時間部分
+  // 如果還是 ISO 格式（舊資料相容），取時間部分
   let timeStr = t;
   if (t.includes('T')) {
     timeStr = t.split('T')[1] || '';
   }
   if (!timeStr.includes(':')) return t;
   const parts = timeStr.split(':');
-  const h = parseInt(parts[0] || '0', 10);
-  const m = parseInt(parts[1] || '0', 10);
-  if (m === 0) return `${h}h`;
-  return `${h}h${String(m).padStart(2, '0')}m`;
+  const h = String(parseInt(parts[0] || '0', 10)).padStart(2, '0');
+  const m = String(parseInt(parts[1] || '0', 10)).padStart(2, '0');
+  return `${h}:${m}`;
 }
 
 // 計算行程天數

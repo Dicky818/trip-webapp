@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Plus, Trash2, Edit2, DollarSign, Users, BarChart2, RefreshCw, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, DollarSign, Users, BarChart2, RefreshCw, ArrowRight, Table2 } from 'lucide-react';
 import { api, Trip, Expense, Member, TripMember, Settlement } from '../../api/gasApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
+import ExpenseBreakdownTab from './ExpenseBreakdownTab';
 
 interface Props { trip: Trip; }
 
@@ -15,7 +16,7 @@ export default function ExpensesTab({ trip }: Props) {
   const [settlement, setSettlement] = useState<Settlement | null>(null);
   const [loading, setLoading] = useState(true);
   const [settlementLoading, setSettlementLoading] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'list' | 'settlement' | 'members'>('list');
+  const [activeSubTab, setActiveSubTab] = useState<'list' | 'breakdown' | 'settlement' | 'members'>('list');
 
   // Expense modal
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -216,11 +217,12 @@ export default function ExpensesTab({ trip }: Props) {
       <div className="flex gap-1 mb-4 bg-slate-100 rounded-xl p-1">
         {[
           { id: 'list', label: '支出列表', icon: <DollarSign size={14} /> },
+          { id: 'breakdown', label: '支出細項', icon: <Table2 size={14} /> },
           { id: 'settlement', label: '結算分帳', icon: <BarChart2 size={14} /> },
           { id: 'members', label: '行程成員', icon: <Users size={14} /> },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors
               ${activeSubTab === tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             {tab.icon} {tab.label}
           </button>
@@ -284,6 +286,18 @@ export default function ExpensesTab({ trip }: Props) {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── 支出細項 ── */}
+      {activeSubTab === 'breakdown' && (
+        <ExpenseBreakdownTab
+          trip={trip}
+          expenses={expenses}
+          members={members}
+          tripMembers={tripMembers}
+          categories={categories}
+          loading={loading}
+        />
       )}
 
       {/* ── 結算分帳 ── */}
