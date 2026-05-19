@@ -30,6 +30,37 @@ function formatTimeDisplay(t: string): string {
   return `${h}h${String(m).padStart(2, '0')}m`;
 }
 
+// 計算航班飛行時間（考慮日期趪越）
+// depDate: 出發日期 (YYYY-MM-DD)，depTime: 出發時間 (HH:MM)
+// arrDate: 到達日期 (YYYY-MM-DD)，arrTime: 到達時間 (HH:MM)
+// 回傳格式如 "3h30m" 或 "+1d 2h30m"
+function calcFlightDuration(depDate: string, depTime: string, arrDate: string, arrTime: string): string {
+  if (!depTime || !arrTime) return '';
+  // 將日期時間組合為可計算的數値（分鐘）
+  const toMinutes = (date: string, time: string): number => {
+    const [hStr, mStr] = time.split(':');
+    const h = parseInt(hStr || '0', 10);
+    const m = parseInt(mStr || '0', 10);
+    if (!date) return h * 60 + m;
+    const [yStr, moStr, dStr] = date.split('-');
+    const d = new Date(parseInt(yStr), parseInt(moStr) - 1, parseInt(dStr));
+    return d.getTime() / 60000 + h * 60 + m;
+  };
+  const depMin = toMinutes(depDate, depTime);
+  const arrMin = toMinutes(arrDate, arrTime);
+  const diff = arrMin - depMin;
+  if (diff <= 0) return '';
+  const totalH = Math.floor(diff / 60);
+  const totalM = diff % 60;
+  const days = Math.floor(totalH / 24);
+  const hours = totalH % 24;
+  let result = '';
+  if (days > 0) result += `+${days}d `;
+  if (hours > 0) result += `${hours}h`;
+  if (totalM > 0) result += `${totalM}m`;
+  return result.trim();
+}
+
 interface Props { trip: Trip; }
 
 export default function InfoTab({ trip }: Props) {
@@ -83,7 +114,12 @@ export default function InfoTab({ trip }: Props) {
   // ── Flight CRUD ──
   const openFlightModal = (flight?: Flight) => {
     setEditFlight(flight || null);
-    setFlightForm(flight ? { ...flight } : { Trip_ID: trip.Trip_ID, Source_Type: 'Manual' });
+    if (flight) {
+      // 編輯時載入現有資料，Arrival_Date 預設與 Flight_Date 相同（如果沒有趪日）
+      setFlightForm({ ...flight, Arrival_Date: (flight as any).Arrival_Date || flight.Flight_Date } as any);
+    } else {
+      setFlightForm({ Trip_ID: trip.Trip_ID, Source_Type: 'Manual' });
+    }
     setShowFlightModal(true);
   };
 
@@ -362,17 +398,43 @@ export default function InfoTab({ trip }: Props) {
             onChange={e => setFlightForm(f => ({ ...f, Departure_Location: e.target.value }))} />
           <Input label="目的地" placeholder="例如：東京 (NRT)" value={flightForm.Arrival_Location || ''}
             onChange={e => setFlightForm(f => ({ ...f, Arrival_Location: e.target.value }))} />
-          <Input label="航班日期" type="date" value={flightForm.Flight_Date || ''}
+          <Input label="航班日期（出發）" type="date" value={flightForm.Flight_Date || ''}
             onChange={e => setFlightForm(f => ({ ...f, Flight_Date: e.target.value }))} />
           <Select label="狀態" value={flightForm.Status || ''}
             onChange={e => setFlightForm(f => ({ ...f, Status: e.target.value }))}
             options={FLIGHT_STATUS.map(s => ({ value: s, label: s || '（未設定）' }))} />
           <Input label="出發時間" type="time" value={flightForm.Departure_Time || ''}
-            onChange={e => setFlightForm(f => ({ ...f, Departure_Time: e.target.value }))} />
+            onChange={e => {
+              const depTime = e.target.value;
+              setFlightForm(f => {
+                const dur = calcFlightDuration(f.Flight_Date || '', depTime, (f as any).Arrival_Date || f.Flight_Date || '', f.Arrival_Time || '');
+                return { ...f, Departure_Time: depTime, Duration: dur || f.Duration || '' };
+              });
+            }} />
+          <Input label="到達日期" type="date" value={(flightForm as any).Arrival_Date || flightForm.Flight_Date || ''}
+            onChange={e => {
+              const arrDate = e.target.value;
+              setFlightForm(f => {
+                const dur = calcFlightDuration(f.Flight_Date || '', f.Departure_Time || '', arrDate, f.Arrival_Time || '');
+                return { ...f, Arrival_Date: arrDate, Duration: dur || f.Duration || '' } as any;
+              });
+            }} />
           <Input label="到達時間" type="time" value={flightForm.Arrival_Time || ''}
-            onChange={e => setFlightForm(f => ({ ...f, Arrival_Time: e.target.value }))} />
-          <Input label="飛行時間" placeholder="例如：3h 30m" value={flightForm.Duration || ''}
-            onChange={e => setFlightForm(f => ({ ...f, Duration: e.target.value }))} />
+            onChange={e => {
+              const arrTime = e.target.value;
+              setFlightForm(f => {
+                const dur = calcFlightDuration(f.Flight_Date || '', f.Departure_Time || '', (f as any).Arrival_Date || f.Flight_Date || '', arrTime);
+                return { ...f, Arrival_Time: arrTime, Duration: dur || f.Duration || '' };
+              });
+            }} />
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700">飛行時間（自動計算）</label>
+            <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-900 min-h-[38px]">
+              {flightForm.Duration
+                ? <span className="text-blue-600">{flightForm.Duration}</span>
+                : <span className="text-slate-400">輸入出發/到達時間即可自動計算</span>}
+            </div>
+          </div>
           <Input label="附件連結" placeholder="Google Drive 分享連結" value={flightForm.Attachment || ''}
             onChange={e => setFlightForm(f => ({ ...f, Attachment: e.target.value }))} />
         </div>

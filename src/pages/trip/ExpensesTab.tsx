@@ -438,10 +438,12 @@ export default function ExpensesTab({ trip }: Props) {
           <Select label="貨幣" value={expenseForm.Currency || trip.Base_Currency}
             onChange={e => setExpenseForm(f => ({ ...f, Currency: e.target.value }))}
             options={CURRENCIES.map(c => ({ value: c, label: c }))} />
-          <Input label="金額" type="number" required placeholder="0.00" value={String(expenseForm.Original_Amount || '')}
+          <Input label="金額" type="number" required placeholder="0.00" step="0.01" min="0"
+            value={String(expenseForm.Original_Amount || '')}
             onChange={e => setExpenseForm(f => ({ ...f, Original_Amount: e.target.value }))} />
           <div className="flex gap-2 items-end">
-            <Input label={`匯率 (→ ${trip.Base_Currency})`} type="number" value={String(expenseForm.Exchange_Rate || '1')}
+            <Input label={`匯率 (→ ${trip.Base_Currency})`} type="number" step="0.0001" min="0"
+              value={String(expenseForm.Exchange_Rate || '1')}
               onChange={e => setExpenseForm(f => ({ ...f, Exchange_Rate: e.target.value }))}
               className="flex-1" />
             <Button size="sm" variant="outline" onClick={fetchExchangeRate} loading={exchangeRateLoading} className="mb-0.5">
