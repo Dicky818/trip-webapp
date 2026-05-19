@@ -49,8 +49,8 @@ function fmtAmt(n: number, currency: string): string {
 }
 
 export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembers, categories, loading }: Props) {
-  // 付款人篩選：'ALL' 或 Member_Name
-  const [selectedPayer, setSelectedPayer] = useState<string>('ALL');
+  // 分攤成員篩選：'ALL' 或 Member_Name
+  const [selectedSplitter, setSelectedSplitter] = useState<string>('ALL'); // 分攤
 
   // 行程成員（用於篩選下拉）
   const activeMembers = members.filter(m => String(m.Is_Active).toUpperCase() === 'TRUE');
@@ -60,11 +60,15 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
   // 行程日期列表
   const tripDates = useMemo(() => getTripDates(trip.Start_Date, trip.End_Date), [trip.Start_Date, trip.End_Date]);
 
-  // 篩選後的支出
+  // 篩選後的支出（按分攤成員篩選） // 分攤
   const filteredExpenses = useMemo(() => {
-    if (selectedPayer === 'ALL') return expenses;
-    return expenses.filter(e => e.Payer === selectedPayer);
-  }, [expenses, selectedPayer]);
+    if (selectedSplitter === 'ALL') return expenses;
+    // Splitters 是逗號分隔的成員名稱字串
+    return expenses.filter(e => {
+      const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
+      return splitters.includes(selectedSplitter);
+    });
+  }, [expenses, selectedSplitter]);
 
   // 建立分類結構：主分類 → 子分類列表（依 categories 順序）
   const activeCategories = categories.filter(c => String(c.Is_Active).toUpperCase() === 'TRUE');
@@ -162,10 +166,10 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
     <div className="p-4">
       {/* 篩選列 */}
       <div className="flex items-center gap-3 mb-4">
-        <span className="text-sm font-medium text-slate-600 whitespace-nowrap">付款人：</span>
+        <span className="text-sm font-medium text-slate-600 whitespace-nowrap">分攤成員：</span>
         <select
-          value={selectedPayer}
-          onChange={e => setSelectedPayer(e.target.value)}
+          value={selectedSplitter}
+          onChange={e => setSelectedSplitter(e.target.value)}
           className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="ALL">全部</option>
