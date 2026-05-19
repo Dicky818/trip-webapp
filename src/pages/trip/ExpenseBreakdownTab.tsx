@@ -89,6 +89,15 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
     return map;
   }, [activeCategories]);
 
+  // 計算每筆支出的分撤金額（選擇特定成員時：金額 ÷ 分撤人數；全部時：原始金額）
+  const getEffectiveAmount = (e: Expense): number => {
+    const total = parseFloat(String(e.Base_Amount)) || 0;
+    if (selectedSplitter === 'ALL') return total;
+    const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
+    const count = splitters.length;
+    return count > 0 ? total / count : total;
+  };
+
   // 建立查找表：main → sub → date → amount
   const amountMap = useMemo(() => {
     const map: Record<string, Record<string, Record<string, number>>> = {};
@@ -96,18 +105,18 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
       const main = e.Main_Category || '（未分類）';
       const sub = e.Sub_Category || '（未分類）';
       const date = e.Date?.includes('T') ? e.Date.slice(0, 10) : (e.Date || '');
-      const amt = parseFloat(String(e.Base_Amount)) || 0;
+      const amt = getEffectiveAmount(e);
       if (!map[main]) map[main] = {};
       if (!map[main][sub]) map[main][sub] = {};
       map[main][sub][date] = (map[main][sub][date] || 0) + amt;
     });
     return map;
-  }, [filteredExpenses]);
+  }, [filteredExpenses, selectedSplitter]);
 
   // 總支出（用於計算百分比）
   const grandTotal = useMemo(() =>
-    filteredExpenses.reduce((sum, e) => sum + (parseFloat(String(e.Base_Amount)) || 0), 0),
-    [filteredExpenses]
+    filteredExpenses.reduce((sum, e) => sum + getEffectiveAmount(e), 0),
+    [filteredExpenses, selectedSplitter]
   );
 
   // 每個主分類的小計（按日期）
@@ -150,10 +159,10 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
     const result: Record<string, number> = {};
     filteredExpenses.forEach(e => {
       const date = e.Date?.includes('T') ? e.Date.slice(0, 10) : (e.Date || '');
-      result[date] = (result[date] || 0) + (parseFloat(String(e.Base_Amount)) || 0);
+      result[date] = (result[date] || 0) + getEffectiveAmount(e);
     });
     return result;
-  }, [filteredExpenses]);
+  }, [filteredExpenses, selectedSplitter]);
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
   if (expenses.length === 0) return (
