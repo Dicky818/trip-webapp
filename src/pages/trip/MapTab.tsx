@@ -117,7 +117,8 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
   // 初始化地圖
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
-    const map = L.map(mapContainerRef.current, {
+    const container = mapContainerRef.current;
+    const map = L.map(container, {
       center: [35.6762, 139.6503],
       zoom: 12,
       zoomControl: true,
@@ -127,6 +128,8 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
       maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
+    // 確保容器尺寸正確後重新計算
+    setTimeout(() => { map.invalidateSize(); }, 100);
     return () => {
       map.remove();
       mapRef.current = null;
@@ -293,7 +296,7 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ minHeight: '600px' }}>
+    <div className="flex flex-col" style={{ minHeight: '600px' }}>
       {/* 天數切換列 */}
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100 flex-shrink-0">
         <button
@@ -327,9 +330,9 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
         </button>
       </div>
 
-      {/* 地圖區域（40%） */}
-      <div className="relative flex-shrink-0" style={{ height: '40%', minHeight: '240px' }}>
-        <div ref={mapContainerRef} className="w-full h-full" />
+      {/* 地圖區域（固定高度 280px） */}
+      <div className="relative flex-shrink-0" style={{ height: '280px' }}>
+        <div ref={mapContainerRef} style={{ width: '100%', height: '280px' }} />
         {/* Geocoding 載入指示 */}
         {geocoding && (
           <div className="absolute top-2 right-2 z-[1000] bg-white rounded-lg shadow px-3 py-1.5 flex items-center gap-2 text-xs text-slate-600">
