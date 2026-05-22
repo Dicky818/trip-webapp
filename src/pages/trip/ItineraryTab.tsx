@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -10,6 +10,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { api, Trip, ItineraryItem, Accommodation, DayAccommodation } from '../../api/gasApi';
 import { Button, Modal, Input, Select, Textarea, EmptyState, ConfirmDialog, Spinner } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
+import MapTab from './MapTab';
 
 interface Props { trip: Trip; }
 
@@ -90,6 +91,8 @@ export default function ItineraryTab({ trip }: Props) {
   const [dayAccommodations, setDayAccommodations] = useState<DayAccommodation[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
+  const [activeSubTab, setActiveSubTab] = useState<'list' | 'map'>('list');
+  const [selectedDay, setSelectedDay] = useState<number>(1);
 
   // Item modal
   const [showItemModal, setShowItemModal] = useState(false);
@@ -257,7 +260,39 @@ export default function ItineraryTab({ trip }: Props) {
   ];
 
   return (
-    <div className="p-5">
+    <div>
+      {/* 子分頁切換 */}
+      <div className="flex gap-1 mx-5 mt-5 mb-4 bg-slate-100 rounded-xl p-1">
+        <button
+          onClick={() => setActiveSubTab('list')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors
+            ${activeSubTab === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <List size={14} /> 每日行程
+        </button>
+        <button
+          onClick={() => setActiveSubTab('map')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors
+            ${activeSubTab === 'map' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <MapPin size={14} /> 地圖
+        </button>
+      </div>
+
+      {/* 地圖子分頁 */}
+      {activeSubTab === 'map' && (
+        <MapTab
+          trip={trip}
+          items={items}
+          selectedDay={selectedDay}
+          onDayChange={setSelectedDay}
+          tripDays={tripDays}
+        />
+      )}
+
+      {/* 每日行程子分頁 */}
+      {activeSubTab === 'list' && (
+      <div className="px-5 pb-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-slate-900">每日行程</h3>
         <Button size="sm" variant="outline" onClick={() => setShowCopyModal(true)}>
@@ -391,6 +426,8 @@ export default function ItineraryTab({ trip }: Props) {
       {/* 刪除確認 */}
       <ConfirmDialog open={!!deleteItem} onClose={() => setDeleteItem(null)} onConfirm={handleDeleteItem}
         title="刪除行程項目" message={`確定要刪除「${deleteItem?.Activity}」嗎？`} loading={deletingItem} />
+      </div>
+      )}
     </div>
   );
 }
