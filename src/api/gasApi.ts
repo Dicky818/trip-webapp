@@ -100,6 +100,8 @@ export interface ItineraryItem {
   Sort_Order: string | number;
   Created_At: string;
   Updated_At: string;
+  Lat?: string | number;
+  Lng?: string | number;
 }
 
 export interface DayAccommodation {

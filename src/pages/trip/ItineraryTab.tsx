@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin } from 'lucide-react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon } from 'lucide-react';
+import L from 'leaflet';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -97,10 +98,17 @@ export default function ItineraryTab({ trip }: Props) {
   // Item modal
   const [showItemModal, setShowItemModal] = useState(false);
   const [editItem, setEditItem] = useState<ItineraryItem | null>(null);
-  const [itemForm, setItemForm] = useState<{ Day_Number: string; Time: string; Activity: string }>({ Day_Number: '1', Time: '', Activity: '' });
+  const [itemForm, setItemForm] = useState<{ Day_Number: string; Time: string; Activity: string; Lat: string; Lng: string }>({ Day_Number: '1', Time: '', Activity: '', Lat: '', Lng: '' });
   const [savingItem, setSavingItem] = useState(false);
   const [deleteItem, setDeleteItem] = useState<ItineraryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState(false);
+  const [latLngError, setLatLngError] = useState('');
+
+  // 彈出式地圖選取 Modal
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const mapPickerRef = useRef<HTMLDivElement>(null);
+  const mapPickerInstance = useRef<L.Map | null>(null);
+  const mapPickerMarker = useRef<L.Marker | null>(null);
 
   // Copy day modal
   const [showCopyModal, setShowCopyModal] = useState(false);
@@ -153,24 +161,40 @@ export default function ItineraryTab({ trip }: Props) {
 
   const openItemModal = (day: number, item?: ItineraryItem) => {
     setEditItem(item || null);
+    setLatLngError('');
     setItemForm(item
-      ? { Day_Number: String(item.Day_Number), Time: item.Time || '', Activity: item.Activity }
-      : { Day_Number: String(day), Time: '', Activity: '' }
+      ? { Day_Number: String(item.Day_Number), Time: item.Time || '', Activity: item.Activity, Lat: item.Lat !== undefined && item.Lat !== '' ? String(item.Lat) : '', Lng: item.Lng !== undefined && item.Lng !== '' ? String(item.Lng) : '' }
+      : { Day_Number: String(day), Time: '', Activity: '', Lat: '', Lng: '' }
     );
     setShowItemModal(true);
   };
 
+  // 驗證座標格式
+  const validateLatLng = (lat: string, lng: string): boolean => {
+    if (!lat && !lng) return true; // 允許空白
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    if (isNaN(latNum) || isNaN(lngNum)) { setLatLngError('請輸入有效的數字座標'); return false; }
+    if (latNum < -90 || latNum > 90) { setLatLngError('緯度必須介於 -90 至 90 之間'); return false; }
+    if (lngNum < -180 || lngNum > 180) { setLatLngError('經度必須介於 -180 至 180 之間'); return false; }
+    setLatLngError('');
+    return true;
+  };
+
   const handleSaveItem = async () => {
     if (!itemForm.Activity.trim()) { showToast('請輸入活動內容', 'error'); return; }
+    if (!validateLatLng(itemForm.Lat, itemForm.Lng)) return;
     setSavingItem(true);
     try {
       const dayInfo = tripDays.find(d => d.day === Number(itemForm.Day_Number));
-      const payload = {
+      const payload: Partial<ItineraryItem> = {
         Trip_ID: trip.Trip_ID,
         Day_Number: Number(itemForm.Day_Number),
         Date: dayInfo?.date || '',
         Time: itemForm.Time,
         Activity: itemForm.Activity,
+        Lat: itemForm.Lat !== '' ? itemForm.Lat : '',
+        Lng: itemForm.Lng !== '' ? itemForm.Lng : '',
       };
       if (editItem) {
         await api.updateItineraryItem(editItem.Itinerary_ID, payload);
@@ -183,6 +207,91 @@ export default function ItineraryTab({ trip }: Props) {
     } catch (e: any) { showToast(e.message || '儲存失敗', 'error'); }
     finally { setSavingItem(false); }
   };
+
+  // 初始化地圖選取器
+  const initMapPicker = useCallback(() => {
+    if (!mapPickerRef.current || mapPickerInstance.current) return;
+    const initLat = parseFloat(itemForm.Lat) || 35.6762;
+    const initLng = parseFloat(itemForm.Lng) || 139.6503;
+    const map = L.map(mapPickerRef.current, { center: [initLat, initLng], zoom: 13 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(map);
+
+    // 若已有座標，顯示初始標記
+    if (itemForm.Lat && itemForm.Lng) {
+      const marker = L.marker([initLat, initLng], { draggable: true }).addTo(map);
+      mapPickerMarker.current = marker;
+    }
+
+    // 點擊地圖放置/移動標記
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+      if (mapPickerMarker.current) {
+        mapPickerMarker.current.setLatLng([lat, lng]);
+      } else {
+        const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+        mapPickerMarker.current = marker;
+      }
+    });
+
+    setTimeout(() => map.invalidateSize(), 100);
+    mapPickerInstance.current = map;
+  }, [itemForm.Lat, itemForm.Lng]);
+
+  const openMapPicker = () => {
+    setShowMapPicker(true);
+    setTimeout(initMapPicker, 50);
+  };
+
+  const confirmMapPicker = () => {
+    if (mapPickerMarker.current) {
+      const { lat, lng } = mapPickerMarker.current.getLatLng();
+      setItemForm(f => ({ ...f, Lat: lat.toFixed(6), Lng: lng.toFixed(6) }));
+      setLatLngError('');
+    }
+    if (mapPickerInstance.current) {
+      mapPickerInstance.current.remove();
+      mapPickerInstance.current = null;
+      mapPickerMarker.current = null;
+    }
+    setShowMapPicker(false);
+  };
+
+  const closeMapPicker = () => {
+    if (mapPickerInstance.current) {
+      mapPickerInstance.current.remove();
+      mapPickerInstance.current = null;
+      mapPickerMarker.current = null;
+    }
+    setShowMapPicker(false);
+  };
+
+  // 從 MapTab 更新座標（拖拽/長按）
+  const handleUpdateItemCoords = useCallback(async (itineraryId: string, lat: number, lng: number) => {
+    try {
+      await api.updateItineraryItem(itineraryId, { Lat: lat.toFixed(6), Lng: lng.toFixed(6) });
+      setItems(prev => prev.map(i => i.Itinerary_ID === itineraryId ? { ...i, Lat: lat.toFixed(6), Lng: lng.toFixed(6) } : i));
+    } catch (e: any) { showToast('座標儲存失敗', 'error'); }
+  }, []);
+
+  // 從 MapTab 新增景點（長按地圖）
+  const handleCreateItemFromMap = useCallback(async (day: number, lat: number, lng: number, activity: string) => {
+    try {
+      const dayInfo = tripDays.find(d => d.day === day);
+      await api.createItineraryItem({
+        Trip_ID: trip.Trip_ID,
+        Day_Number: day,
+        Date: dayInfo?.date || '',
+        Time: '',
+        Activity: activity,
+        Lat: lat.toFixed(6),
+        Lng: lng.toFixed(6),
+      });
+      showToast('景點已新增');
+      await fetchAll();
+    } catch (e: any) { showToast(e.message || '新增失敗', 'error'); }
+  }, [trip.Trip_ID, tripDays]);
 
   const handleDeleteItem = async () => {
     if (!deleteItem) return;
@@ -287,6 +396,8 @@ export default function ItineraryTab({ trip }: Props) {
           selectedDay={selectedDay}
           onDayChange={setSelectedDay}
           tripDays={tripDays}
+          onUpdateCoords={handleUpdateItemCoords}
+          onCreateItem={handleCreateItemFromMap}
         />
       )}
 
@@ -402,8 +513,67 @@ export default function ItineraryTab({ trip }: Props) {
             onChange={e => setItemForm(f => ({ ...f, Time: e.target.value }))} />
           <Textarea label="活動內容" required placeholder="例如：參觀淺草寺" value={itemForm.Activity} rows={3}
             onChange={e => setItemForm(f => ({ ...f, Activity: e.target.value }))} />
+
+          {/* 座標輸入 */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-medium text-slate-700">座標（選填）</label>
+              <button type="button" onClick={openMapPicker}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                <Navigation size={12} /> 在地圖上選取
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number" step="any" placeholder="緯度（如 25.0339）"
+                value={itemForm.Lat}
+                onChange={e => { setItemForm(f => ({ ...f, Lat: e.target.value })); setLatLngError(''); }}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="number" step="any" placeholder="經度（如 121.5645）"
+                value={itemForm.Lng}
+                onChange={e => { setItemForm(f => ({ ...f, Lng: e.target.value })); setLatLngError(''); }}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {latLngError && <p className="text-xs text-red-500 mt-1">{latLngError}</p>}
+            {itemForm.Lat && itemForm.Lng && !latLngError && (
+              <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                <MapPin size={11} /> 已設定座標：{parseFloat(itemForm.Lat).toFixed(5)}, {parseFloat(itemForm.Lng).toFixed(5)}
+              </p>
+            )}
+          </div>
         </div>
       </Modal>
+
+      {/* 彈出式地圖選取 Modal */}
+      {showMapPicker && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ height: '70vh' }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-semibold text-slate-900 text-sm">在地圖上選取位置</h3>
+                <p className="text-xs text-slate-500 mt-0.5">點擊地圖任意位置以放置標記</p>
+              </div>
+              <button onClick={closeMapPicker} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                <XIcon size={16} />
+              </button>
+            </div>
+            <div ref={mapPickerRef} className="flex-1" style={{ minHeight: 0 }} />
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-100">
+              <button onClick={closeMapPicker}
+                className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+                取消
+              </button>
+              <button onClick={confirmMapPicker}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium">
+                確認位置
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 複製行程 Modal */}
       <Modal open={showCopyModal} onClose={() => setShowCopyModal(false)} title="複製行程"
