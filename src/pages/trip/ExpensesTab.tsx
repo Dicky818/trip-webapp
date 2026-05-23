@@ -25,6 +25,9 @@ export default function ExpensesTab({ trip }: Props) {
     Date: '', Main_Category: '', Sub_Category: '', Note: '',
     Original_Amount: '', Currency: trip.Base_Currency,
     Exchange_Rate: '1', Payer: '', splitterIds: [],
+    Flight_No: '', Airline: '', Departure_Location: '', Arrival_Location: '',
+    Flight_Date: '', Departure_Time: '', Arrival_Date: '', Arrival_Time: '', Flight_Status: '',
+    Accommodation_Address: '', Check_In_Date: '', Check_Out_Date: '',
   });
   const [savingExpense, setSavingExpense] = useState(false);
   const [deleteExpense, setDeleteExpense] = useState<Expense | null>(null);
@@ -121,6 +124,18 @@ export default function ExpensesTab({ trip }: Props) {
         Exchange_Rate: String(expense.Exchange_Rate || '1'),
         Payer: expense.Payer || '',
         splitterIds,
+        Flight_No: expense.Flight_No || '',
+        Airline: expense.Airline || '',
+        Departure_Location: expense.Departure_Location || '',
+        Arrival_Location: expense.Arrival_Location || '',
+        Flight_Date: expense.Flight_Date || '',
+        Departure_Time: expense.Departure_Time || '',
+        Arrival_Date: expense.Arrival_Date || '',
+        Arrival_Time: expense.Arrival_Time || '',
+        Flight_Status: expense.Flight_Status || '',
+        Accommodation_Address: expense.Accommodation_Address || '',
+        Check_In_Date: expense.Check_In_Date || '',
+        Check_Out_Date: expense.Check_Out_Date || '',
       });
     } else {
       setExpenseForm({
@@ -145,6 +160,8 @@ export default function ExpensesTab({ trip }: Props) {
     if (!expenseForm.Payer) { showToast('請選擇付款人', 'error'); return; }
     setSavingExpense(true);
     try {
+      const isFlightCategory = expenseForm.Main_Category === '機票' || expenseForm.Sub_Category === '機票';
+      const isAccommodationCategory = expenseForm.Main_Category === '住宿' || expenseForm.Sub_Category === '住宿';
       const payload: Partial<Expense> = {
         Trip_ID: trip.Trip_ID,
         Date: expenseForm.Date,
@@ -157,6 +174,22 @@ export default function ExpensesTab({ trip }: Props) {
         Base_Amount: parseFloat(baseAmount),
         Payer: expenseForm.Payer,
         Splitters: expenseForm.splitterIds?.join(',') || '',
+        ...(isFlightCategory ? {
+          Flight_No: expenseForm.Flight_No,
+          Airline: expenseForm.Airline,
+          Departure_Location: expenseForm.Departure_Location,
+          Arrival_Location: expenseForm.Arrival_Location,
+          Flight_Date: expenseForm.Flight_Date,
+          Departure_Time: expenseForm.Departure_Time,
+          Arrival_Date: expenseForm.Arrival_Date,
+          Arrival_Time: expenseForm.Arrival_Time,
+          Flight_Status: expenseForm.Flight_Status,
+        } : {}),
+        ...(isAccommodationCategory ? {
+          Accommodation_Address: expenseForm.Accommodation_Address,
+          Check_In_Date: expenseForm.Check_In_Date,
+          Check_Out_Date: expenseForm.Check_Out_Date,
+        } : {}),
       };
       if (editExpense) {
         await api.updateExpense(editExpense.Expense_ID, payload);
@@ -364,27 +397,10 @@ export default function ExpensesTab({ trip }: Props) {
                 </p>
               </Card>
 
-              {/* 分類統計 */}
-              {Object.keys(settlement.categoryStats || {}).length > 0 && (
-                <Card className="p-4">
-                  <p className="text-sm font-semibold text-slate-700 mb-3">分類統計</p>
-                  <div className="space-y-2">
-                    {Object.entries(settlement.categoryStats).map(([cat, amt]) => (
-                      <div key={cat} className="flex items-center justify-between">
-                        <span className="text-sm text-slate-600">{cat}</span>
-                        <span className="text-sm font-medium text-slate-900">
-                          {trip.Base_Currency} {Number(amt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {/* 個人結算 */}
+              {/* 個人結算摘要 */}
               {Object.keys(settlement.memberBalances || {}).length > 0 && (
                 <Card className="p-4">
-                  <p className="text-sm font-semibold text-slate-700 mb-3">個人結算</p>
+                  <p className="text-sm font-semibold text-slate-700 mb-3">個人結算摘要</p>
                   <div className="space-y-2">
                     {Object.entries(settlement.memberBalances).map(([member, balance]) => (
                       <div key={member} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
@@ -394,7 +410,8 @@ export default function ExpensesTab({ trip }: Props) {
                             {Number(balance) >= 0 ? '+' : ''}{Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {trip.Base_Currency}
                           </span>
                           <p className="text-xs text-slate-400">
-                            已付 {Number(settlement.memberPaid?.[member] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            已付 {Number(settlement.memberPaid?.[member] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·
+                            應付 {Number(settlement.memberOwed?.[member] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
                       </div>
@@ -403,10 +420,62 @@ export default function ExpensesTab({ trip }: Props) {
                 </Card>
               )}
 
-              {/* 轉帳建議 */}
+              {/* 轉帳矩陣 */}
+              {Object.keys(settlement.memberBalances || {}).length > 0 && (
+                <Card className="p-4">
+                  <p className="text-sm font-semibold text-slate-700 mb-3">轉帳矩陣（誰欠誰多少）</p>
+                  {(() => {
+                    const memberList = Object.keys(settlement.memberBalances || {});
+                    // Build matrix: matrix[from][to] = amount
+                    const matrix: Record<string, Record<string, number>> = {};
+                    memberList.forEach(m => { matrix[m] = {}; memberList.forEach(n => { matrix[m][n] = 0; }); });
+                    (settlement.settlements || []).forEach(s => {
+                      if (matrix[s.from]) matrix[s.from][s.to] = s.amount;
+                    });
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="text-xs border-collapse w-full">
+                          <thead>
+                            <tr>
+                              <th className="px-2 py-1.5 text-left text-slate-500 font-medium border-b border-slate-200 whitespace-nowrap">
+                                付款方 ↓ / 收款方 →
+                              </th>
+                              {memberList.map(to => (
+                                <th key={to} className="px-3 py-1.5 text-center text-slate-700 font-semibold border-b border-slate-200 whitespace-nowrap">
+                                  {to}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {memberList.map(from => (
+                              <tr key={from} className="border-b border-slate-100">
+                                <td className="px-2 py-2 font-semibold text-slate-700 whitespace-nowrap">{from}</td>
+                                {memberList.map(to => {
+                                  const amt = matrix[from]?.[to] || 0;
+                                  const isSelf = from === to;
+                                  return (
+                                    <td key={to} className={`px-3 py-2 text-center whitespace-nowrap
+                                      ${isSelf ? 'bg-slate-50 text-slate-300' : amt > 0 ? 'bg-red-50 text-red-600 font-semibold' : 'text-slate-300'}`}>
+                                      {isSelf ? '—' : amt > 0 ? `${trip.Base_Currency} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '0'}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <p className="text-xs text-slate-400 mt-2">表格中的金額表示「行成員」需要轉帳給「列成員」的金額</p>
+                      </div>
+                    );
+                  })()}
+                </Card>
+              )}
+
+              {/* 建議轉帳（文字版） */}
               {(settlement.settlements || []).length > 0 && (
                 <Card className="p-4">
-                  <p className="text-sm font-semibold text-slate-700 mb-3">建議轉帳</p>
+                  <p className="text-sm font-semibold text-slate-700 mb-3">建議轉帳步驟</p>
                   <div className="space-y-2">
                     {settlement.settlements.map((s, i) => (
                       <div key={i} className="flex items-center gap-2 p-2.5 bg-blue-50 rounded-lg">
@@ -531,6 +600,56 @@ export default function ExpensesTab({ trip }: Props) {
               )}
             </div>
           </div>
+
+          {/* 機票額外欄位 */}
+          {(expenseForm.Main_Category === '機票' || expenseForm.Sub_Category === '機票') && (
+            <>
+              <div className="col-span-2 border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">機票資訊</p>
+              </div>
+              <Input label="航班號" placeholder="例如：CX543" value={expenseForm.Flight_No || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Flight_No: e.target.value }))} />
+              <Input label="航空公司" placeholder="例如：國泰航空" value={expenseForm.Airline || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Airline: e.target.value }))} />
+              <Input label="出發地" placeholder="例如：香港 (HKG)" value={expenseForm.Departure_Location || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Departure_Location: e.target.value }))} />
+              <Input label="目的地" placeholder="例如：東京成田 (NRT)" value={expenseForm.Arrival_Location || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Arrival_Location: e.target.value }))} />
+              <Input label="航班日期（出發）" type="date" value={expenseForm.Flight_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Flight_Date: e.target.value }))} />
+              <Select label="狀態" value={expenseForm.Flight_Status || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Flight_Status: e.target.value }))}
+                options={[
+                  { value: '', label: '（選擇狀態）' },
+                  { value: 'confirmed', label: '已確認' },
+                  { value: 'pending', label: '待確認' },
+                  { value: 'cancelled', label: '已取消' },
+                ]} />
+              <Input label="出發時間" type="time" value={expenseForm.Departure_Time || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Departure_Time: e.target.value }))} />
+              <Input label="到達日期" type="date" value={expenseForm.Arrival_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Arrival_Date: e.target.value }))} />
+              <Input label="到達時間" type="time" value={expenseForm.Arrival_Time || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Arrival_Time: e.target.value }))} />
+            </>
+          )}
+
+          {/* 住宿額外欄位 */}
+          {(expenseForm.Main_Category === '住宿' || expenseForm.Sub_Category === '住宿') && (
+            <>
+              <div className="col-span-2 border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">住宿資訊</p>
+              </div>
+              <div className="col-span-2">
+                <Input label="地址" placeholder="例如：東京都新宿區..." value={expenseForm.Accommodation_Address || ''}
+                  onChange={e => setExpenseForm(f => ({ ...f, Accommodation_Address: e.target.value }))} />
+              </div>
+              <Input label="入住日期" type="date" value={expenseForm.Check_In_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Check_In_Date: e.target.value }))} />
+              <Input label="退房日期" type="date" value={expenseForm.Check_Out_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Check_Out_Date: e.target.value }))} />
+            </>
+          )}
         </div>
       </Modal>
 

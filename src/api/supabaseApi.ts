@@ -15,6 +15,17 @@ export interface Trip {
   Created_At: string;
   Updated_At: string;
   Status: string;
+  Share_Code?: string;
+  Share_Password?: string;
+  Is_Owner?: boolean;
+}
+
+export interface TripCollaborator {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  role: 'owner' | 'collaborator';
+  joined_at: string;
 }
 
 export interface Flight {
@@ -68,7 +79,9 @@ export interface ItineraryItem {
   Day_Number: string | number;
   Date: string;
   Time: string;
+  Activity_Name?: string;
   Activity: string;
+  Note?: string;
   Location?: string;
   Sort_Order: string | number;
   Created_At: string;
@@ -101,6 +114,20 @@ export interface Expense {
   Payer: string;
   Splitters: string;
   Is_Settled?: string | boolean;
+  // Flight-specific fields
+  Flight_No?: string;
+  Airline?: string;
+  Departure_Location?: string;
+  Arrival_Location?: string;
+  Flight_Date?: string;
+  Departure_Time?: string;
+  Arrival_Date?: string;
+  Arrival_Time?: string;
+  Flight_Status?: string;
+  // Accommodation-specific fields
+  Accommodation_Address?: string;
+  Check_In_Date?: string;
+  Check_Out_Date?: string;
   Created_At: string;
   Updated_At: string;
 }
@@ -151,6 +178,8 @@ function rowToTrip(r: Record<string, unknown>): Trip {
     Created_At: (r.created_at as string) || '',
     Updated_At: (r.updated_at as string) || '',
     Status: 'active',
+    Share_Code: (r.share_code as string) || '',
+    Share_Password: (r.share_password as string) || '',
   };
 }
 
@@ -212,7 +241,9 @@ function rowToItinerary(r: Record<string, unknown>): ItineraryItem {
     Day_Number: r.day_number as number,
     Date: (r.date as string) || '',
     Time: (r.time as string) || '',
+    Activity_Name: (r.activity_name as string) || '',
     Activity: (r.activity as string) || '',
+    Note: (r.note as string) || '',
     Location: (r.location as string) || '',
     Sort_Order: (r.sort_order as number) || 0,
     Lat: r.lat as number | undefined,
@@ -237,6 +268,18 @@ function rowToExpense(r: Record<string, unknown>): Expense {
     Payer: (r.payer as string) || '',
     Splitters: (r.splitters as string) || '',
     Is_Settled: r.is_settled as boolean,
+    Flight_No: (r.flight_no as string) || '',
+    Airline: (r.airline as string) || '',
+    Departure_Location: (r.departure_location as string) || '',
+    Arrival_Location: (r.arrival_location as string) || '',
+    Flight_Date: (r.flight_date as string) || '',
+    Departure_Time: (r.departure_time as string) || '',
+    Arrival_Date: (r.arrival_date as string) || '',
+    Arrival_Time: (r.arrival_time as string) || '',
+    Flight_Status: (r.flight_status as string) || '',
+    Accommodation_Address: (r.accommodation_address as string) || '',
+    Check_In_Date: (r.check_in_date as string) || '',
+    Check_Out_Date: (r.check_out_date as string) || '',
     Created_At: (r.created_at as string) || '',
     Updated_At: (r.updated_at as string) || '',
   };
@@ -301,7 +344,7 @@ function calcSettlement(expenses: Expense[], members: string[]): Settlement {
     memberBalances[m] = (memberPaid[m] || 0) - (memberOwed[m] || 0);
   });
 
-  // Greedy settlement algorithm
+  // Matrix settlement algorithm (who owes whom)
   const settlements: Array<{ from: string; to: string; amount: number }> = [];
   const bal = { ...memberBalances };
   const debtors = Object.entries(bal).filter(([, v]) => v < -0.01).sort((a, b) => a[1] - b[1]);
@@ -341,22 +384,70 @@ export const api = {
 
   // ── Trips ────────────────────────────────────────────────
   getTrips: async () => {
-    const { data, error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return err('User not logged in');
+
+    // Get trips owned by user
+    const { data: ownedTrips, error: ownedError } = await supabase
       .from('trips')
       .select('*')
-      .order('start_date', { ascending: false });
-    if (error) return err(error.message);
-    return ok((data || []).map(rowToTrip));
+      .eq('user_id', user.id);
+
+    if (ownedError) return err(ownedError.message);
+
+    // Get trips where user is a collaborator
+    const { data: collabRecords, error: collabError } = await supabase
+      .from('trip_collaborators')
+      .select('trip_id')
+      .eq('user_id', user.id);
+
+    if (collabError) return err(collabError.message);
+
+    let collabTrips: any[] = [];
+    if (collabRecords && collabRecords.length > 0) {
+      const tripIds = collabRecords.map(r => r.trip_id);
+      const { data: sharedTrips, error: sharedError } = await supabase
+        .from('trips')
+        .select('*')
+        .in('id', tripIds);
+        
+      if (!sharedError && sharedTrips) {
+        collabTrips = sharedTrips;
+      }
+    }
+
+    // Combine and deduplicate
+    const allTripsMap = new Map();
+    
+    (ownedTrips || []).forEach(t => {
+      allTripsMap.set(t.id, { ...rowToTrip(t), Is_Owner: true });
+    });
+    
+    collabTrips.forEach(t => {
+      if (!allTripsMap.has(t.id)) {
+        allTripsMap.set(t.id, { ...rowToTrip(t), Is_Owner: false });
+      }
+    });
+
+    const result = Array.from(allTripsMap.values()).sort((a, b) => {
+      return new Date(b.Start_Date).getTime() - new Date(a.Start_Date).getTime();
+    });
+
+    return ok(result);
   },
 
   getTripById: async (tripId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('trips')
       .select('*')
       .eq('id', tripId)
       .single();
     if (error) return err(error.message);
-    return ok(rowToTrip(data));
+    const trip = rowToTrip(data);
+    // Check if current user is the owner
+    const isOwner = user && data.user_id === user.id;
+    return ok({ ...trip, Is_Owner: !!isOwner });
   },
 
   createTrip: async (body: Partial<Trip>) => {
@@ -389,6 +480,76 @@ export const api = {
 
   deleteTrip: async (tripId: string) => {
     const { error } = await supabase.from('trips').delete().eq('id', tripId);
+    if (error) return err(error.message);
+    return ok(null);
+  },
+
+  // ── Trip Sharing ─────────────────────────────────────────
+  generateShareCode: async (tripId: string) => {
+    const shareCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const sharePassword = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    const { error } = await supabase
+      .from('trips')
+      .update({ share_code: shareCode, share_password: sharePassword })
+      .eq('id', tripId);
+      
+    if (error) return err(error.message);
+    return ok({ shareCode, sharePassword });
+  },
+
+  joinTripByCode: async (shareCode: string, sharePassword: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return err('User not logged in');
+
+    // Find the trip
+    const { data: trip, error: tripError } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('share_code', shareCode)
+      .eq('share_password', sharePassword)
+      .single();
+
+    if (tripError || !trip) return err('Invalid share code or password');
+
+    // Check if already a collaborator
+    const { data: existing } = await supabase
+      .from('trip_collaborators')
+      .select('id')
+      .eq('trip_id', trip.id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (existing) return ok({ Trip_ID: trip.id });
+
+    // Add as collaborator
+    const { error: joinError } = await supabase
+      .from('trip_collaborators')
+      .insert({
+        trip_id: trip.id,
+        user_id: user.id,
+        role: 'collaborator'
+      });
+
+    if (joinError) return err(joinError.message);
+    return ok({ Trip_ID: trip.id });
+  },
+
+  getTripCollaborators: async (tripId: string) => {
+    const { data, error } = await supabase
+      .from('trip_collaborators')
+      .select('*')
+      .eq('trip_id', tripId);
+      
+    if (error) return err(error.message);
+    return ok(data as TripCollaborator[]);
+  },
+
+  removeCollaborator: async (collaboratorId: string) => {
+    const { error } = await supabase
+      .from('trip_collaborators')
+      .delete()
+      .eq('id', collaboratorId);
     if (error) return err(error.message);
     return ok(null);
   },
@@ -564,7 +725,9 @@ export const api = {
         day_number: Number(body.Day_Number) || 1,
         date: body.Date || null,
         time: body.Time || '',
+        activity_name: body.Activity_Name || '',
         activity: body.Activity || '',
+        note: body.Note || '',
         location: body.Location || '',
         sort_order: Number(body.Sort_Order) || 0,
         lat: body.Lat ? Number(body.Lat) : null,
@@ -581,7 +744,9 @@ export const api = {
     if (body.Day_Number !== undefined) updates.day_number = Number(body.Day_Number);
     if (body.Date !== undefined) updates.date = body.Date || null;
     if (body.Time !== undefined) updates.time = body.Time;
+    if (body.Activity_Name !== undefined) updates.activity_name = body.Activity_Name;
     if (body.Activity !== undefined) updates.activity = body.Activity;
+    if (body.Note !== undefined) updates.note = body.Note;
     if (body.Location !== undefined) updates.location = body.Location;
     if (body.Sort_Order !== undefined) updates.sort_order = Number(body.Sort_Order);
     if (body.Lat !== undefined) updates.lat = body.Lat ? Number(body.Lat) : null;
@@ -711,6 +876,18 @@ export const api = {
         payer: body.Payer || '',
         splitters: body.Splitters || '',
         is_settled: false,
+        flight_no: body.Flight_No || null,
+        airline: body.Airline || null,
+        departure_location: body.Departure_Location || null,
+        arrival_location: body.Arrival_Location || null,
+        flight_date: body.Flight_Date || null,
+        departure_time: body.Departure_Time || null,
+        arrival_date: body.Arrival_Date || null,
+        arrival_time: body.Arrival_Time || null,
+        flight_status: body.Flight_Status || null,
+        accommodation_address: body.Accommodation_Address || null,
+        check_in_date: body.Check_In_Date || null,
+        check_out_date: body.Check_Out_Date || null,
       })
       .select()
       .single();
@@ -729,6 +906,18 @@ export const api = {
     if (body.Is_Settled !== undefined) {
       updates.is_settled = body.Is_Settled === true || String(body.Is_Settled).toUpperCase() === 'TRUE';
     }
+    if (body.Flight_No !== undefined) updates.flight_no = body.Flight_No;
+    if (body.Airline !== undefined) updates.airline = body.Airline;
+    if (body.Departure_Location !== undefined) updates.departure_location = body.Departure_Location;
+    if (body.Arrival_Location !== undefined) updates.arrival_location = body.Arrival_Location;
+    if (body.Flight_Date !== undefined) updates.flight_date = body.Flight_Date || null;
+    if (body.Departure_Time !== undefined) updates.departure_time = body.Departure_Time;
+    if (body.Arrival_Date !== undefined) updates.arrival_date = body.Arrival_Date || null;
+    if (body.Arrival_Time !== undefined) updates.arrival_time = body.Arrival_Time;
+    if (body.Flight_Status !== undefined) updates.flight_status = body.Flight_Status;
+    if (body.Accommodation_Address !== undefined) updates.accommodation_address = body.Accommodation_Address;
+    if (body.Check_In_Date !== undefined) updates.check_in_date = body.Check_In_Date || null;
+    if (body.Check_Out_Date !== undefined) updates.check_out_date = body.Check_Out_Date || null;
 
     // Recalculate base amount if amount or currency changed
     if (body.Original_Amount !== undefined || body.Currency !== undefined) {

@@ -96,7 +96,15 @@ function SortableItem({ item, onEdit, onDelete }: {
       {item.Time && (
         <span className="text-xs font-mono text-slate-500 w-12 flex-shrink-0">{formatTimeDisplay(item.Time)}</span>
       )}
-      <span className="flex-1 text-sm text-slate-800">{item.Activity}</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium text-slate-800">{item.Activity_Name || item.Activity}</span>
+        {item.Activity_Name && item.Activity && (
+          <p className="text-xs text-slate-500 truncate">{item.Activity}</p>
+        )}
+        {item.Note && (
+          <p className="text-xs text-slate-400 truncate italic">{item.Note}</p>
+        )}
+      </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={() => onEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
           <Edit2 size={13} />
@@ -122,7 +130,7 @@ export default function ItineraryTab({ trip }: Props) {
   // Item modal
   const [showItemModal, setShowItemModal] = useState(false);
   const [editItem, setEditItem] = useState<ItineraryItem | null>(null);
-  const [itemForm, setItemForm] = useState<{ Day_Number: string; Time: string; Activity: string; Lat: string; Lng: string }>({ Day_Number: '1', Time: '', Activity: '', Lat: '', Lng: '' });
+  const [itemForm, setItemForm] = useState<{ Day_Number: string; Time: string; Activity_Name: string; Activity: string; Note: string; Lat: string; Lng: string }>({ Day_Number: '1', Time: '', Activity_Name: '', Activity: '', Note: '', Lat: '', Lng: '' });
   const [savingItem, setSavingItem] = useState(false);
   const [deleteItem, setDeleteItem] = useState<ItineraryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState(false);
@@ -256,8 +264,8 @@ export default function ItineraryTab({ trip }: Props) {
     setLocationSuggestions([]);
     setShowSuggestions(false);
     setItemForm(item
-      ? { Day_Number: String(item.Day_Number), Time: item.Time || '', Activity: item.Activity, Lat: item.Lat !== undefined && item.Lat !== '' ? String(item.Lat) : '', Lng: item.Lng !== undefined && item.Lng !== '' ? String(item.Lng) : '' }
-      : { Day_Number: String(day), Time: '', Activity: '', Lat: '', Lng: '' }
+      ? { Day_Number: String(item.Day_Number), Time: item.Time || '', Activity_Name: item.Activity_Name || '', Activity: item.Activity, Note: item.Note || '', Lat: item.Lat !== undefined && item.Lat !== '' ? String(item.Lat) : '', Lng: item.Lng !== undefined && item.Lng !== '' ? String(item.Lng) : '' }
+      : { Day_Number: String(day), Time: '', Activity_Name: '', Activity: '', Note: '', Lat: '', Lng: '' }
     );
     setShowItemModal(true);
   };
@@ -275,7 +283,7 @@ export default function ItineraryTab({ trip }: Props) {
   };
 
   const handleSaveItem = async () => {
-    if (!itemForm.Activity.trim()) { showToast('請輸入活動內容', 'error'); return; }
+    if (!itemForm.Activity_Name.trim()) { showToast('請輸入活動名稱', 'error'); return; }
     if (!validateLatLng(itemForm.Lat, itemForm.Lng)) return;
     setSavingItem(true);
     try {
@@ -285,7 +293,9 @@ export default function ItineraryTab({ trip }: Props) {
         Day_Number: Number(itemForm.Day_Number),
         Date: dayInfo?.date || '',
         Time: itemForm.Time,
+        Activity_Name: itemForm.Activity_Name,
         Activity: itemForm.Activity,
+        Note: itemForm.Note,
         Lat: itemForm.Lat !== '' ? itemForm.Lat : '',
         Lng: itemForm.Lng !== '' ? itemForm.Lng : '',
       };
@@ -602,10 +612,14 @@ export default function ItineraryTab({ trip }: Props) {
           <Select label="日期" required value={itemForm.Day_Number}
             onChange={e => setItemForm(f => ({ ...f, Day_Number: e.target.value }))}
             options={dayOptions} />
-          <Input label="時間" type="time" value={itemForm.Time}
+          <Input label="時間" type="time" required value={itemForm.Time}
             onChange={e => setItemForm(f => ({ ...f, Time: e.target.value }))} />
-          <Textarea label="活動內容" required placeholder="例如：參觀淺草寺" value={itemForm.Activity} rows={3}
+          <Input label="活動名稱" required placeholder="例如：清水寺" value={itemForm.Activity_Name}
+            onChange={e => setItemForm(f => ({ ...f, Activity_Name: e.target.value }))} />
+          <Textarea label="活動內容（選填）" placeholder="例如：參觀清水寺舞台，欣賞京都市景" value={itemForm.Activity} rows={2}
             onChange={e => setItemForm(f => ({ ...f, Activity: e.target.value }))} />
+          <Input label="備註（選填）" placeholder="例如：需要提前購票" value={itemForm.Note}
+            onChange={e => setItemForm(f => ({ ...f, Note: e.target.value }))} />
 
           {/* 地點搜尋（Google Places） */}
           <div className="relative">
@@ -728,7 +742,7 @@ export default function ItineraryTab({ trip }: Props) {
 
       {/* 刪除確認 */}
       <ConfirmDialog open={!!deleteItem} onClose={() => setDeleteItem(null)} onConfirm={handleDeleteItem}
-        title="刪除行程項目" message={`確定要刪除「${deleteItem?.Activity}」嗎？`} loading={deletingItem} />
+        title="刪除行程項目" message={`確定要刪除「${deleteItem?.Activity_Name || deleteItem?.Activity}」嗎？`} loading={deletingItem} />
       </div>
       )}
     </div>

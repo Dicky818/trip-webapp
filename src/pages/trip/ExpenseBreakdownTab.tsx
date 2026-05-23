@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Trip, Expense, Member, TripMember, Category } from '../../api/supabaseApi';
 import { Spinner, EmptyState } from '../../components/ui';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, RefreshCw } from 'lucide-react';
+import { api } from '../../api/supabaseApi';
 
 interface Props {
   trip: Trip;
@@ -11,6 +12,8 @@ interface Props {
   categories: Category[];
   loading: boolean;
 }
+
+const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
 // 解析本地日期字串（避免 UTC 偏移）
 function parseLocalDate(d: string): Date {
@@ -35,24 +38,51 @@ function getTripDates(start: string, end: string): string[] {
   return dates;
 }
 
-// 格式化日期為 M/D（如 2026-08-12 → 8/12）
+// 格式化日期為 M/D
 function formatShortDate(d: string): string {
   const s = d.includes('T') ? d.slice(0, 10) : d;
   const parts = s.split('-');
   return `${parseInt(parts[1] || '0')}/${parseInt(parts[2] || '0')}`;
 }
 
-// 格式化金額（保留兩位小數，0 顯示為空）
-function fmtAmt(n: number, currency: string): string {
-  if (n === 0) return '';
-  return `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+// localStorage key for display currency preference
+const DISPLAY_CURRENCY_KEY = 'trip_display_currency';
 
 export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembers, categories, loading }: Props) {
-  // 分攤成員篩選：'ALL' 或 Member_Name
-  const [selectedSplitter, setSelectedSplitter] = useState<string>('ALL'); // 分攤
+  // 分攤成員篩選
+  const [selectedSplitter, setSelectedSplitter] = useState<string>('ALL');
 
-  // 行程成員（用於篩選下拉）
+  // 顯示貨幣（個人偏好，儲存於 localStorage）
+  const [displayCurrency, setDisplayCurrency] = useState<string>(() => {
+    return localStorage.getItem(DISPLAY_CURRENCY_KEY) || trip.Base_Currency;
+  });
+  const [exchangeRate, setExchangeRate] = useState<number>(1); // base → display
+  const [rateLoading, setRateLoading] = useState(false);
+
+  // 更新 localStorage 並取得匯率
+  const handleCurrencyChange = async (newCurrency: string) => {
+    setDisplayCurrency(newCurrency);
+    localStorage.setItem(DISPLAY_CURRENCY_KEY, newCurrency);
+  };
+
+  // 取得匯率（base → display）
+  useEffect(() => {
+    if (displayCurrency === trip.Base_Currency) {
+      setExchangeRate(1);
+      return;
+    }
+    setRateLoading(true);
+    api.getExchangeRate(trip.Base_Currency, displayCurrency)
+      .then(result => {
+        if (result.success) setExchangeRate(result.rate);
+      })
+      .finally(() => setRateLoading(false));
+  }, [displayCurrency, trip.Base_Currency]);
+
+  // 轉換金額（base → display）
+  const convertAmt = (baseAmt: number) => baseAmt * exchangeRate;
+
+  // 行程成員
   const activeMembers = members.filter(m => String(m.Is_Active).toUpperCase() === 'TRUE');
   const tripMemberIds = new Set(tripMembers.map(tm => tm.Member_ID));
   const tripMemberObjects = activeMembers.filter(m => tripMemberIds.has(m.Member_ID));
@@ -60,17 +90,16 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
   // 行程日期列表
   const tripDates = useMemo(() => getTripDates(trip.Start_Date, trip.End_Date), [trip.Start_Date, trip.End_Date]);
 
-  // 篩選後的支出（按分攤成員篩選） // 分攤
+  // 篩選後的支出
   const filteredExpenses = useMemo(() => {
     if (selectedSplitter === 'ALL') return expenses;
-    // Splitters 是逗號分隔的成員名稱字串
     return expenses.filter(e => {
       const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
       return splitters.includes(selectedSplitter);
     });
   }, [expenses, selectedSplitter]);
 
-  // 建立分類結構：主分類 → 子分類列表（依 categories 順序）
+  // 建立分類結構
   const activeCategories = categories.filter(c => String(c.Is_Active).toUpperCase() === 'TRUE');
   const categoryStructure = useMemo(() => {
     const map: Array<{ main: string; subs: string[] }> = [];
@@ -89,7 +118,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
     return map;
   }, [activeCategories]);
 
-  // 計算每筆支出的分撤金額（選擇特定成員時：金額 ÷ 分撤人數；全部時：原始金額）
+  // 計算每筆支出的分攤金額（base currency）
   const getEffectiveAmount = (e: Expense): number => {
     const total = parseFloat(String(e.Base_Amount)) || 0;
     if (selectedSplitter === 'ALL') return total;
@@ -98,7 +127,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
     return count > 0 ? total / count : total;
   };
 
-  // 建立查找表：main → sub → date → amount
+  // 建立查找表：main → sub → date → amount (in base currency)
   const amountMap = useMemo(() => {
     const map: Record<string, Record<string, Record<string, number>>> = {};
     filteredExpenses.forEach(e => {
@@ -113,7 +142,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
     return map;
   }, [filteredExpenses, selectedSplitter]);
 
-  // 總支出（用於計算百分比）
+  // 總支出
   const grandTotal = useMemo(() =>
     filteredExpenses.reduce((sum, e) => sum + getEffectiveAmount(e), 0),
     [filteredExpenses, selectedSplitter]
@@ -164,17 +193,25 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
     return result;
   }, [filteredExpenses, selectedSplitter]);
 
+  // 格式化顯示金額
+  const fmtAmt = (baseAmt: number, showCurrency = false): string => {
+    if (baseAmt === 0) return '';
+    const displayAmt = convertAmt(baseAmt);
+    const formatted = displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return showCurrency ? `${displayCurrency} ${formatted}` : formatted;
+  };
+
   if (loading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
   if (expenses.length === 0) return (
     <EmptyState icon={<DollarSign size={32} />} title="尚無支出記錄" description="請先在「支出列表」新增支出" />
   );
 
-  const cur = trip.Base_Currency;
+  const grandTotalDisplay = convertAmt(grandTotal);
 
   return (
     <div className="p-4">
       {/* 篩選列 */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <span className="text-sm font-medium text-slate-600 whitespace-nowrap">分攤成員：</span>
         <select
           value={selectedSplitter}
@@ -186,9 +223,40 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
             <option key={m.Member_ID} value={m.Member_Name}>{m.Member_Name}</option>
           ))}
         </select>
-        <span className="text-sm text-slate-500 ml-auto">
-          總計：<span className="font-semibold text-slate-900">{cur} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+
+        {/* 貨幣切換器 */}
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs text-slate-500 whitespace-nowrap">顯示貨幣：</span>
+          <select
+            value={displayCurrency}
+            onChange={e => handleCurrencyChange(e.target.value)}
+            className="text-sm border border-blue-200 rounded-lg px-2 py-1.5 bg-blue-50 text-blue-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {CURRENCIES.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          {rateLoading && <RefreshCw size={13} className="animate-spin text-blue-500" />}
+          {displayCurrency !== trip.Base_Currency && !rateLoading && (
+            <span className="text-xs text-slate-400">
+              1 {trip.Base_Currency} = {exchangeRate.toFixed(4)} {displayCurrency}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 總計 */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-slate-500">
+          總計：<span className="font-semibold text-slate-900">
+            {displayCurrency} {grandTotalDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
         </span>
+        {displayCurrency !== trip.Base_Currency && (
+          <span className="text-xs text-slate-400">
+            ({trip.Base_Currency} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+          </span>
+        )}
       </div>
 
       {/* 表格（橫向捲動） */}
@@ -204,7 +272,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
                   {formatShortDate(date)}
                 </th>
               ))}
-              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap min-w-[90px] border-r border-[#b8996e]">總計</th>
+              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap min-w-[100px] border-r border-[#b8996e]">總計</th>
               <th className="px-3 py-2 text-right font-semibold whitespace-nowrap min-w-[60px]">佔比</th>
             </tr>
           </thead>
@@ -225,12 +293,12 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
                       const amt = mainCategoryDateTotal[main]?.[date] || 0;
                       return (
                         <td key={date} className="px-2 py-2 text-right text-slate-700 border-r border-slate-200 whitespace-nowrap">
-                          {amt > 0 ? `${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                          {fmtAmt(amt)}
                         </td>
                       );
                     })}
                     <td className="px-3 py-2 text-right text-slate-900 font-bold border-r border-slate-200 whitespace-nowrap">
-                      {hasData ? `${cur} ${mainTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                      {hasData ? fmtAmt(mainTotal, true) : ''}
                     </td>
                     <td className="px-3 py-2 text-right text-slate-600 whitespace-nowrap">
                       {hasData ? `${mainPct.toFixed(2)}%` : '0.00%'}
@@ -250,12 +318,12 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
                           const amt = amountMap[main]?.[sub]?.[date] || 0;
                           return (
                             <td key={date} className="px-2 py-1.5 text-right text-slate-700 border-r border-slate-100 whitespace-nowrap">
-                              {amt > 0 ? amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
+                              {fmtAmt(amt)}
                             </td>
                           );
                         })}
                         <td className="px-3 py-1.5 text-right text-slate-800 font-medium border-r border-slate-100 whitespace-nowrap">
-                          {subTotal > 0 ? `${cur} ${subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                          {subTotal > 0 ? fmtAmt(subTotal, true) : ''}
                         </td>
                         <td className="px-3 py-1.5 text-right text-slate-500 whitespace-nowrap">
                           {subTotal > 0 ? `${subPct.toFixed(2)}%` : '0.00%'}
@@ -276,12 +344,12 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
                 const amt = dateTotals[date] || 0;
                 return (
                   <td key={date} className="px-2 py-2 text-right border-r border-[#b8996e] whitespace-nowrap">
-                    {amt > 0 ? amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
+                    {fmtAmt(amt)}
                   </td>
                 );
               })}
               <td className="px-3 py-2 text-right border-r border-[#b8996e] whitespace-nowrap">
-                {cur} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {displayCurrency} {grandTotalDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
               <td className="px-3 py-2 text-right whitespace-nowrap">100%</td>
             </tr>

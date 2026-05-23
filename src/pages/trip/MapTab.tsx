@@ -213,7 +213,7 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
         // 否則用 Nominatim
         results[key] = { status: 'pending' };
         setGeoResults(prev => ({ ...prev, [key]: { status: 'pending' } }));
-        const activity = item.Activity?.trim();
+        const activity = (item.Activity_Name || item.Activity)?.trim();
         if (!activity) {
           results[key] = { status: 'not_found' };
           setGeoResults(prev => ({ ...prev, [key]: { status: 'not_found' } }));
@@ -259,7 +259,7 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
         draggable: true,
       });
 
-      marker.bindPopup(`<b>${idx + 1}. ${item.Activity}</b>${item.Time ? `<br><span style="color:#64748b;font-size:12px">${item.Time}</span>` : ''}${geo!.source === 'manual' ? '<br><span style="color:#10b981;font-size:11px">📍 手動座標</span>' : '<br><span style="color:#94a3b8;font-size:11px">🔍 自動定位</span>'}`);
+      marker.bindPopup(`<b>${idx + 1}. ${item.Activity_Name || item.Activity}</b>${item.Activity_Name && item.Activity ? `<br><span style="color:#64748b;font-size:11px">${item.Activity}</span>` : ''}${item.Time ? `<br><span style="color:#64748b;font-size:12px">${item.Time}</span>` : ''}${geo!.source === 'manual' ? '<br><span style="color:#10b981;font-size:11px">📍 手動座標</span>' : '<br><span style="color:#94a3b8;font-size:11px">🔍 自動定位</span>'}`);
 
       marker.on('click', () => { setActiveIndex(idx); scrollCarouselTo(idx); });
 
@@ -271,10 +271,7 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
         const addr = await reverseGeocode(lat, lng);
         if (addr) {
           const confirmed = window.confirm(`已移動至：\n${addr}\n\n是否要用此地址更新景點名稱「${item.Activity}」？`);
-          if (confirmed) {
-            // 透過 updateItineraryItem 更新名稱（需要從 ItineraryTab 傳入，這裡用 onUpdateCoords 的同層 API）
-            // 此處只更新座標，名稱更新需要用戶在表單中手動確認
-          }
+          // Name update handled in ItineraryTab form
         }
       });
 
@@ -437,8 +434,14 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
                       <div className="flex-1 min-w-0">
                         {item.Time && <span className="text-xs text-slate-400 font-mono">{item.Time}</span>}
                         <p className={`text-sm font-medium mt-0.5 leading-snug ${isActive ? 'text-slate-900' : 'text-slate-600'}`}>
-                          {item.Activity}
+                          {item.Activity_Name || item.Activity}
                         </p>
+                        {item.Activity_Name && item.Activity && (
+                          <p className="text-xs text-slate-400 leading-snug">{item.Activity}</p>
+                        )}
+                        {item.Note && (
+                          <p className="text-xs text-slate-400 italic leading-snug">{item.Note}</p>
+                        )}
                         <div className="mt-2 flex items-center gap-1.5">
                           {isPending && <span className="flex items-center gap-1 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> 定位中...</span>}
                           {isFound && isManual && <span className="flex items-center gap-1 text-xs text-blue-600"><MapPin size={11} /> 手動座標</span>}
