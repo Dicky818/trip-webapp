@@ -127,6 +127,7 @@ export interface Expense {
   Base_Amount: string | number;
   Payer: string;
   Splitters: string;
+  Is_Settled?: string | boolean; // 'TRUE' | 'FALSE' | '' 或 true/false
   Created_At: string;
   Updated_At: string;
 }

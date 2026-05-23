@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Plus, Trash2, Edit2, DollarSign, Users, BarChart2, RefreshCw, ArrowRight, Table2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, DollarSign, Users, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle } from 'lucide-react';
 import { api, Trip, Expense, Member, TripMember, Settlement } from '../../api/gasApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
@@ -30,6 +30,7 @@ export default function ExpensesTab({ trip }: Props) {
   const [deleteExpense, setDeleteExpense] = useState<Expense | null>(null);
   const [deletingExpense, setDeletingExpense] = useState(false);
   const [exchangeRateLoading, setExchangeRateLoading] = useState(false);
+  const [settlingExpenseId, setSettlingExpenseId] = useState<string | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -169,6 +170,19 @@ export default function ExpensesTab({ trip }: Props) {
     finally { setSavingExpense(false); }
   };
 
+  const handleToggleSettled = async (exp: Expense) => {
+    const newVal = !(String(exp.Is_Settled).toUpperCase() === 'TRUE' || exp.Is_Settled === true);
+    setSettlingExpenseId(exp.Expense_ID);
+    try {
+      await api.updateExpense(exp.Expense_ID, { Is_Settled: newVal ? 'TRUE' : 'FALSE' } as any);
+      setExpenses(prev => prev.map(e =>
+        e.Expense_ID === exp.Expense_ID ? { ...e, Is_Settled: newVal ? 'TRUE' : 'FALSE' } : e
+      ));
+      showToast(newVal ? '已標記為付清' : '已取消付清標記');
+    } catch (e: any) { showToast(e.message || '更新失敗', 'error'); }
+    finally { setSettlingExpenseId(null); }
+  };
+
   const handleDeleteExpense = async () => {
     if (!deleteExpense) return;
     setDeletingExpense(true);
@@ -206,8 +220,12 @@ export default function ExpensesTab({ trip }: Props) {
     }));
   };
 
-  // 總計
+  // 已付清判斷工具
+  const isSettled = (exp: Expense) => String(exp.Is_Settled).toUpperCase() === 'TRUE' || exp.Is_Settled === true;
+
+  // 總計（含已付清）
   const totalBase = useMemo(() => expenses.reduce((sum, e) => sum + (parseFloat(String(e.Base_Amount)) || 0), 0), [expenses]);
+  const settledCount = useMemo(() => expenses.filter(isSettled).length, [expenses]);
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
 
@@ -236,6 +254,9 @@ export default function ExpensesTab({ trip }: Props) {
             <div>
               <span className="text-sm text-slate-500">共 {expenses.length} 筆支出</span>
               <span className="ml-2 font-semibold text-slate-900">{trip.Base_Currency} {totalBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              {settledCount > 0 && (
+                <span className="ml-2 text-xs text-emerald-600 font-medium">（{settledCount} 筆已付清）</span>
+              )}
             </div>
             <Button size="sm" onClick={() => openExpenseModal()}>
               <Plus size={14} /> 新增支出
@@ -249,14 +270,16 @@ export default function ExpensesTab({ trip }: Props) {
             <div className="space-y-2">
               {expenses.map(exp => (
                 <div key={exp.Expense_ID}
-                  className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors group">
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-colors group
+                    ${isSettled(exp) ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100 hover:border-blue-200'}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-medium text-slate-900">
+                      <span className={`text-sm font-medium ${isSettled(exp) ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                         {exp.Sub_Category || exp.Main_Category}
-                        {exp.Note && <span className="text-slate-500 font-normal ml-1">— {exp.Note}</span>}
+                        {exp.Note && <span className="font-normal ml-1">— {exp.Note}</span>}
                       </span>
-                      {exp.Main_Category && <Badge color="slate">{exp.Main_Category}</Badge>}
+                      {exp.Main_Category && <Badge color={isSettled(exp) ? 'green' : 'slate'}>{exp.Main_Category}</Badge>}
+                      {isSettled(exp) && <span className="text-xs text-emerald-600 font-medium">已付清</span>}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span>{exp.Date}</span>
@@ -266,10 +289,22 @@ export default function ExpensesTab({ trip }: Props) {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold text-slate-900 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold text-sm ${isSettled(exp) ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                       {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
+                    {/* 已付清按鈕（常駐顯示） */}
+                    <button
+                      onClick={() => handleToggleSettled(exp)}
+                      disabled={settlingExpenseId === exp.Expense_ID}
+                      title={isSettled(exp) ? '取消付清' : '標記為已付清'}
+                      className={`p-1.5 rounded-lg transition-colors flex-shrink-0
+                        ${isSettled(exp)
+                          ? 'text-emerald-500 hover:text-slate-400 hover:bg-slate-100'
+                          : 'text-slate-300 hover:text-emerald-500 hover:bg-emerald-50'}
+                        ${settlingExpenseId === exp.Expense_ID ? 'opacity-50 cursor-wait' : ''}`}>
+                      {isSettled(exp) ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                    </button>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openExpenseModal(exp)}
                         className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
@@ -304,7 +339,12 @@ export default function ExpensesTab({ trip }: Props) {
       {activeSubTab === 'settlement' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">結算分帳</h3>
+            <div>
+              <h3 className="font-semibold text-slate-900">結算分帳</h3>
+              {settledCount > 0 && (
+                <p className="text-xs text-emerald-600 mt-0.5">已排除 {settledCount} 筆已付清支出</p>
+              )}
+            </div>
             <Button size="sm" variant="outline" onClick={fetchSettlement} loading={settlementLoading}>
               <RefreshCw size={14} /> 重新計算
             </Button>
