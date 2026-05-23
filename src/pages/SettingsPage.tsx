@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Link2, Users, Tag, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { api, Member, Category } from '../api/gasApi';
+import { api, Member, Category } from '../api/supabaseApi';
 import { Button, Card, Input, Modal, ConfirmDialog, Badge, Spinner } from '../components/ui';
 
 export default function SettingsPage() {

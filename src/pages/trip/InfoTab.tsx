@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plane, Hotel, Ticket, Plus, Trash2, Edit2, ExternalLink, Clock, MapPin } from 'lucide-react';
-import { api, Trip, Flight, Accommodation, Booking } from '../../api/gasApi';
+import { api, Trip, Flight, Accommodation, Booking } from '../../api/supabaseApi';
 import { Button, Card, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 
@@ -102,9 +102,9 @@ export default function InfoTab({ trip }: Props) {
         api.getAccommodations(trip.Trip_ID),
         api.getBookings(trip.Trip_ID),
       ]);
-      setFlights(f.data || []);
-      setAccommodations(a.data || []);
-      setBookings(b.data || []);
+      setFlights((f as any).data || []);
+      setAccommodations((a as any).data || []);
+      setBookings((b as any).data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };

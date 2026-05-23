@@ -8,10 +8,34 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { api, Trip, ItineraryItem, Accommodation, DayAccommodation } from '../../api/gasApi';
+import { api, Trip, ItineraryItem, Accommodation, DayAccommodation } from '../../api/supabaseApi';
 import { Button, Modal, Input, Select, Textarea, EmptyState, ConfirmDialog, Spinner } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import MapTab from './MapTab';
+
+// Google Places API key
+const GOOGLE_PLACES_API_KEY = 'AIzaSyCgBcqumEfwXfqwdSVwj7q8GOymnY_C6fY';
+
+// Load Google Maps script once
+let googleMapsLoaded = false;
+let googleMapsLoading = false;
+const googleMapsCallbacks: (() => void)[] = [];
+function loadGoogleMaps(callback: () => void) {
+  if (googleMapsLoaded) { callback(); return; }
+  googleMapsCallbacks.push(callback);
+  if (googleMapsLoading) return;
+  googleMapsLoading = true;
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_API_KEY}&libraries=places&language=zh-TW`;
+  script.async = true;
+  script.onload = () => {
+    googleMapsLoaded = true;
+    googleMapsLoading = false;
+    googleMapsCallbacks.forEach(cb => cb());
+    googleMapsCallbacks.length = 0;
+  };
+  document.head.appendChild(script);
+}
 
 interface Props { trip: Trip; }
 
@@ -103,6 +127,14 @@ export default function ItineraryTab({ trip }: Props) {
   const [deleteItem, setDeleteItem] = useState<ItineraryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState(false);
   const [latLngError, setLatLngError] = useState('');
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationSuggestions, setLocationSuggestions] = useState<{ place_id: string; description: string }[]>([]);
+  const [locationSearching, setLocationSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteService = useRef<any>(null);
+  const placesService = useRef<any>(null);
+  const placesDiv = useRef<HTMLDivElement | null>(null);
 
   // 彈出式地圖選取 Modal
   const [showMapPicker, setShowMapPicker] = useState(false);
@@ -126,9 +158,9 @@ export default function ItineraryTab({ trip }: Props) {
         api.getAccommodations(trip.Trip_ID),
         api.getDayAccommodations(trip.Trip_ID),
       ]);
-      setItems(it.data || []);
-      setAccommodations(acc.data || []);
-      setDayAccommodations(da.data || []);
+      setItems((it as any).data || []);
+      setAccommodations((acc as any).data || []);
+      setDayAccommodations((da as any).data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -159,9 +191,70 @@ export default function ItineraryTab({ trip }: Props) {
     }
   };
 
+  // Initialize Google Places services
+  const initPlacesServices = useCallback(() => {
+    if (!(window as any).google?.maps?.places) return;
+    if (!autocompleteService.current) {
+      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+    }
+    if (!placesService.current) {
+      if (!placesDiv.current) {
+        placesDiv.current = document.createElement('div');
+      }
+      placesService.current = new (window as any).google.maps.places.PlacesService(placesDiv.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadGoogleMaps(() => initPlacesServices());
+  }, [initPlacesServices]);
+
+  // Search location with Google Places Autocomplete
+  const searchLocation = useCallback((query: string) => {
+    setLocationQuery(query);
+    if (!query.trim() || query.length < 2) { setLocationSuggestions([]); setShowSuggestions(false); return; }
+    if (!autocompleteService.current) { loadGoogleMaps(() => { initPlacesServices(); }); return; }
+    setLocationSearching(true);
+    autocompleteService.current.getPlacePredictions(
+      { input: query, language: 'zh-TW' },
+      (predictions: any, status: any) => {
+        setLocationSearching(false);
+        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setLocationSuggestions(predictions.map((p: any) => ({ place_id: p.place_id, description: p.description })));
+          setShowSuggestions(true);
+        } else {
+          setLocationSuggestions([]);
+          setShowSuggestions(false);
+        }
+      }
+    );
+  }, [initPlacesServices]);
+
+  // Select a place and get its coordinates
+  const selectPlace = useCallback((placeId: string, description: string) => {
+    setLocationQuery(description);
+    setShowSuggestions(false);
+    setLocationSuggestions([]);
+    if (!placesService.current) return;
+    placesService.current.getDetails(
+      { placeId, fields: ['geometry', 'name', 'formatted_address'] },
+      (place: any, status: any) => {
+        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          setItemForm(f => ({ ...f, Lat: lat.toFixed(6), Lng: lng.toFixed(6) }));
+          setLatLngError('');
+        }
+      }
+    );
+  }, []);
+
   const openItemModal = (day: number, item?: ItineraryItem) => {
     setEditItem(item || null);
     setLatLngError('');
+    setLocationQuery('');
+    setLocationSuggestions([]);
+    setShowSuggestions(false);
     setItemForm(item
       ? { Day_Number: String(item.Day_Number), Time: item.Time || '', Activity: item.Activity, Lat: item.Lat !== undefined && item.Lat !== '' ? String(item.Lat) : '', Lng: item.Lng !== undefined && item.Lng !== '' ? String(item.Lng) : '' }
       : { Day_Number: String(day), Time: '', Activity: '', Lat: '', Lng: '' }
@@ -513,6 +606,46 @@ export default function ItineraryTab({ trip }: Props) {
             onChange={e => setItemForm(f => ({ ...f, Time: e.target.value }))} />
           <Textarea label="活動內容" required placeholder="例如：參觀淺草寺" value={itemForm.Activity} rows={3}
             onChange={e => setItemForm(f => ({ ...f, Activity: e.target.value }))} />
+
+          {/* 地點搜尋（Google Places） */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">地點搜尋（自動填入座標）</label>
+            <div className="relative">
+              <input
+                ref={locationInputRef}
+                type="text"
+                placeholder="輸入地點名稱，如：清水寺、大阪城..."
+                value={locationQuery}
+                onChange={e => searchLocation(e.target.value)}
+                onFocus={() => locationSuggestions.length > 0 && setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+              />
+              {locationSearching && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <svg className="w-4 h-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            {showSuggestions && locationSuggestions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                {locationSuggestions.map(s => (
+                  <button
+                    key={s.place_id}
+                    type="button"
+                    onMouseDown={() => selectPlace(s.place_id, s.description)}
+                    className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 border-b border-slate-100 last:border-0 flex items-start gap-2"
+                  >
+                    <MapPin size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                    <span>{s.description}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* 座標輸入 */}
           <div>

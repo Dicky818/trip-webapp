@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Plus, Trash2, Edit2, DollarSign, Users, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle } from 'lucide-react';
-import { api, Trip, Expense, Member, TripMember, Settlement } from '../../api/gasApi';
+import { api, Trip, Expense, Member, TripMember, Settlement } from '../../api/supabaseApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import ExpenseBreakdownTab from './ExpenseBreakdownTab';
@@ -39,8 +39,8 @@ export default function ExpensesTab({ trip }: Props) {
         api.getExpenses(trip.Trip_ID),
         api.getTripMembers(trip.Trip_ID),
       ]);
-      setExpenses(exp.data || []);
-      setTripMembers(tm.data || []);
+      setExpenses((exp as any).data || []);
+      setTripMembers((tm as any).data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -49,7 +49,7 @@ export default function ExpensesTab({ trip }: Props) {
     setSettlementLoading(true);
     try {
       const result = await api.getSettlement(trip.Trip_ID);
-      setSettlement(result.data);
+      setSettlement((result as any).data);
     } catch (e: any) { showToast(e.message || '計算失敗', 'error'); }
     finally { setSettlementLoading(false); }
   };

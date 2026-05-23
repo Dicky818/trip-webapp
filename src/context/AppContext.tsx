@@ -1,12 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { api, Trip, Member, Category } from '../api/gasApi';
+import { api, Trip, Member, Category } from '../api/supabaseApi';
 
 interface AppContextType {
-  // GAS URL
-  gasUrl: string;
-  setGasUrl: (url: string) => void;
-  isConfigured: boolean;
-
   // Trips
   trips: Trip[];
   tripsLoading: boolean;
@@ -25,14 +20,16 @@ interface AppContextType {
   // Toast notifications
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+
+  // Legacy compatibility (no-op)
+  gasUrl: string;
+  setGasUrl: (url: string) => void;
+  isConfigured: boolean;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [gasUrl, setGasUrlState] = useState<string>(() => {
-    return localStorage.getItem('trip_webapp_gas_url') || '';
-  });
   const [trips, setTrips] = useState<Trip[]>([]);
   const [tripsLoading, setTripsLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -41,49 +38,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const setGasUrl = useCallback((url: string) => {
-    localStorage.setItem('trip_webapp_gas_url', url);
-    setGasUrlState(url);
-  }, []);
-
   const fetchTrips = useCallback(async () => {
-    if (!gasUrl) return;
     setTripsLoading(true);
     try {
       const result = await api.getTrips();
-      setTrips(result.data || []);
+      if (result.success) {
+        setTrips((result as { success: true; data: Trip[] }).data || []);
+      }
     } catch (e) {
       console.error('fetchTrips error:', e);
     } finally {
       setTripsLoading(false);
     }
-  }, [gasUrl]);
+  }, []);
 
   const fetchMembers = useCallback(async () => {
-    if (!gasUrl) return;
     setMembersLoading(true);
     try {
       const result = await api.getMembers();
-      setMembers(result.data || []);
+      if (result.success) {
+        setMembers((result as { success: true; data: Member[] }).data || []);
+      }
     } catch (e) {
       console.error('fetchMembers error:', e);
     } finally {
       setMembersLoading(false);
     }
-  }, [gasUrl]);
+  }, []);
 
   const fetchCategories = useCallback(async () => {
-    if (!gasUrl) return;
     setCategoriesLoading(true);
     try {
       const result = await api.getCategories();
-      setCategories(result.data || []);
+      if (result.success) {
+        setCategories((result as { success: true; data: Category[] }).data || []);
+      }
     } catch (e) {
       console.error('fetchCategories error:', e);
     } finally {
       setCategoriesLoading(false);
     }
-  }, [gasUrl]);
+  }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
@@ -92,11 +87,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      gasUrl, setGasUrl, isConfigured: !!gasUrl,
       trips, tripsLoading, fetchTrips,
       members, membersLoading, fetchMembers,
       categories, categoriesLoading, fetchCategories,
       toast, showToast,
+      // Legacy no-ops
+      gasUrl: 'supabase',
+      setGasUrl: () => {},
+      isConfigured: true,
     }}>
       {children}
       {toast && (

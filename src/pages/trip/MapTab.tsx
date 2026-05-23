@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, AlertTriangle, ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react';
-import { ItineraryItem, Trip } from '../../api/gasApi';
+import { ItineraryItem, Trip } from '../../api/supabaseApi';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 

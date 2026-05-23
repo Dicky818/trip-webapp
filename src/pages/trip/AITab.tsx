@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { api, Trip } from '../../api/gasApi';
+import { api, Trip } from '../../api/supabaseApi';
 import { Button, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 
@@ -22,7 +22,7 @@ export default function AITab({ trip }: Props) {
       const result = await api.generateAIAdvice(trip.Trip_ID);
       if (result.success && result.data) {
         setAdvice(result.data);
-        setModel(result.model || '');
+        setModel((result as any).model || '');
         setGenerated(true);
         showToast('AI 注意事項已生成');
       } else {

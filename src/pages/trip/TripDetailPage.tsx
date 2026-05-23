@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { api, Trip } from '../../api/gasApi';
+import { api, Trip } from '../../api/supabaseApi';
 import { Button, TabBar, Spinner, Input, Select } from '../../components/ui';
 import InfoTab from './InfoTab';
 import ItineraryTab from './ItineraryTab';

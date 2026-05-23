@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Trip, Expense, Member, TripMember, Category } from '../../api/gasApi';
+import { Trip, Expense, Member, TripMember, Category } from '../../api/supabaseApi';
 import { Spinner, EmptyState } from '../../components/ui';
 import { DollarSign } from 'lucide-react';
 
