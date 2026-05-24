@@ -222,7 +222,7 @@ export default function InfoTab({ trip }: Props) {
         )}
       </section>
 
-      {/* ── 住宿資訊（從支出讀取） ── */
+      {/* ── 住宿資訊（從支出讀取） ── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
