@@ -102,13 +102,20 @@ function SortableItem({ item, onEdit, onDelete }: {
           <p className="text-xs text-slate-500 mt-0.5 whitespace-pre-wrap break-words">{item.Activity}</p>
         )}
         {item.Note && (
-          <p className="text-xs text-blue-500 mt-0.5 break-all italic">
-            {/^https?:\/\//.test(item.Note) ? (
-              <a href={item.Note} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-700">
-                {item.Note}
-              </a>
-            ) : item.Note}
-          </p>
+          <div className="mt-0.5 space-y-0.5">
+            {item.Note.split('\n').map((url, i) => {
+              const trimmed = url.trim();
+              if (!trimmed) return null;
+              return /^https?:\/\//.test(trimmed) ? (
+                <a key={i} href={trimmed} target="_blank" rel="noopener noreferrer"
+                  className="block text-xs text-blue-500 underline hover:text-blue-700 break-all italic">
+                  {trimmed}
+                </a>
+              ) : (
+                <p key={i} className="text-xs text-slate-500 break-all">{trimmed}</p>
+              );
+            })}
+          </div>
         )}
       </div>
       <div className="flex gap-1 flex-shrink-0">
@@ -624,7 +631,7 @@ export default function ItineraryTab({ trip }: Props) {
             onChange={e => setItemForm(f => ({ ...f, Activity_Name: e.target.value }))} />
           <Textarea label="活動內容（選填）" placeholder="例如：參觀清水寺舞台，欣賞京都市景" value={itemForm.Activity} rows={2}
             onChange={e => setItemForm(f => ({ ...f, Activity: e.target.value }))} />
-          <Input label="網址（選填）" placeholder="例如：https://ja.kyoto.travel/..." value={itemForm.Note}
+          <Textarea label="網址（選填，可輸入多個，每行一個）" placeholder={`https://ja.kyoto.travel/...\nhttps://maps.google.com/...`} value={itemForm.Note} rows={3}
             onChange={e => setItemForm(f => ({ ...f, Note: e.target.value }))} />
 
           {/* 地點搜尋（Google Places） */}
