@@ -209,6 +209,9 @@ export default function InfoTab({ trip }: Props) {
                           <span>= {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString()}</span>
                         )}
                         <span>· 付款：{exp.Payer}</span>
+                        {exp.Splitters && (
+                          <span>· 分帳：{exp.Splitters}</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -219,7 +222,7 @@ export default function InfoTab({ trip }: Props) {
         )}
       </section>
 
-      {/* ── 住宿資訊（從支出讀取） ── */}
+      {/* ── 住宿資訊（從支出讀取） ── */
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -256,6 +259,9 @@ export default function InfoTab({ trip }: Props) {
                       <span>= {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString()}</span>
                     )}
                     <span>· 付款：{exp.Payer}</span>
+                    {exp.Splitters && (
+                      <span>· 分帳：{exp.Splitters}</span>
+                    )}
                   </div>
                 </div>
               </div>
