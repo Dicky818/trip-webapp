@@ -192,11 +192,11 @@ export default function InfoTab({ trip }: Props) {
                           <Clock size={11} />
                           <span>
                             {exp.Departure_Time ? formatTime(exp.Departure_Time) : '?'}
-                            {exp.Arrival_Date && exp.Arrival_Date !== (exp.Flight_Date || exp.Date) && (
-                              <span className="text-slate-400"> (+1d)</span>
-                            )}
                             {' — '}
                             {exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '?'}
+                            {exp.Arrival_Date && exp.Arrival_Date !== (exp.Flight_Date || exp.Date) && (
+                              <span className="text-slate-400"> （回程 {formatDateOnly(exp.Arrival_Date)}）</span>
+                            )}
                           </span>
                           {duration && <span className="text-slate-400">({duration})</span>}
                         </div>

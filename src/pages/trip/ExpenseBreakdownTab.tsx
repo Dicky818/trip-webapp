@@ -124,17 +124,80 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     return count > 0 ? total / count : total;
   };
 
+  // 判斷某分類是否需要日期分攤
+  // 鐵路套票：主分類「交通」子分類含「鐵路」「套票」「Pass」「Rail」
+  // 酒店/民宿：主分類「住宿」或子分類含「酒店」「民宿」「Airbnb」
+  // 機票：主分類「機票」或子分類「機票」
+  const getDateSpread = (e: Expense): string[] => {
+    const main = (e.Main_Category || '').toLowerCase();
+    const sub = (e.Sub_Category || '').toLowerCase();
+    const isRailPass = (main === '交通' || main === '鐵路') &&
+      (sub.includes('鐵路') || sub.includes('套票') || sub.includes('pass') || sub.includes('rail') || main.includes('鐵路'));
+    const isAccommodation = main === '住宿' || sub.includes('酒店') || sub.includes('民宿') || sub.includes('airbnb') || sub.includes('bnb');
+    const isFlight = main === '機票' || sub === '機票';
+
+    const toDateStr = (d: string) => d?.includes('T') ? d.slice(0, 10) : (d || '');
+
+    // 產生從 start 到 end（含頭尾）的每一天
+    const spreadDates = (start: string, end: string): string[] => {
+      if (!start || !end) return start ? [start] : [];
+      const dates: string[] = [];
+      const s = parseLocalDate(start);
+      const e2 = parseLocalDate(end);
+      let cur = new Date(s);
+      while (cur <= e2) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, '0');
+        const d2 = String(cur.getDate()).padStart(2, '0');
+        dates.push(`${y}-${m}-${d2}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
+    };
+
+    if (isRailPass) {
+      // 鐵路套票：用 Check_In_Date / Check_Out_Date 或 Flight_Date / Arrival_Date 或 Date
+      const start = toDateStr(e.Check_In_Date || e.Flight_Date || e.Date || '');
+      const end = toDateStr(e.Check_Out_Date || e.Arrival_Date || e.Date || '');
+      return spreadDates(start, end);
+    }
+    if (isAccommodation) {
+      // 酒店/民宿：Check_In_Date 到 Check_Out_Date（含頭尾）
+      const start = toDateStr(e.Check_In_Date || e.Date || '');
+      const end = toDateStr(e.Check_Out_Date || e.Date || '');
+      return spreadDates(start, end);
+    }
+    if (isFlight) {
+      // 機票：出發日 + 回程日（Arrival_Date 作為回程日）
+      const dep = toDateStr(e.Flight_Date || e.Date || '');
+      const ret = toDateStr(e.Arrival_Date || '');
+      if (ret && ret !== dep) return [dep, ret].filter(Boolean);
+      return dep ? [dep] : [];
+    }
+    // 其他：使用支出日期
+    return [toDateStr(e.Date || '')];
+  };
+
   // 建立查找表：main → sub → date → amount (in base currency)
+  // 對需要分攤的分類，金額平均分配到每一天
   const amountMap = useMemo(() => {
     const map: Record<string, Record<string, Record<string, number>>> = {};
     filteredExpenses.forEach(e => {
       const main = e.Main_Category || '（未分類）';
       const sub = e.Sub_Category || '（未分類）';
-      const date = e.Date?.includes('T') ? e.Date.slice(0, 10) : (e.Date || '');
       const amt = getEffectiveAmount(e);
+      const dates = getDateSpread(e);
+      const perDay = dates.length > 0 ? amt / dates.length : amt;
       if (!map[main]) map[main] = {};
       if (!map[main][sub]) map[main][sub] = {};
-      map[main][sub][date] = (map[main][sub][date] || 0) + amt;
+      if (dates.length === 0) {
+        // 無日期，放到空字串 key
+        map[main][sub][''] = (map[main][sub][''] || 0) + amt;
+      } else {
+        dates.forEach(date => {
+          map[main][sub][date] = (map[main][sub][date] || 0) + perDay;
+        });
+      }
     });
     return map;
   }, [filteredExpenses, selectedSplitter]);
@@ -180,15 +243,18 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     return result;
   }, [amountMap]);
 
-  // 每天的總計
+  // 每天的總計（使用 amountMap 確保分攤後的金額）
   const dateTotals = useMemo(() => {
     const result: Record<string, number> = {};
-    filteredExpenses.forEach(e => {
-      const date = e.Date?.includes('T') ? e.Date.slice(0, 10) : (e.Date || '');
-      result[date] = (result[date] || 0) + getEffectiveAmount(e);
+    Object.values(amountMap).forEach(subMap => {
+      Object.values(subMap).forEach(dateMap => {
+        Object.entries(dateMap).forEach(([date, amt]) => {
+          if (date) result[date] = (result[date] || 0) + amt;
+        });
+      });
     });
     return result;
-  }, [filteredExpenses, selectedSplitter]);
+  }, [amountMap]);
 
   // 格式化顯示金額
   const fmtAmt = (baseAmt: number, showCurrency = false): string => {

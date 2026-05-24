@@ -608,9 +608,9 @@ export default function ExpensesTab({ trip }: Props) {
                 ]} />
               <Input label="出發時間" type="time" value={expenseForm.Departure_Time || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Departure_Time: e.target.value }))} />
-              <Input label="到達日期" type="date" value={expenseForm.Arrival_Date || ''}
+              <Input label="回程日期" type="date" value={expenseForm.Arrival_Date || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Arrival_Date: e.target.value }))} />
-              <Input label="到達時間" type="time" value={expenseForm.Arrival_Time || ''}
+              <Input label="回程時間" type="time" value={expenseForm.Arrival_Time || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Arrival_Time: e.target.value }))} />
             </>
           )}
