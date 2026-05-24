@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { api, Trip, Member, Category } from '../api/supabaseApi';
+import { api, Trip, Member, Category, UserProfile } from '../api/supabaseApi';
 
 interface AppContextType {
   // Trips
@@ -7,10 +7,10 @@ interface AppContextType {
   tripsLoading: boolean;
   fetchTrips: () => Promise<void>;
 
-  // Members (global)
-  members: Member[];
-  membersLoading: boolean;
-  fetchMembers: () => Promise<void>;
+  // User Profile (replaces global members)
+  userProfile: UserProfile | null;
+  profileLoading: boolean;
+  fetchUserProfile: () => Promise<void>;
 
   // Categories (global)
   categories: Category[];
@@ -21,10 +21,13 @@ interface AppContextType {
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 
-  // Legacy compatibility (no-op)
+  // Legacy compatibility (no-op stubs kept so old imports don't break)
   gasUrl: string;
   setGasUrl: (url: string) => void;
   isConfigured: boolean;
+  members: Member[];
+  membersLoading: boolean;
+  fetchMembers: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -32,8 +35,8 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [tripsLoading, setTripsLoading] = useState(false);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [membersLoading, setMembersLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -52,17 +55,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const fetchMembers = useCallback(async () => {
-    setMembersLoading(true);
+  const fetchUserProfile = useCallback(async () => {
+    setProfileLoading(true);
     try {
-      const result = await api.getMembers();
+      const result = await api.getUserProfile();
       if (result.success) {
-        setMembers((result as { success: true; data: Member[] }).data || []);
+        setUserProfile((result as { success: true; data: UserProfile }).data || null);
       }
     } catch (e) {
-      console.error('fetchMembers error:', e);
+      console.error('fetchUserProfile error:', e);
     } finally {
-      setMembersLoading(false);
+      setProfileLoading(false);
     }
   }, []);
 
@@ -88,13 +91,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       trips, tripsLoading, fetchTrips,
-      members, membersLoading, fetchMembers,
+      userProfile, profileLoading, fetchUserProfile,
       categories, categoriesLoading, fetchCategories,
       toast, showToast,
       // Legacy no-ops
       gasUrl: 'supabase',
       setGasUrl: () => {},
       isConfigured: true,
+      members: [],
+      membersLoading: false,
+      fetchMembers: async () => {},
     }}>
       {children}
       {toast && (

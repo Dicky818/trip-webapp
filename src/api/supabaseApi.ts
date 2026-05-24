@@ -26,6 +26,14 @@ export interface TripCollaborator {
   user_id: string;
   role: 'owner' | 'collaborator';
   joined_at: string;
+  display_name?: string;
+}
+
+export interface UserProfile {
+  User_ID: string;
+  Display_Name: string;
+  Created_At: string;
+  Updated_At: string;
 }
 
 export interface Flight {
@@ -149,11 +157,14 @@ export interface Member {
   Updated_At: string;
 }
 
+// TripMember now maps to trip_collaborators + user_profiles
+// Member_ID = user_id, Member_Name = display_name
 export interface TripMember {
-  Trip_Member_ID: string;
+  Trip_Member_ID: string;  // collaborator record id (or 'owner-{trip_id}' for owner)
   Trip_ID: string;
-  Member_ID: string;
-  Member_Name?: string;
+  Member_ID: string;        // user_id
+  Member_Name: string;      // display_name from user_profiles
+  Is_Owner: boolean;
   Created_At: string;
 }
 
@@ -1011,91 +1022,127 @@ export const api = {
   },
 
   // ── Members ──────────────────────────────────────────────
-  getMembers: async () => {
+  // ── User Profile ─────────────────────────────────────────
+  // Each user has one profile with a display name they set themselves
+  getUserProfile: async () => {
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return err('User not logged in');
     const { data, error } = await supabase
-      .from('members')
+      .from('user_profiles')
       .select('*')
-      .or(`user_id.eq.${user?.id || '00000000-0000-0000-0000-000000000000'},user_id.is.null`)
-      .eq('is_active', true)
-      .order('created_at');
-    if (error) return err(error.message);
-    return ok((data || []).map(rowToMember));
-  },
-
-  createMember: async (body: Partial<Member>) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from('members')
-      .insert({
-        user_id: user?.id || null,
-        member_name: body.Member_Name || '',
-        is_active: true,
-      })
-      .select()
+      .eq('id', user.id)
       .single();
-    if (error) return err(error.message);
-    return ok(rowToMember(data));
-  },
-
-  updateMember: async (memberId: string, body: Partial<Member>) => {
-    const updates: Record<string, unknown> = {};
-    if (body.Member_Name !== undefined) updates.member_name = body.Member_Name;
-    const { error } = await supabase.from('members').update(updates).eq('id', memberId);
-    if (error) return err(error.message);
-    return ok(null);
-  },
-
-  deactivateMember: async (memberId: string) => {
-    const { error } = await supabase.from('members').update({ is_active: false }).eq('id', memberId);
-    if (error) return err(error.message);
-    return ok(null);
-  },
-
-  // ── Trip Members ─────────────────────────────────────────
-  getTripMembers: async (tripId: string) => {
-    const { data, error } = await supabase
-      .from('trip_members')
-      .select('*')
-      .eq('trip_id', tripId)
-      .order('created_at');
-    if (error) return err(error.message);
-    return ok((data || []).map(r => ({
-      Trip_Member_ID: r.id as string,
-      Trip_ID: r.trip_id as string,
-      Member_ID: r.id as string, // use same id for compatibility
-      Member_Name: (r.member_name as string) || '',
-      Created_At: (r.created_at as string) || '',
-    } as TripMember)));
-  },
-
-  addTripMember: async (body: { Trip_ID: string; Member_ID: string; Member_Name?: string }) => {
-    // Look up member name if not provided
-    let memberName = body.Member_Name || '';
-    if (!memberName && body.Member_ID) {
-      const { data } = await supabase.from('members').select('member_name').eq('id', body.Member_ID).single();
-      memberName = (data?.member_name as string) || '';
-    }
-    const { data, error } = await supabase
-      .from('trip_members')
-      .insert({ trip_id: body.Trip_ID, member_name: memberName })
-      .select()
-      .single();
-    if (error) return err(error.message);
+    if (error && error.code !== 'PGRST116') return err(error.message);
+    if (!data) return ok(null as unknown as UserProfile);
     return ok({
-      Trip_Member_ID: data.id as string,
-      Trip_ID: data.trip_id as string,
-      Member_ID: data.id as string,
-      Member_Name: (data.member_name as string) || '',
+      User_ID: data.id as string,
+      Display_Name: (data.display_name as string) || '',
       Created_At: (data.created_at as string) || '',
-    } as TripMember);
+      Updated_At: (data.updated_at as string) || '',
+    } as UserProfile);
   },
 
-  removeTripMember: async (tripMemberId: string) => {
-    const { error } = await supabase.from('trip_members').delete().eq('id', tripMemberId);
+  upsertUserProfile: async (displayName: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return err('User not logged in');
+    const { error } = await supabase
+      .from('user_profiles')
+      .upsert({ id: user.id, display_name: displayName, updated_at: new Date().toISOString() });
     if (error) return err(error.message);
+    return ok({ Display_Name: displayName });
+  },
+
+  // ── Trip Members (now based on trip_collaborators + user_profiles) ─────
+  // Returns all participants of a trip: owner + collaborators with their display names
+  getTripMembers: async (tripId: string) => {
+    // Get the trip to find the owner
+    const { data: tripData, error: tripError } = await supabase
+      .from('trips')
+      .select('id, user_id, owner_display_name')
+      .eq('id', tripId)
+      .single();
+    if (tripError) return err(tripError.message);
+
+    // Get collaborators
+    const { data: collabs, error: collabError } = await supabase
+      .from('trip_collaborators')
+      .select('id, user_id, display_name, joined_at')
+      .eq('trip_id', tripId);
+    if (collabError) return err(collabError.message);
+
+    // Collect all user_ids to fetch profiles
+    const allUserIds = [tripData.user_id, ...(collabs || []).map((c: any) => c.user_id)].filter(Boolean);
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('id, display_name')
+      .in('id', allUserIds);
+
+    const profileMap: Record<string, string> = {};
+    (profiles || []).forEach((p: any) => { profileMap[p.id] = p.display_name || ''; });
+
+    const members: TripMember[] = [];
+
+    // Add owner
+    const ownerName = tripData.owner_display_name || profileMap[tripData.user_id] || '擁有者';
+    members.push({
+      Trip_Member_ID: `owner-${tripId}`,
+      Trip_ID: tripId,
+      Member_ID: tripData.user_id,
+      Member_Name: ownerName,
+      Is_Owner: true,
+      Created_At: '',
+    });
+
+    // Add collaborators
+    (collabs || []).forEach((c: any) => {
+      const name = c.display_name || profileMap[c.user_id] || '協作者';
+      members.push({
+        Trip_Member_ID: c.id,
+        Trip_ID: tripId,
+        Member_ID: c.user_id,
+        Member_Name: name,
+        Is_Owner: false,
+        Created_At: c.joined_at || '',
+      });
+    });
+
+    return ok(members);
+  },
+
+  // Update display name for a user in a specific trip
+  // For owner: updates trips.owner_display_name
+  // For collaborator: updates trip_collaborators.display_name
+  updateTripMemberName: async (tripId: string, isOwner: boolean, newName: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return err('User not logged in');
+    if (isOwner) {
+      const { error } = await supabase
+        .from('trips')
+        .update({ owner_display_name: newName })
+        .eq('id', tripId)
+        .eq('user_id', user.id);
+      if (error) return err(error.message);
+    } else {
+      const { error } = await supabase
+        .from('trip_collaborators')
+        .update({ display_name: newName })
+        .eq('trip_id', tripId)
+        .eq('user_id', user.id);
+      if (error) return err(error.message);
+    }
+    // Also update global user profile
+    await supabase.from('user_profiles')
+      .upsert({ id: user.id, display_name: newName, updated_at: new Date().toISOString() });
     return ok(null);
   },
+
+  // Legacy stubs for compatibility
+  getMembers: async () => ok([] as Member[]),
+  createMember: async (_body: Partial<Member>) => err('Use upsertUserProfile instead'),
+  updateMember: async (_id: string, _body: Partial<Member>) => err('Use updateTripMemberName instead'),
+  deactivateMember: async (_id: string) => err('Use updateTripMemberName instead'),
+  addTripMember: async (_body: { Trip_ID: string; Member_ID: string; Member_Name?: string }) => err('Members are now account-based'),
+  removeTripMember: async (_id: string) => err('Members are now account-based'),
 
   // ── AI ───────────────────────────────────────────────────
   generateAIAdvice: async (tripId: string) => {

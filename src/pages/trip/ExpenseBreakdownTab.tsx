@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Trip, Expense, Member, TripMember, Category } from '../../api/supabaseApi';
+import { Trip, Expense, TripMember, Category } from '../../api/supabaseApi';
 import { Spinner, EmptyState } from '../../components/ui';
 import { DollarSign, RefreshCw } from 'lucide-react';
 import { api } from '../../api/supabaseApi';
@@ -7,7 +7,6 @@ import { api } from '../../api/supabaseApi';
 interface Props {
   trip: Trip;
   expenses: Expense[];
-  members: Member[];
   tripMembers: TripMember[];
   categories: Category[];
   loading: boolean;
@@ -48,7 +47,7 @@ function formatShortDate(d: string): string {
 // localStorage key for display currency preference
 const DISPLAY_CURRENCY_KEY = 'trip_display_currency';
 
-export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembers, categories, loading }: Props) {
+export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categories, loading }: Props) {
   // 分攤成員篩選
   const [selectedSplitter, setSelectedSplitter] = useState<string>('ALL');
 
@@ -82,10 +81,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, members, tripMembe
   // 轉換金額（base → display）
   const convertAmt = (baseAmt: number) => baseAmt * exchangeRate;
 
-  // 行程成員
-  const activeMembers = members.filter(m => String(m.Is_Active).toUpperCase() === 'TRUE');
-  const tripMemberIds = new Set(tripMembers.map(tm => tm.Member_ID));
-  const tripMemberObjects = activeMembers.filter(m => tripMemberIds.has(m.Member_ID));
+  // 行程成員（直接使用 tripMembers，已包含擁有者和協作者）
+  const tripMemberObjects = tripMembers;
 
   // 行程日期列表
   const tripDates = useMemo(() => getTripDates(trip.Start_Date, trip.End_Date), [trip.Start_Date, trip.End_Date]);
