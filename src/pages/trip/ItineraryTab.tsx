@@ -89,23 +89,29 @@ function SortableItem({ item, onEdit, onDelete }: {
 
   return (
     <div ref={setNodeRef} style={style}
-      className="flex items-center gap-2 p-3 bg-white rounded-lg border border-slate-200 hover:border-blue-200 group transition-colors">
-      <button {...attributes} {...listeners} className="drag-handle p-1 text-slate-300 hover:text-slate-500 flex-shrink-0">
+      className="flex items-start gap-2 p-3 bg-white rounded-lg border border-slate-200 hover:border-blue-200 group transition-colors">
+      <button {...attributes} {...listeners} className="drag-handle p-1 text-slate-300 hover:text-slate-500 flex-shrink-0 mt-0.5">
         <GripVertical size={16} />
       </button>
       {item.Time && (
-        <span className="text-xs font-mono text-slate-500 w-12 flex-shrink-0">{formatTimeDisplay(item.Time)}</span>
+        <span className="text-xs font-mono text-slate-500 w-12 flex-shrink-0 mt-0.5">{formatTimeDisplay(item.Time)}</span>
       )}
       <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium text-slate-800">{item.Activity_Name || item.Activity}</span>
+        <span className="text-sm font-medium text-slate-800 break-words">{item.Activity_Name || item.Activity}</span>
         {item.Activity_Name && item.Activity && (
-          <p className="text-xs text-slate-500 truncate">{item.Activity}</p>
+          <p className="text-xs text-slate-500 mt-0.5 whitespace-pre-wrap break-words">{item.Activity}</p>
         )}
         {item.Note && (
-          <p className="text-xs text-slate-400 truncate italic">{item.Note}</p>
+          <p className="text-xs text-blue-500 mt-0.5 break-all italic">
+            {/^https?:\/\//.test(item.Note) ? (
+              <a href={item.Note} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-700">
+                {item.Note}
+              </a>
+            ) : item.Note}
+          </p>
         )}
       </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1 flex-shrink-0">
         <button onClick={() => onEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
           <Edit2 size={13} />
         </button>
@@ -618,7 +624,7 @@ export default function ItineraryTab({ trip }: Props) {
             onChange={e => setItemForm(f => ({ ...f, Activity_Name: e.target.value }))} />
           <Textarea label="活動內容（選填）" placeholder="例如：參觀清水寺舞台，欣賞京都市景" value={itemForm.Activity} rows={2}
             onChange={e => setItemForm(f => ({ ...f, Activity: e.target.value }))} />
-          <Input label="備註（選填）" placeholder="例如：需要提前購票" value={itemForm.Note}
+          <Input label="網址（選填）" placeholder="例如：https://ja.kyoto.travel/..." value={itemForm.Note}
             onChange={e => setItemForm(f => ({ ...f, Note: e.target.value }))} />
 
           {/* 地點搜尋（Google Places） */}
