@@ -188,22 +188,8 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
 
   // Track if activeIndex change was user-triggered (card click) vs day-change reset
   const userClickedCardRef = useRef(false);
-
-  // Fly to active POI when user clicks a card
-  useEffect(() => {
-    if (!userClickedCardRef.current) return;
-    userClickedCardRef.current = false;
-    const map = mapRef.current;
-    if (!map || !mapsReady) return;
-    const activeItem = viewItems[activeIndex];
-    if (!activeItem) return;
-    const geo = geoResults[activeItem.Itinerary_ID];
-    if (geo?.status === 'found' && geo.lat !== undefined && geo.lng !== undefined) {
-      map.panTo({ lat: geo.lat, lng: geo.lng });
-      const currentZoom = map.getZoom() || 13;
-      if (currentZoom < 15) map.setZoom(15);
-    }
-  }, [activeIndex, geoResults, viewItems, mapsReady]);
+  // Track previous viewDay + geoResults key to know when to fitBounds vs just pan
+  const prevFitKeyRef = useRef('');
 
   // Update map markers and polylines
   useEffect(() => {
@@ -337,11 +323,29 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
       }
     }
 
-    if (foundItems.length === 1) {
-      map.setCenter({ lat: foundItems[0].geo!.lat!, lng: foundItems[0].geo!.lng! });
-      map.setZoom(15);
-    } else {
-      map.fitBounds(bounds, 40);
+    // Only fitBounds when the view/geocoding changes, NOT when user just clicked a card
+    const fitKey = `${viewDay}:${Object.keys(geoResults).filter(k => geoResults[k].status === 'found').sort().join(',')}`;
+    const shouldFit = fitKey !== prevFitKeyRef.current;
+    if (shouldFit) {
+      prevFitKeyRef.current = fitKey;
+      if (foundItems.length === 1) {
+        map.setCenter({ lat: foundItems[0].geo!.lat!, lng: foundItems[0].geo!.lng! });
+        map.setZoom(15);
+      } else {
+        map.fitBounds(bounds, 40);
+      }
+    } else if (userClickedCardRef.current) {
+      // User clicked a card — pan to the active item
+      userClickedCardRef.current = false;
+      const activeItem = viewItems[activeIndex];
+      if (activeItem) {
+        const geo = geoResults[activeItem.Itinerary_ID];
+        if (geo?.status === 'found' && geo.lat !== undefined && geo.lng !== undefined) {
+          map.panTo({ lat: geo.lat, lng: geo.lng });
+          const currentZoom = map.getZoom() || 13;
+          if (currentZoom < 15) map.setZoom(15);
+        }
+      }
     }
   }, [geoResults, viewDay, activeIndex, mapsReady]);
 
