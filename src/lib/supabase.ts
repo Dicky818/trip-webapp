@@ -1,13 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://xnchtzpfmyeiftyacfqk.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuY2h0enBmbXllaWZ0eWFjZnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1MTQ4NDYsImV4cCI6MjA5NTA5MDg0Nn0.p37oyVjOtZiAhSqdFudMuOHE5hA0Y2CnaXIcJccM5rc';
+const SUPABASE_URL = 'https://skrdhktjyiiipxcuxknk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrcmRoa3RqeWlpaXB4Y3V4a25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MDY3ODksImV4cCI6MjA5NTQ4Mjc4OX0.EhuDYdzQguQ-Bc098P7ZYepAGRwwyJFdSySXrEsol10';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+  },
+  db: {
+    schema: 'trip_planner',
   },
 });
 

@@ -1,10 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Plane, Hotel, Ticket, Plus, Trash2, Edit2, ExternalLink, Clock, MapPin } from 'lucide-react';
-import { api, Trip, Expense, Booking } from '../../api/supabaseApi';
-import { Button, Card, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge } from '../../components/ui';
-import { useApp } from '../../context/AppContext';
-
-const BOOKING_TYPES = ['', '餐廳', '門票', '活動', '交通', '其他'];
+import { useState, useEffect } from 'react';
+import { Plane, Hotel, Ticket, ExternalLink, Clock, MapPin, Train } from 'lucide-react';
+import { api, Trip, Expense } from '../../api/supabaseApi';
+import { Card, EmptyState, Spinner, Badge } from '../../components/ui';
 
 // 只取日期部分
 function formatDateOnly(d: string): string {
@@ -21,36 +18,10 @@ function formatTime(t: string): string {
   return `${h}:${m}`;
 }
 
-// 計算航班飛行時間
-function calcFlightDuration(depDate: string, depTime: string, arrDate: string, arrTime: string): string {
-  if (!depTime || !arrTime) return '';
-  const toMinutes = (date: string, time: string): number => {
-    const [hStr, mStr] = time.split(':');
-    const h = parseInt(hStr || '0', 10);
-    const m = parseInt(mStr || '0', 10);
-    if (!date) return h * 60 + m;
-    const [yStr, moStr, dStr] = date.split('-');
-    const d = new Date(parseInt(yStr), parseInt(moStr) - 1, parseInt(dStr));
-    return d.getTime() / 60000 + h * 60 + m;
-  };
-  const depMin = toMinutes(depDate, depTime);
-  const arrMin = toMinutes(arrDate, arrTime);
-  const diff = arrMin - depMin;
-  if (diff <= 0) return '';
-  const totalH = Math.floor(diff / 60);
-  const totalM = diff % 60;
-  const days = Math.floor(totalH / 24);
-  const hours = totalH % 24;
-  let result = '';
-  if (days > 0) result += `+${days}d `;
-  if (hours > 0) result += `${hours}h`;
-  if (totalM > 0) result += `${totalM}m`;
-  return result.trim();
-}
-
 // Flight category keywords
 const FLIGHT_KEYWORDS = ['機票', '航班', '飛機', 'flight'];
-const ACCOMMODATION_KEYWORDS = ['住宿', '酒店', '旅館', '民宿', '飯店', 'hotel', 'accommodation'];
+const ACCOMMODATION_KEYWORDS = ['住宿', '酒店', '旅館', '民宿', '飯店', 'hotel', 'accommodation', 'airbnb'];
+const RAIL_KEYWORDS = ['鐵路', '套票', 'pass', 'rail', 'jr', '新幹線'];
 
 function isFlightExpense(exp: Expense): boolean {
   const cat = (exp.Main_Category + ' ' + exp.Sub_Category).toLowerCase();
@@ -62,31 +33,22 @@ function isAccommodationExpense(exp: Expense): boolean {
   return ACCOMMODATION_KEYWORDS.some(k => cat.includes(k.toLowerCase()));
 }
 
+function isRailExpense(exp: Expense): boolean {
+  const cat = (exp.Main_Category + ' ' + exp.Sub_Category).toLowerCase();
+  return RAIL_KEYWORDS.some(k => cat.includes(k.toLowerCase()));
+}
+
 interface Props { trip: Trip; }
 
 export default function InfoTab({ trip }: Props) {
-  const { showToast } = useApp();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Booking modal
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [editBooking, setEditBooking] = useState<Booking | null>(null);
-  const [bookingForm, setBookingForm] = useState<Partial<Booking>>({});
-  const [savingBooking, setSavingBooking] = useState(false);
-  const [deleteBooking, setDeleteBooking] = useState<Booking | null>(null);
-  const [deletingBooking, setDeletingBooking] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [exp, b] = await Promise.all([
-        api.getExpenses(trip.Trip_ID),
-        api.getBookings(trip.Trip_ID),
-      ]);
+      const exp = await api.getExpenses(trip.Trip_ID);
       setExpenses((exp as any).data || []);
-      setBookings((b as any).data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -96,41 +58,8 @@ export default function InfoTab({ trip }: Props) {
   // Filter expenses by category
   const flightExpenses = expenses.filter(isFlightExpense);
   const accommodationExpenses = expenses.filter(isAccommodationExpense);
-
-  // ── Booking CRUD ──
-  const openBookingModal = (booking?: Booking) => {
-    setEditBooking(booking || null);
-    setBookingForm(booking ? { ...booking } : { Trip_ID: trip.Trip_ID });
-    setShowBookingModal(true);
-  };
-
-  const handleSaveBooking = async () => {
-    if (!bookingForm.Booking_Name?.trim()) { showToast('請輸入預訂名稱', 'error'); return; }
-    setSavingBooking(true);
-    try {
-      if (editBooking) {
-        await api.updateBooking(editBooking.Booking_ID, bookingForm);
-      } else {
-        await api.createBooking({ ...bookingForm, Trip_ID: trip.Trip_ID });
-      }
-      showToast(editBooking ? '預訂已更新' : '預訂已新增');
-      setShowBookingModal(false);
-      await fetchAll();
-    } catch (e: any) { showToast(e.message || '儲存失敗', 'error'); }
-    finally { setSavingBooking(false); }
-  };
-
-  const handleDeleteBooking = async () => {
-    if (!deleteBooking) return;
-    setDeletingBooking(true);
-    try {
-      await api.deleteBooking(deleteBooking.Booking_ID);
-      showToast('預訂已刪除');
-      setDeleteBooking(null);
-      await fetchAll();
-    } catch (e: any) { showToast(e.message || '刪除失敗', 'error'); }
-    finally { setDeletingBooking(false); }
-  };
+  const railExpenses = expenses.filter(isRailExpense);
+  const bookingExpenses = expenses.filter(exp => exp.Is_Booking === true);
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
 
@@ -152,12 +81,6 @@ export default function InfoTab({ trip }: Props) {
         ) : (
           <div className="space-y-2">
             {flightExpenses.map(exp => {
-              const duration = calcFlightDuration(
-                exp.Flight_Date || exp.Date,
-                exp.Departure_Time || '',
-                exp.Arrival_Date || exp.Flight_Date || exp.Date,
-                exp.Arrival_Time || ''
-              );
               const statusColor = exp.Flight_Status === 'cancelled' ? 'red'
                 : exp.Flight_Status === 'pending' ? 'yellow' : 'slate';
               const statusLabel = exp.Flight_Status === 'confirmed' ? '已確認'
@@ -187,18 +110,23 @@ export default function InfoTab({ trip }: Props) {
                           <span className="text-slate-400">· {formatDateOnly(exp.Flight_Date || exp.Date)}</span>
                         )}
                       </div>
-                      {(exp.Departure_Time || exp.Arrival_Time) && (
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                          <Clock size={11} />
-                          <span>
-                            {exp.Departure_Time ? formatTime(exp.Departure_Time) : '?'}
-                            {' — '}
-                            {exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '?'}
-                            {exp.Arrival_Date && exp.Arrival_Date !== (exp.Flight_Date || exp.Date) && (
-                              <span className="text-slate-400"> （回程 {formatDateOnly(exp.Arrival_Date)}）</span>
-                            )}
-                          </span>
-                          {duration && <span className="text-slate-400">({duration})</span>}
+                      {(exp.Departure_Time || exp.Landing_Time || exp.Arrival_Time || exp.Return_Landing_Time) && (
+                        <div className="text-xs text-slate-500 mt-1 space-y-0.5">
+                          {(exp.Departure_Time || exp.Landing_Time) && (
+                            <div className="flex items-center gap-1.5">
+                              <Clock size={11} />
+                              <span className="text-slate-400">去程：</span>
+                              <span>{exp.Departure_Time ? formatTime(exp.Departure_Time) : '?'} → {exp.Landing_Time ? formatTime(exp.Landing_Time) : '?'}</span>
+                            </div>
+                          )}
+                          {(exp.Arrival_Time || exp.Return_Landing_Time) && (
+                            <div className="flex items-center gap-1.5">
+                              <Clock size={11} />
+                              <span className="text-slate-400">回程：</span>
+                              {exp.Arrival_Date && <span className="text-slate-400">{formatDateOnly(exp.Arrival_Date)} </span>}
+                              <span>{exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '?'} → {exp.Return_Landing_Time ? formatTime(exp.Return_Landing_Time) : '?'}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
@@ -241,15 +169,17 @@ export default function InfoTab({ trip }: Props) {
               <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-900 mb-1">
-                    {exp.Sub_Category || exp.Note || '（未填住宿名稱）'}
-                    {exp.Note && exp.Sub_Category && <span className="font-normal text-slate-500 ml-1">— {exp.Note}</span>}
+                    {exp.Accommodation_Name || exp.Sub_Category || exp.Note || '（未填住宿名稱）'}
+                    {exp.Note && (exp.Accommodation_Name || exp.Sub_Category) && (
+                      <span className="font-normal text-slate-500 ml-1">— {exp.Note}</span>
+                    )}
                   </p>
                   {exp.Accommodation_Address && (
                     <p className="text-sm text-slate-500 flex items-center gap-1 mb-1">
                       <MapPin size={12} />{exp.Accommodation_Address}
                     </p>
                   )}
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                     {exp.Check_In_Date && <span>入住：{formatDateOnly(exp.Check_In_Date)}</span>}
                     {exp.Check_Out_Date && <span>退房：{formatDateOnly(exp.Check_Out_Date)}</span>}
                     <span className="font-medium text-slate-700">
@@ -270,85 +200,89 @@ export default function InfoTab({ trip }: Props) {
         )}
       </section>
 
-      {/* ── 預訂資訊 ── */}
+      {/* ── 鐵路套票資訊（從支出讀取） ── */}
+      {railExpenses.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Train size={18} className="text-blue-600" />
+              <h3 className="font-semibold text-slate-900">鐵路套票</h3>
+              <span className="text-xs text-slate-400">({railExpenses.length})</span>
+            </div>
+            <p className="text-xs text-slate-400">資料來自「支出」→「鐵路」分類</p>
+          </div>
+          <div className="space-y-2">
+            {railExpenses.map(exp => (
+              <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-900 mb-1">
+                    {exp.Sub_Category || exp.Note || '鐵路套票'}
+                    {exp.Note && exp.Sub_Category && <span className="font-normal text-slate-500 ml-1">— {exp.Note}</span>}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                    {exp.Rail_Start_Date && <span>使用期間：{formatDateOnly(exp.Rail_Start_Date)}</span>}
+                    {exp.Rail_End_Date && <span>→ {formatDateOnly(exp.Rail_End_Date)}</span>}
+                    {exp.Rail_Order_No && <span>訂單：{exp.Rail_Order_No}</span>}
+                    {exp.Rail_Platform && <span>平台：{exp.Rail_Platform}</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
+                    <span className="font-medium text-slate-700">
+                      {exp.Currency} {Number(exp.Original_Amount).toLocaleString()}
+                    </span>
+                    {exp.Currency !== trip.Base_Currency && (
+                      <span>= {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString()}</span>
+                    )}
+                    <span>· 付款：{exp.Payer}</span>
+                    {exp.Splitters && <span>· 分帳：{exp.Splitters}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── 預訂資訊（從支出中標記為「預訂」的項目） ── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Ticket size={18} className="text-blue-600" />
             <h3 className="font-semibold text-slate-900">預訂資訊</h3>
-            <span className="text-xs text-slate-400">({bookings.length})</span>
+            <span className="text-xs text-slate-400">({bookingExpenses.length})</span>
           </div>
-          <Button size="sm" variant="outline" onClick={() => openBookingModal()}>
-            <Plus size={14} /> 新增預訂
-          </Button>
+          <p className="text-xs text-slate-400">在支出中開啟「顯示於預訂資訊」</p>
         </div>
-        {bookings.length === 0 ? (
-          <EmptyState icon={<Ticket size={32} />} title="尚無預訂" description="點擊「新增預訂」新增餐廳、門票等預訂資訊" />
+        {bookingExpenses.length === 0 ? (
+          <EmptyState icon={<Ticket size={32} />} title="尚無預訂"
+            description="在新增/編輯支出時，開啟「顯示於預訂資訊」開關，即可在此顯示" />
         ) : (
           <div className="space-y-2">
-            {bookings.map(b => (
-              <div key={b.Booking_ID} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors group">
+            {bookingExpenses.map(exp => (
+              <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-slate-900">{b.Booking_Name}</span>
-                    {b.Booking_Type && <Badge color="slate">{b.Booking_Type}</Badge>}
+                    <span className="font-semibold text-slate-900">
+                      {exp.Note || exp.Sub_Category || exp.Main_Category}
+                    </span>
+                    <Badge color="blue">{exp.Main_Category}{exp.Sub_Category ? ` / ${exp.Sub_Category}` : ''}</Badge>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    {b.Date && <span>{b.Date}</span>}
-                    {b.Location && <span className="flex items-center gap-1"><MapPin size={11} />{b.Location}</span>}
-                    {b.Price && Number(b.Price) > 0 && <span>{trip.Base_Currency} {Number(b.Price).toLocaleString()}</span>}
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                    {exp.Date && <span>{formatDateOnly(exp.Date)}</span>}
+                    <span className="font-medium text-slate-700">
+                      {exp.Currency} {Number(exp.Original_Amount).toLocaleString()}
+                    </span>
+                    {exp.Currency !== trip.Base_Currency && (
+                      <span>= {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString()}</span>
+                    )}
+                    <span>· 付款：{exp.Payer}</span>
+                    {exp.Splitters && <span>· 分帳：{exp.Splitters}</span>}
                   </div>
-                  {b.Attachment && (
-                    <a href={b.Attachment} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-blue-500 hover:underline mt-1">
-                      <ExternalLink size={11} /> 查看附件
-                    </a>
-                  )}
-                </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openBookingModal(b)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Edit2 size={14} />
-                  </button>
-                  <button onClick={() => setDeleteBooking(b)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                    <Trash2 size={14} />
-                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
-
-      {/* 新增/編輯預訂 Modal */}
-      <Modal open={showBookingModal} onClose={() => setShowBookingModal(false)}
-        title={editBooking ? '編輯預訂' : '新增預訂'}
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setShowBookingModal(false)}>取消</Button>
-            <Button onClick={handleSaveBooking} loading={savingBooking}>儲存</Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <Input label="預訂名稱" required placeholder="例如：東京鐵塔門票" value={bookingForm.Booking_Name || ''}
-            onChange={e => setBookingForm(f => ({ ...f, Booking_Name: e.target.value }))} />
-          <Select label="類型" value={bookingForm.Booking_Type || ''}
-            onChange={e => setBookingForm(f => ({ ...f, Booking_Type: e.target.value }))}
-            options={BOOKING_TYPES.map(t => ({ value: t, label: t || '（選擇類型）' }))} />
-          <Input label="日期" type="date" value={bookingForm.Date || ''}
-            onChange={e => setBookingForm(f => ({ ...f, Date: e.target.value }))} />
-          <Input label="地點" placeholder="可選" value={bookingForm.Location || ''}
-            onChange={e => setBookingForm(f => ({ ...f, Location: e.target.value }))} />
-          <Input label="費用" type="number" step="0.01" min="0" placeholder="0" value={String(bookingForm.Price || '')}
-            onChange={e => setBookingForm(f => ({ ...f, Price: e.target.value }))} />
-          <Input label="附件連結" placeholder="https://..." value={bookingForm.Attachment || ''}
-            onChange={e => setBookingForm(f => ({ ...f, Attachment: e.target.value }))} />
-        </div>
-      </Modal>
-
-      {/* 刪除確認 */}
-      <ConfirmDialog open={!!deleteBooking} onClose={() => setDeleteBooking(null)} onConfirm={handleDeleteBooking}
-        title="刪除預訂" message={`確定要刪除「${deleteBooking?.Booking_Name}」嗎？`} loading={deletingBooking} />
     </div>
   );
 }

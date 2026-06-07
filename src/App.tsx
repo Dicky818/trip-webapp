@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import HomePage from './pages/HomePage';
@@ -46,9 +46,9 @@ function ProtectedRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename="/trip-webapp">
+      <HashRouter>
         <ProtectedRoutes />
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 }

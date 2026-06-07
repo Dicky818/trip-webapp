@@ -1,16 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { MapPin, AlertTriangle, ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { MapPin, AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { ItineraryItem, Trip } from '../../api/supabaseApi';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 
-// Fix Leaflet default icon path issue with Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCgBcqumEfwXfqwdSVwj7q8GOymnY_C6fY';
+
+declare global { interface Window { google: any; } }
 
 interface Props {
   trip: Trip;
@@ -26,58 +20,58 @@ interface GeoResult {
   status: 'pending' | 'found' | 'not_found';
   lat?: number;
   lng?: number;
-  source?: 'manual' | 'geocode'; // manual = from Lat/Lng field, geocode = from Nominatim
+  source?: 'manual' | 'geocode';
 }
 
-// 反向地理編碼（座標 → 地址）
-async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'zh-TW,zh,en', 'User-Agent': 'TripWebApp/1.0' } });
-    const data = await res.json();
-    if (data?.display_name) {
-      // 取前兩個地址段落（更簡潔）
-      const parts = data.display_name.split(',').slice(0, 3).map((s: string) => s.trim());
-      return parts.join(', ');
-    }
-    return null;
-  } catch { return null; }
+// Day colors for All view - 16 distinct colors
+const DAY_COLORS = [
+  '#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed',
+  '#0891b2', '#db2777', '#65a30d', '#ea580c', '#0284c7',
+  '#9333ea', '#059669', '#b45309', '#e11d48', '#0d9488',
+  '#4f46e5',
+];
+
+function getDayColor(day: number): string {
+  return DAY_COLORS[(day - 1) % DAY_COLORS.length];
 }
 
-// Nominatim 正向地理編碼
-async function geocode(query: string, countryHint: string = ''): Promise<{ lat: number; lng: number } | null> {
-  const searchQuery = countryHint ? `${query} ${countryHint}` : query;
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'zh-TW,zh,en', 'User-Agent': 'TripWebApp/1.0' } });
-    const data = await res.json();
-    if (data?.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    if (countryHint) {
-      const url2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
-      const res2 = await fetch(url2, { headers: { 'Accept-Language': 'zh-TW,zh,en', 'User-Agent': 'TripWebApp/1.0' } });
-      const data2 = await res2.json();
-      if (data2?.length > 0) return { lat: parseFloat(data2[0].lat), lng: parseFloat(data2[0].lon) };
-    }
-    return null;
-  } catch { return null; }
+// Load Google Maps script once
+let googleMapsLoaded = false;
+let googleMapsLoading = false;
+const googleMapsCallbacks: (() => void)[] = [];
+function loadGoogleMaps(callback: () => void) {
+  if (googleMapsLoaded) { callback(); return; }
+  googleMapsCallbacks.push(callback);
+  if (googleMapsLoading) return;
+  googleMapsLoading = true;
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,geocoding&language=zh-TW`;
+  script.async = true;
+  script.defer = true;
+  script.onload = () => {
+    googleMapsLoaded = true;
+    googleMapsLoading = false;
+    googleMapsCallbacks.forEach(cb => cb());
+    googleMapsCallbacks.length = 0;
+  };
+  document.head.appendChild(script);
 }
 
-// 建立數字標記 SVG
-function createNumberedIcon(num: number, isActive: boolean): L.DivIcon {
-  const bg = isActive ? '#2563eb' : '#64748b';
-  const size = isActive ? 36 : 30;
-  return L.divIcon({
-    className: '',
-    html: `<div style="width:${size}px;height:${size}px;background:${bg};border:2.5px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-      <span style="transform:rotate(45deg);color:white;font-weight:700;font-size:${isActive ? 14 : 12}px;font-family:system-ui,sans-serif;line-height:1;">${num}</span>
-    </div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size],
-    popupAnchor: [0, -size],
+async function geocodeWithGoogle(query: string): Promise<{ lat: number; lng: number } | null> {
+  return new Promise(resolve => {
+    if (!window.google?.maps?.Geocoder) { resolve(null); return; }
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: query }, (results: any, status: any) => {
+      if (status === 'OK' && results?.[0]) {
+        const loc = results[0].geometry.location;
+        resolve({ lat: loc.lat(), lng: loc.lng() });
+      } else {
+        resolve(null);
+      }
+    });
   });
 }
 
-// 判斷兩點距離是否過遠（超過 800km 視為跨國長途）
 function isTooFar(lat1: number, lng1: number, lat2: number, lng2: number): boolean {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -86,131 +80,90 @@ function isTooFar(lat1: number, lng1: number, lat2: number, lng2: number): boole
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) > 800;
 }
 
-// 長按偵測 hook（500ms）
-function useLongPress(callback: (e: L.LeafletMouseEvent) => void, map: L.Map | null) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const movedRef = useRef(false);
+// ALL_DAYS sentinel value
+const ALL_DAYS = 0;
 
-  useEffect(() => {
-    if (!map) return;
-    const onDown = (e: L.LeafletMouseEvent) => {
-      movedRef.current = false;
-      timerRef.current = setTimeout(() => {
-        if (!movedRef.current) callback(e);
-      }, 600);
-    };
-    const onMove = () => { movedRef.current = true; if (timerRef.current) clearTimeout(timerRef.current); };
-    const onUp = () => { if (timerRef.current) clearTimeout(timerRef.current); };
-    map.on('mousedown', onDown);
-    map.on('mousemove', onMove);
-    map.on('mouseup', onUp);
-    // Touch support
-    (map as any).on('touchstart', (e: any) => {
-      movedRef.current = false;
-      const touch = e.originalEvent?.touches?.[0];
-      if (!touch) return;
-      timerRef.current = setTimeout(() => {
-        if (!movedRef.current) {
-          const latlng = map.containerPointToLatLng(L.point(touch.clientX - map.getContainer().getBoundingClientRect().left, touch.clientY - map.getContainer().getBoundingClientRect().top));
-          callback({ latlng } as L.LeafletMouseEvent);
-        }
-      }, 600);
-    });
-    (map as any).on('touchmove', () => { movedRef.current = true; if (timerRef.current) clearTimeout(timerRef.current); });
-    (map as any).on('touchend', () => { if (timerRef.current) clearTimeout(timerRef.current); });
-    return () => {
-      map.off('mousedown', onDown);
-      map.off('mousemove', onMove);
-      map.off('mouseup', onUp);
-    };
-  }, [map, callback]);
-}
-
-export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays, onUpdateCoords, onCreateItem }: Props) {
-  const mapRef = useRef<L.Map | null>(null);
+export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Props) {
+  const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<L.Marker[]>([]);
-  const polylinesRef = useRef<L.Polyline[]>([]);
+  const markersRef = useRef<any[]>([]);
+  const polylinesRef = useRef<any[]>([]);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const activeInfoWindowRef = useRef<any>(null);
 
+  const [mapsReady, setMapsReady] = useState(false);
   const [geoResults, setGeoResults] = useState<Record<string, GeoResult>>({});
   const [activeIndex, setActiveIndex] = useState(0);
   const [geocoding, setGeocoding] = useState(false);
+  // viewDay: 0 = All, otherwise specific day
+  const [viewDay, setViewDay] = useState<number>(ALL_DAYS);
 
-  // 長按新增景點 Modal
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [pendingLatLng, setPendingLatLng] = useState<{ lat: number; lng: number } | null>(null);
-  const [newActivityName, setNewActivityName] = useState('');
-  const [reverseAddr, setReverseAddr] = useState<string | null>(null);
-  const [reverseLoading, setReverseLoading] = useState(false);
-  const [savingNew, setSavingNew] = useState(false);
+  // Items for the current view
+  const viewItems = useMemo(() => {
+    if (viewDay === ALL_DAYS) {
+      return [...items].sort((a, b) => {
+        const dayDiff = Number(a.Day_Number) - Number(b.Day_Number);
+        if (dayDiff !== 0) return dayDiff;
+        return Number(a.Sort_Order) - Number(b.Sort_Order);
+      });
+    }
+    return items
+      .filter(i => Number(i.Day_Number) === viewDay)
+      .sort((a, b) => Number(a.Sort_Order) - Number(b.Sort_Order));
+  }, [items, viewDay]);
 
-  // 當天行程項目（依 Sort_Order 排序）
-  const dayItems = items
-    .filter(i => Number(i.Day_Number) === selectedDay)
-    .sort((a, b) => Number(a.Sort_Order) - Number(b.Sort_Order));
-
-  // 初始化地圖
+  // Sync viewDay with parent selectedDay when not in All mode
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-    const container = mapContainerRef.current;
-    const map = L.map(container, { center: [35.6762, 139.6503], zoom: 12, zoomControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(map);
+    if (viewDay !== ALL_DAYS) setViewDay(selectedDay);
+  }, [selectedDay]);
+
+  useEffect(() => {
+    loadGoogleMaps(() => setMapsReady(true));
+  }, []);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapsReady || !mapContainerRef.current || mapRef.current) return;
+    const map = new (window.google.maps.Map as any)(mapContainerRef.current, {
+      center: { lat: 35.0116, lng: 135.7681 },
+      zoom: 13,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      zoomControl: true,
+      gestureHandling: 'greedy',
+    });
     mapRef.current = map;
-    setTimeout(() => { map.invalidateSize(); }, 100);
-    return () => { map.remove(); mapRef.current = null; };
-  }, []);
+    return () => {
+      markersRef.current.forEach(m => m.setMap(null));
+      polylinesRef.current.forEach(p => p.setMap(null));
+      mapRef.current = null;
+    };
+  }, [mapsReady]);
 
-  // 長按地圖新增景點
-  const handleLongPress = useCallback(async (e: L.LeafletMouseEvent) => {
-    const { lat, lng } = e.latlng;
-    setPendingLatLng({ lat, lng });
-    setNewActivityName('');
-    setReverseAddr(null);
-    setShowAddModal(true);
-    // 反向地理編碼
-    setReverseLoading(true);
-    const addr = await reverseGeocode(lat, lng);
-    setReverseAddr(addr);
-    setReverseLoading(false);
-  }, []);
-
-  useLongPress(handleLongPress, mapRef.current);
-
-  // 查詢當天所有景點座標（優先使用手動 Lat/Lng，否則 Nominatim）
+  // Geocode items for current view
   useEffect(() => {
-    if (dayItems.length === 0) { setGeoResults({}); return; }
+    if (!mapsReady) return;
+    if (viewItems.length === 0) { setGeoResults({}); return; }
     setGeocoding(true);
     setActiveIndex(0);
 
     const fetchAll = async () => {
       const results: Record<string, GeoResult> = {};
-      const tripName = trip.Trip_Name || '';
-      const countryHint = tripName.match(/日本|Japan/i) ? 'Japan' :
-        tripName.match(/韓國|Korea/i) ? 'Korea' :
-        tripName.match(/台灣|Taiwan/i) ? 'Taiwan' :
-        tripName.match(/泰國|Thailand/i) ? 'Thailand' :
-        tripName.match(/香港|Hong Kong/i) ? 'Hong Kong' :
-        tripName.match(/新加坡|Singapore/i) ? 'Singapore' :
-        tripName.match(/大阪|京都|東京|北海道|沖繩/i) ? 'Japan' :
-        tripName.match(/首爾|釜山/i) ? 'Korea' : '';
-
-      for (const item of dayItems) {
+      for (const item of viewItems) {
         const key = item.Itinerary_ID;
+        // Skip if already geocoded
+        if (geoResults[key]?.status === 'found' || geoResults[key]?.status === 'not_found') {
+          results[key] = geoResults[key];
+          continue;
+        }
         const manualLat = item.Lat !== undefined && item.Lat !== '' ? parseFloat(String(item.Lat)) : NaN;
         const manualLng = item.Lng !== undefined && item.Lng !== '' ? parseFloat(String(item.Lng)) : NaN;
-
-        // 優先使用手動座標
         if (!isNaN(manualLat) && !isNaN(manualLng) && manualLat >= -90 && manualLat <= 90 && manualLng >= -180 && manualLng <= 180) {
           results[key] = { status: 'found', lat: manualLat, lng: manualLng, source: 'manual' };
           setGeoResults(prev => ({ ...prev, [key]: results[key] }));
           continue;
         }
-
-        // 否則用 Nominatim
         results[key] = { status: 'pending' };
         setGeoResults(prev => ({ ...prev, [key]: { status: 'pending' } }));
         const activity = (item.Activity_Name || item.Activity)?.trim();
@@ -219,8 +172,8 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
           setGeoResults(prev => ({ ...prev, [key]: { status: 'not_found' } }));
           continue;
         }
-        await new Promise(r => setTimeout(r, 300));
-        const geo = await geocode(activity, countryHint);
+        await new Promise(r => setTimeout(r, 200));
+        const geo = await geocodeWithGoogle(activity);
         if (geo) {
           results[key] = { status: 'found', lat: geo.lat, lng: geo.lng, source: 'geocode' };
         } else {
@@ -230,98 +183,167 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
       }
       setGeocoding(false);
     };
-
     fetchAll();
-  }, [selectedDay, trip.Trip_ID, items]);
+  }, [viewDay, items, mapsReady]);
 
-  // 更新地圖標記和連線
+  // Track if activeIndex change was user-triggered (card click) vs day-change reset
+  const userClickedCardRef = useRef(false);
+
+  // Fly to active POI when user clicks a card
+  useEffect(() => {
+    if (!userClickedCardRef.current) return;
+    userClickedCardRef.current = false;
+    const map = mapRef.current;
+    if (!map || !mapsReady) return;
+    const activeItem = viewItems[activeIndex];
+    if (!activeItem) return;
+    const geo = geoResults[activeItem.Itinerary_ID];
+    if (geo?.status === 'found' && geo.lat !== undefined && geo.lng !== undefined) {
+      map.panTo({ lat: geo.lat, lng: geo.lng });
+      const currentZoom = map.getZoom() || 13;
+      if (currentZoom < 15) map.setZoom(15);
+    }
+  }, [activeIndex, geoResults, viewItems, mapsReady]);
+
+  // Update map markers and polylines
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapsReady) return;
 
-    markersRef.current.forEach(m => m.remove());
-    polylinesRef.current.forEach(p => p.remove());
+    markersRef.current.forEach(m => m.setMap(null));
+    polylinesRef.current.forEach(p => p.setMap(null));
     markersRef.current = [];
     polylinesRef.current = [];
+    if (activeInfoWindowRef.current) {
+      activeInfoWindowRef.current.close();
+      activeInfoWindowRef.current = null;
+    }
 
-    const foundItems = dayItems
+    const foundItems = viewItems
       .map((item, idx) => ({ item, idx, geo: geoResults[item.Itinerary_ID] }))
       .filter(({ geo }) => geo?.status === 'found' && geo.lat !== undefined);
 
     if (foundItems.length === 0) return;
 
-    const bounds: [number, number][] = [];
+    const bounds = new (window.google.maps as any).LatLngBounds();
+
+    // Build per-day index counters for All view labels
+    const dayIndexCounters: Record<number, number> = {};
 
     foundItems.forEach(({ item, idx, geo }) => {
       const isActive = idx === activeIndex;
-      const marker = L.marker([geo!.lat!, geo!.lng!], {
-        icon: createNumberedIcon(idx + 1, isActive),
-        draggable: true,
+      const dayNum = Number(item.Day_Number);
+      const color = viewDay === ALL_DAYS ? getDayColor(dayNum) : (isActive ? '#2563eb' : '#64748b');
+      const position = { lat: geo!.lat!, lng: geo!.lng! };
+
+      // In All mode, label shows per-day sequential index; in single day mode, shows overall index
+      let labelText: string;
+      if (viewDay === ALL_DAYS) {
+        dayIndexCounters[dayNum] = (dayIndexCounters[dayNum] || 0) + 1;
+        labelText = String(dayIndexCounters[dayNum]);
+      } else {
+        labelText = String(idx + 1);
+      }
+
+      const marker = new (window.google.maps as any).Marker({
+        position,
+        map,
+        label: {
+          text: labelText,
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: isActive ? '13px' : '11px',
+        },
+        draggable: false,
+        icon: {
+          path: (window.google.maps as any).SymbolPath.CIRCLE,
+          scale: isActive ? 18 : 14,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 2.5,
+        },
+        zIndex: isActive ? 100 : idx,
       });
 
-      marker.bindPopup(`<b>${idx + 1}. ${item.Activity_Name || item.Activity}</b>${item.Activity_Name && item.Activity ? `<br><span style="color:#64748b;font-size:11px">${item.Activity}</span>` : ''}${item.Time ? `<br><span style="color:#64748b;font-size:12px">${item.Time}</span>` : ''}${geo!.source === 'manual' ? '<br><span style="color:#10b981;font-size:11px">📍 手動座標</span>' : '<br><span style="color:#94a3b8;font-size:11px">🔍 自動定位</span>'}`);
+      const dayLabel = viewDay === ALL_DAYS ? `第 ${dayNum} 天 · ` : '';
+      const infoWindow = new (window.google.maps as any).InfoWindow({
+        content: `<div style="font-family:system-ui,sans-serif;max-width:220px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="background:${color};color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;flex-shrink:0">${dayNum}</span>
+            <b style="font-size:13px">${item.Activity_Name || item.Activity}</b>
+          </div>
+          ${dayLabel ? `<div style="color:#64748b;font-size:11px;margin-bottom:2px">${dayLabel}</div>` : ''}
+          ${item.Activity_Name && item.Activity ? `<div style="color:#64748b;font-size:11px;margin-bottom:2px">${item.Activity}</div>` : ''}
+          ${item.Time ? `<div style="color:#64748b;font-size:12px">🕐 ${item.Time}</div>` : ''}
+          <div style="color:${geo!.source === 'manual' ? '#10b981' : '#94a3b8'};font-size:11px;margin-top:4px">${geo!.source === 'manual' ? '📍 手動座標' : '🔍 自動定位'}</div>
+        </div>`,
+      });
 
-      marker.on('click', () => { setActiveIndex(idx); scrollCarouselTo(idx); });
+      marker.addListener('click', () => {
+        if (activeInfoWindowRef.current) activeInfoWindowRef.current.close();
+        infoWindow.open(map, marker);
+        activeInfoWindowRef.current = infoWindow;
+        setActiveIndex(idx);
+        scrollCarouselTo(idx);
+      });
 
-      // 拖拽結束後儲存新座標
-      marker.on('dragend', async () => {
-        const { lat, lng } = marker.getLatLng();
-        await onUpdateCoords(item.Itinerary_ID, lat, lng);
-        // 反向地理編碼提示
-        const addr = await reverseGeocode(lat, lng);
-        if (addr) {
-          const confirmed = window.confirm(`已移動至：\n${addr}\n\n是否要用此地址更新景點名稱「${item.Activity}」？`);
-          // Name update handled in ItineraryTab form
+      marker.setMap(map);
+      markersRef.current.push(marker);
+      bounds.extend(position);
+    });
+
+    // Draw polylines - in All mode, draw per day; in single day mode, draw all
+    if (viewDay === ALL_DAYS) {
+      // Group by day and draw per-day polylines
+      const dayGroups: Record<number, typeof foundItems> = {};
+      foundItems.forEach(fi => {
+        const d = Number(fi.item.Day_Number);
+        if (!dayGroups[d]) dayGroups[d] = [];
+        dayGroups[d].push(fi);
+      });
+      Object.entries(dayGroups).forEach(([dayStr, dayFoundItems]) => {
+        const dayNum = Number(dayStr);
+        const color = getDayColor(dayNum);
+        for (let i = 0; i < dayFoundItems.length - 1; i++) {
+          const a = dayFoundItems[i].geo!;
+          const b = dayFoundItems[i + 1].geo!;
+          const farApart = isTooFar(a.lat!, a.lng!, b.lat!, b.lng!);
+          const polyline = new (window.google.maps as any).Polyline({
+            path: [{ lat: a.lat!, lng: a.lng! }, { lat: b.lat!, lng: b.lng! }],
+            strokeColor: color,
+            strokeOpacity: farApart ? 0 : 0.6,
+            strokeWeight: 2,
+            icons: farApart ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '15px' }] : [],
+            map,
+          });
+          polylinesRef.current.push(polyline);
         }
       });
-
-      marker.addTo(map);
-      markersRef.current.push(marker);
-      bounds.push([geo!.lat!, geo!.lng!]);
-    });
-
-    // 連線
-    for (let i = 0; i < foundItems.length - 1; i++) {
-      const a = foundItems[i].geo!;
-      const b = foundItems[i + 1].geo!;
-      const farApart = isTooFar(a.lat!, a.lng!, b.lat!, b.lng!);
-      const polyline = L.polyline([[a.lat!, a.lng!], [b.lat!, b.lng!]],
-        farApart
-          ? { color: '#f59e0b', weight: 2, opacity: 0.5, dashArray: '8, 8' }
-          : { color: '#3b82f6', weight: 2.5, opacity: 0.6, dashArray: '6, 4' }
-      );
-      polyline.addTo(map);
-      polylinesRef.current.push(polyline);
+    } else {
+      for (let i = 0; i < foundItems.length - 1; i++) {
+        const a = foundItems[i].geo!;
+        const b = foundItems[i + 1].geo!;
+        const farApart = isTooFar(a.lat!, a.lng!, b.lat!, b.lng!);
+        const polyline = new (window.google.maps as any).Polyline({
+          path: [{ lat: a.lat!, lng: a.lng! }, { lat: b.lat!, lng: b.lng! }],
+          strokeColor: farApart ? '#f59e0b' : '#3b82f6',
+          strokeOpacity: 0.7,
+          strokeWeight: 2.5,
+          icons: farApart ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 }, offset: '0', repeat: '20px' }] : [],
+          map,
+        });
+        polylinesRef.current.push(polyline);
+      }
     }
 
-    if (bounds.length === 1) map.setView(bounds[0], 14);
-    else if (bounds.length > 1) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-  }, [geoResults, selectedDay, activeIndex]);
-
-  // 更新標記高亮
-  useEffect(() => {
-    const foundItems = dayItems
-      .map((item, idx) => ({ item, idx, geo: geoResults[item.Itinerary_ID] }))
-      .filter(({ geo }) => geo?.status === 'found');
-    markersRef.current.forEach((marker, i) => {
-      const item = foundItems[i];
-      if (!item) return;
-      marker.setIcon(createNumberedIcon(item.idx + 1, item.idx === activeIndex));
-    });
-  }, [activeIndex]);
-
-  // panTo 至 activeIndex
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const foundItems = dayItems
-      .map((item, idx) => ({ item, idx, geo: geoResults[item.Itinerary_ID] }))
-      .filter(({ geo }) => geo?.status === 'found');
-    const target = foundItems.find(f => f.idx === activeIndex);
-    if (target?.geo?.lat !== undefined) {
-      map.panTo([target.geo.lat!, target.geo.lng!], { animate: true, duration: 0.5 });
+    if (foundItems.length === 1) {
+      map.setCenter({ lat: foundItems[0].geo!.lat!, lng: foundItems[0].geo!.lng! });
+      map.setZoom(15);
+    } else {
+      map.fitBounds(bounds, 40);
     }
-  }, [activeIndex]);
+  }, [geoResults, viewDay, activeIndex, mapsReady]);
 
   const scrollCarouselTo = useCallback((idx: number) => {
     if (!carouselRef.current) return;
@@ -335,186 +357,200 @@ export default function MapTab({ trip, items, selectedDay, onDayChange, tripDays
     const container = carouselRef.current;
     const cardWidth = container.offsetWidth * 0.85 + 12;
     const idx = Math.round(container.scrollLeft / cardWidth);
-    if (idx !== activeIndex && idx >= 0 && idx < dayItems.length) setActiveIndex(idx);
-  }, [activeIndex, dayItems.length]);
+    if (idx !== activeIndex && idx >= 0 && idx < viewItems.length) setActiveIndex(idx);
+  }, [activeIndex, viewItems.length]);
 
-  const handlePrevDay = () => { if (selectedDay > 1) { onDayChange(selectedDay - 1); setActiveIndex(0); } };
-  const handleNextDay = () => { if (selectedDay < tripDays.length) { onDayChange(selectedDay + 1); setActiveIndex(0); } };
+  const handlePrevDay = () => {
+    if (viewDay === ALL_DAYS) return;
+    if (viewDay > 1) { const nd = viewDay - 1; setViewDay(nd); onDayChange(nd); setActiveIndex(0); }
+    else { setViewDay(ALL_DAYS); setActiveIndex(0); }
+  };
 
-  const handleConfirmAdd = async () => {
-    if (!newActivityName.trim() || !pendingLatLng) return;
-    setSavingNew(true);
-    await onCreateItem(selectedDay, pendingLatLng.lat, pendingLatLng.lng, newActivityName.trim());
-    setSavingNew(false);
-    setShowAddModal(false);
-    setPendingLatLng(null);
-    setNewActivityName('');
+  const handleNextDay = () => {
+    if (viewDay === ALL_DAYS) { const nd = 1; setViewDay(nd); onDayChange(nd); setActiveIndex(0); }
+    else if (viewDay < tripDays.length) { const nd = viewDay + 1; setViewDay(nd); onDayChange(nd); setActiveIndex(0); }
+  };
+
+  const handleDayButtonClick = (day: number) => {
+    setViewDay(day);
+    onDayChange(day);
+    setActiveIndex(0);
   };
 
   return (
     <div className="flex flex-col" style={{ minHeight: '600px' }}>
-      {/* 天數切換列 */}
+      {/* Day selector bar */}
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100 flex-shrink-0">
-        <button onClick={handlePrevDay} disabled={selectedDay <= 1}
+        <button onClick={handlePrevDay} disabled={viewDay === ALL_DAYS}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-30 transition-colors">
           <ChevronLeft size={18} />
         </button>
         <div className="flex gap-1 flex-1 overflow-x-auto scrollbar-hide">
-          {tripDays.map(({ day, date }) => (
-            <button key={day} onClick={() => { onDayChange(day); setActiveIndex(0); }}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap
-                ${selectedDay === day ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
-              Day {day}
-              <span className="block text-[10px] opacity-70">{date.slice(5).replace('-', '/')}</span>
-            </button>
-          ))}
+          {/* All button */}
+          <button
+            onClick={() => { setViewDay(ALL_DAYS); setActiveIndex(0); }}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap
+              ${viewDay === ALL_DAYS ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
+            All
+            <span className="block text-[10px] opacity-70">全部</span>
+          </button>
+          {/* Per-day buttons with color indicator */}
+          {tripDays.map(({ day, date }) => {
+            const color = getDayColor(day);
+            const isSelected = viewDay === day;
+            return (
+              <button key={day} onClick={() => handleDayButtonClick(day)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap border-2
+                  ${isSelected ? 'text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 border-transparent'}`}
+                style={isSelected ? { backgroundColor: color, borderColor: color } : { borderColor: 'transparent' }}>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: isSelected ? 'white' : color }} />
+                  Day {day}
+                </span>
+                <span className="block text-[10px] opacity-70">{date.slice(5).replace('-', '/')}</span>
+              </button>
+            );
+          })}
         </div>
-        <button onClick={handleNextDay} disabled={selectedDay >= tripDays.length}
+        <button onClick={handleNextDay} disabled={viewDay === tripDays.length}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-30 transition-colors">
           <ChevronRight size={18} />
         </button>
       </div>
 
-      {/* 地圖區域（固定高度 280px） */}
+      {/* Legend for All view */}
+      {viewDay === ALL_DAYS && tripDays.length > 0 && (
+        <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex-shrink-0">
+          <div className="flex flex-wrap gap-2">
+            {tripDays.map(({ day, date }) => (
+              <button key={day} onClick={() => handleDayButtonClick(day)}
+                className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 transition-colors">
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: getDayColor(day) }} />
+                <span>Day {day} ({date.slice(5).replace('-', '/')})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Google Maps area */}
       <div className="relative flex-shrink-0" style={{ height: '280px' }}>
         <div ref={mapContainerRef} style={{ width: '100%', height: '280px' }} />
-        {/* 長按提示 */}
-        <div className="absolute bottom-2 left-2 z-[1000] bg-white/90 rounded-lg px-2.5 py-1 text-xs text-slate-500 shadow">
-          長按地圖新增景點 · 拖拽標記移動位置
-        </div>
+        {!mapsReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
+            <Loader2 size={24} className="animate-spin text-blue-500" />
+          </div>
+        )}
         {geocoding && (
-          <div className="absolute top-2 right-2 z-[1000] bg-white rounded-lg shadow px-3 py-1.5 flex items-center gap-2 text-xs text-slate-600">
+          <div className="absolute top-2 right-2 z-[100] bg-white rounded-lg shadow px-3 py-1.5 flex items-center gap-2 text-xs text-slate-600">
             <Loader2 size={13} className="animate-spin text-blue-500" />
             正在定位景點...
           </div>
         )}
-        {!geocoding && dayItems.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-50/80 z-[1000]">
+        {!geocoding && viewItems.length === 0 && mapsReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-50/80 z-[100]">
             <div className="text-center text-slate-500">
               <MapPin size={28} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm">第 {selectedDay} 天尚無行程</p>
-              <p className="text-xs text-slate-400 mt-1">長按地圖可直接新增景點</p>
+              <p className="text-sm">{viewDay === ALL_DAYS ? '尚無任何行程' : `第 ${viewDay} 天尚無行程`}</p>
+              <p className="text-xs text-slate-400 mt-1">請在「每日行程」分頁新增行程</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* 卡片輪播區域 */}
+      {/* Carousel */}
       <div className="flex-1 bg-slate-50 overflow-hidden flex flex-col" style={{ minHeight: '200px' }}>
-        {dayItems.length === 0 ? (
+        {viewItems.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-            請先在「每日行程」分頁新增行程，或長按地圖直接新增
+            請先在「每日行程」分頁新增行程
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between px-4 pt-3 pb-1 flex-shrink-0">
-              <span className="text-xs font-medium text-slate-500">第 {selectedDay} 天 · {dayItems.length} 個景點</span>
-              <span className="text-xs text-slate-400">{activeIndex + 1} / {dayItems.length}</span>
+              <span className="text-xs font-medium text-slate-500">
+                {viewDay === ALL_DAYS ? `全部 · ${viewItems.length} 個景點` : `第 ${viewDay} 天 · ${viewItems.length} 個景點`}
+              </span>
+              <span className="text-xs text-slate-400">{activeIndex + 1} / {viewItems.length}</span>
             </div>
             <div ref={carouselRef} onScroll={handleCarouselScroll}
               className="flex-1 overflow-x-auto flex gap-3 px-4 pb-4 pt-1 snap-x snap-mandatory scrollbar-hide"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {dayItems.map((item, idx) => {
+              {(() => {
+                // Build per-day index map for All view
+                const dayCounters: Record<number, number> = {};
+                const perDayIndex = viewItems.map(item => {
+                  const d = Number(item.Day_Number);
+                  dayCounters[d] = (dayCounters[d] || 0) + 1;
+                  return dayCounters[d];
+                });
+                return viewItems.map((item, idx) => {
                 const geo = geoResults[item.Itinerary_ID];
                 const isActive = idx === activeIndex;
                 const isPending = !geo || geo.status === 'pending';
                 const isFound = geo?.status === 'found';
                 const isNotFound = geo?.status === 'not_found';
                 const isManual = geo?.source === 'manual';
+                const dayNum = Number(item.Day_Number);
+                const dayColor = getDayColor(dayNum);
+                const cardLabel = viewDay === ALL_DAYS ? perDayIndex[idx] : idx + 1;
                 return (
-                  <div key={item.Itinerary_ID} onClick={() => { setActiveIndex(idx); scrollCarouselTo(idx); }}
+                  <div key={item.Itinerary_ID} onClick={() => { userClickedCardRef.current = true; setActiveIndex(idx); scrollCarouselTo(idx); }}
                     className={`flex-shrink-0 snap-center rounded-2xl p-4 cursor-pointer transition-all duration-200 border
-                      ${isActive ? 'bg-white border-blue-300 shadow-md' : 'bg-white border-slate-200 shadow-sm opacity-80'}`}
-                    style={{ width: '85%' }}>
+                      ${isActive ? 'bg-white shadow-md' : 'bg-white border-slate-200 shadow-sm opacity-80'}`}
+                    style={isActive ? { borderColor: viewDay === ALL_DAYS ? dayColor : '#93c5fd', borderWidth: '2px' } : {}}
+                    data-width="85%">
                     <div className="flex items-start gap-3">
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white
-                        ${isActive ? 'bg-blue-600' : 'bg-slate-400'}`}>
-                        {idx + 1}
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                        style={{ backgroundColor: viewDay === ALL_DAYS ? dayColor : (isActive ? '#2563eb' : '#94a3b8') }}>
+                        {cardLabel}
                       </div>
                       <div className="flex-1 min-w-0">
-                        {item.Time && <span className="text-xs text-slate-400 font-mono">{item.Time}</span>}
+                        {viewDay === ALL_DAYS && (
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded-full text-white mb-1 inline-block"
+                            style={{ backgroundColor: dayColor }}>
+                            第 {dayNum} 天
+                          </span>
+                        )}
+                        {item.Time && <span className="block text-xs text-slate-400 font-mono">{item.Time}</span>}
                         <p className={`text-sm font-medium mt-0.5 leading-snug ${isActive ? 'text-slate-900' : 'text-slate-600'}`}>
                           {item.Activity_Name || item.Activity}
                         </p>
                         {item.Activity_Name && item.Activity && (
-                          <p className="text-xs text-slate-400 leading-snug">{item.Activity}</p>
+                          <p className="text-xs text-slate-400 leading-snug whitespace-pre-wrap break-words">{item.Activity}</p>
                         )}
                         {item.Note && (
-                          <p className="text-xs text-slate-400 italic leading-snug">{item.Note}</p>
+                          <div className="mt-0.5 space-y-0.5">
+                            {item.Note.split('\n').map((url, i) => {
+                              const trimmed = url.trim();
+                              if (!trimmed) return null;
+                              return /^https?:\/\//.test(trimmed) ? (
+                                <a key={i} href={trimmed} target="_blank" rel="noopener noreferrer"
+                                  className="block text-xs text-blue-500 underline break-all italic">
+                                  {trimmed}
+                                </a>
+                              ) : (
+                                <p key={i} className="text-xs text-slate-400 italic">{trimmed}</p>
+                              );
+                            })}
+                          </div>
                         )}
                         <div className="mt-2 flex items-center gap-1.5">
                           {isPending && <span className="flex items-center gap-1 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> 定位中...</span>}
                           {isFound && isManual && <span className="flex items-center gap-1 text-xs text-blue-600"><MapPin size={11} /> 手動座標</span>}
                           {isFound && !isManual && <span className="flex items-center gap-1 text-xs text-emerald-600"><MapPin size={11} /> 自動定位</span>}
-                          {isNotFound && <span className="flex items-center gap-1 text-xs text-amber-500"><AlertTriangle size={11} /> ⚠ 無法定位</span>}
+                          {isNotFound && <span className="flex items-center gap-1 text-xs text-amber-500"><AlertTriangle size={11} /> 無法定位</span>}
                         </div>
-                        {/* 顯示已儲存的座標 */}
-                        {item.Lat && item.Lng && (
-                          <p className="text-[10px] text-slate-400 mt-1 font-mono">
-                            {parseFloat(String(item.Lat)).toFixed(4)}, {parseFloat(String(item.Lng)).toFixed(4)}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </div>
                 );
-              })}
-              <div className="flex-shrink-0" style={{ width: '7.5%' }} />
+              });
+              })()}
+              <div className="flex-shrink-0 w-[7.5%]" />
             </div>
           </>
         )}
       </div>
-
-      {/* 長按新增景點 Modal */}
-      {showAddModal && pendingLatLng && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <Plus size={16} className="text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-slate-900">新增景點</h3>
-            </div>
-            <p className="text-xs text-slate-500 mb-3 font-mono">
-              📍 {pendingLatLng.lat.toFixed(5)}, {pendingLatLng.lng.toFixed(5)}
-            </p>
-            {reverseLoading && (
-              <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
-                <Loader2 size={11} className="animate-spin" /> 正在取得地址...
-              </p>
-            )}
-            {reverseAddr && !reverseLoading && (
-              <div className="bg-slate-50 rounded-lg p-2.5 mb-3">
-                <p className="text-xs text-slate-500 mb-1">附近地址：</p>
-                <p className="text-xs text-slate-700">{reverseAddr}</p>
-              </div>
-            )}
-            <div className="mb-4">
-              <label className="text-sm font-medium text-slate-700 block mb-1.5">景點名稱 *</label>
-              <input
-                type="text"
-                placeholder="例如：清水寺、路邊拉麵店..."
-                value={newActivityName}
-                onChange={e => setNewActivityName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleConfirmAdd(); }}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoFocus
-              />
-            </div>
-            <p className="text-xs text-slate-400 mb-4">將新增至第 {selectedDay} 天行程</p>
-            <div className="flex gap-2">
-              <button onClick={() => { setShowAddModal(false); setPendingLatLng(null); }}
-                className="flex-1 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
-                取消
-              </button>
-              <button onClick={handleConfirmAdd} disabled={!newActivityName.trim() || savingNew}
-                className="flex-1 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50">
-                {savingNew ? '新增中...' : '新增景點'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

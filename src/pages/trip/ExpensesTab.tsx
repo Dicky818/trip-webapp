@@ -26,8 +26,10 @@ export default function ExpensesTab({ trip }: Props) {
     Original_Amount: '', Currency: trip.Base_Currency,
     Exchange_Rate: '1', Payer: '', splitterIds: [],
     Flight_No: '', Airline: '', Departure_Location: '', Arrival_Location: '',
-    Flight_Date: '', Departure_Time: '', Arrival_Date: '', Arrival_Time: '', Flight_Status: '',
-    Accommodation_Address: '', Check_In_Date: '', Check_Out_Date: '',
+    Flight_Date: '', Departure_Time: '', Landing_Time: '', Arrival_Date: '', Arrival_Time: '', Return_Landing_Time: '', Flight_Status: '',
+    Accommodation_Name: '', Accommodation_Address: '', Check_In_Date: '', Check_Out_Date: '',
+    Rail_Start_Date: '', Rail_End_Date: '', Rail_Order_No: '', Rail_Platform: '',
+    Is_Booking: false,
   });
   const [savingExpense, setSavingExpense] = useState(false);
   const [deleteExpense, setDeleteExpense] = useState<Expense | null>(null);
@@ -131,12 +133,20 @@ export default function ExpensesTab({ trip }: Props) {
         Arrival_Location: expense.Arrival_Location || '',
         Flight_Date: expense.Flight_Date || '',
         Departure_Time: expense.Departure_Time || '',
+        Landing_Time: expense.Landing_Time || '',
         Arrival_Date: expense.Arrival_Date || '',
         Arrival_Time: expense.Arrival_Time || '',
+        Return_Landing_Time: expense.Return_Landing_Time || '',
         Flight_Status: expense.Flight_Status || '',
+        Accommodation_Name: expense.Accommodation_Name || '',
         Accommodation_Address: expense.Accommodation_Address || '',
         Check_In_Date: expense.Check_In_Date || '',
         Check_Out_Date: expense.Check_Out_Date || '',
+        Rail_Start_Date: expense.Rail_Start_Date || '',
+        Rail_End_Date: expense.Rail_End_Date || '',
+        Rail_Order_No: expense.Rail_Order_No || '',
+        Rail_Platform: expense.Rail_Platform || '',
+        Is_Booking: expense.Is_Booking || false,
       });
     } else {
       setExpenseForm({
@@ -182,15 +192,23 @@ export default function ExpensesTab({ trip }: Props) {
           Arrival_Location: expenseForm.Arrival_Location,
           Flight_Date: expenseForm.Flight_Date,
           Departure_Time: expenseForm.Departure_Time,
+          Landing_Time: expenseForm.Landing_Time,
           Arrival_Date: expenseForm.Arrival_Date,
           Arrival_Time: expenseForm.Arrival_Time,
+          Return_Landing_Time: expenseForm.Return_Landing_Time,
           Flight_Status: expenseForm.Flight_Status,
         } : {}),
         ...(isAccommodationCategory ? {
+          Accommodation_Name: expenseForm.Accommodation_Name,
           Accommodation_Address: expenseForm.Accommodation_Address,
           Check_In_Date: expenseForm.Check_In_Date,
           Check_Out_Date: expenseForm.Check_Out_Date,
         } : {}),
+        Rail_Start_Date: expenseForm.Rail_Start_Date || undefined,
+        Rail_End_Date: expenseForm.Rail_End_Date || undefined,
+        Rail_Order_No: expenseForm.Rail_Order_No || undefined,
+        Rail_Platform: expenseForm.Rail_Platform || undefined,
+        Is_Booking: expenseForm.Is_Booking,
       };
       if (editExpense) {
         await api.updateExpense(editExpense.Expense_ID, payload);
@@ -608,18 +626,27 @@ export default function ExpensesTab({ trip }: Props) {
                 ]} />
               <Input label="出發時間" type="time" value={expenseForm.Departure_Time || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Departure_Time: e.target.value }))} />
+              <Input label="到達時間" type="time" value={expenseForm.Landing_Time || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Landing_Time: e.target.value }))} />
               <Input label="回程日期" type="date" value={expenseForm.Arrival_Date || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Arrival_Date: e.target.value }))} />
               <Input label="回程時間" type="time" value={expenseForm.Arrival_Time || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Arrival_Time: e.target.value }))} />
+              <Input label="到港時間" type="time" value={expenseForm.Return_Landing_Time || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Return_Landing_Time: e.target.value }))} />
             </>
           )}
 
           {/* 住宿額外欄位 */}
-          {(expenseForm.Main_Category === '住宿' || expenseForm.Sub_Category === '住宿') && (
+          {(expenseForm.Main_Category === '住宿' || expenseForm.Sub_Category === '住宿' ||
+            ['酒店', '民宿', 'Airbnb', '旅館'].some(k => (expenseForm.Sub_Category || '').includes(k))) && (
             <>
               <div className="col-span-2 border-t border-slate-100 pt-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">住宿資訊</p>
+              </div>
+              <div className="col-span-2">
+                <Input label="名稱" placeholder="例如：新宿格蘭貝爾酒店" value={expenseForm.Accommodation_Name || ''}
+                  onChange={e => setExpenseForm(f => ({ ...f, Accommodation_Name: e.target.value }))} />
               </div>
               <div className="col-span-2">
                 <Input label="地址" placeholder="例如：東京都新宿區..." value={expenseForm.Accommodation_Address || ''}
@@ -631,6 +658,44 @@ export default function ExpensesTab({ trip }: Props) {
                 onChange={e => setExpenseForm(f => ({ ...f, Check_Out_Date: e.target.value }))} />
             </>
           )}
+
+          {/* 鐵路套票額外欄位 */}
+          {(['鐵路', '套票', 'Pass', 'Rail', 'JR', '新幹線'].some(k => (expenseForm.Sub_Category || '').toLowerCase().includes(k.toLowerCase())) ||
+            expenseForm.Main_Category === '鐵路' || expenseForm.Sub_Category === '鐵路（套票）') && (
+            <>
+              <div className="col-span-2 border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">鐵路套票資訊</p>
+              </div>
+              <Input label="使用開始日期" type="date" value={expenseForm.Rail_Start_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Rail_Start_Date: e.target.value }))} />
+              <Input label="使用完結日期" type="date" value={expenseForm.Rail_End_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Rail_End_Date: e.target.value }))} />
+              <Input label="訂單編號" placeholder="例如：JR-2026-XXXXX" value={expenseForm.Rail_Order_No || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Rail_Order_No: e.target.value }))} />
+              <Input label="購買平台" placeholder="例如：JR Pass Official" value={expenseForm.Rail_Platform || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Rail_Platform: e.target.value }))} />
+            </>
+          )}
+
+          {/* 預訂 Toggle */}
+          <div className="col-span-2 border-t border-slate-100 pt-3">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <div
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  expenseForm.Is_Booking ? 'bg-blue-600' : 'bg-slate-200'
+                }`}
+                onClick={() => setExpenseForm(f => ({ ...f, Is_Booking: !f.Is_Booking }))}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  expenseForm.Is_Booking ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </div>
+              <span className="text-sm font-medium text-slate-700">顯示於預訂資訊</span>
+              {expenseForm.Is_Booking && (
+                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">已標記為預訂</span>
+              )}
+            </label>
+          </div>
         </div>
       </Modal>
 

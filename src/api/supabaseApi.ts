@@ -98,6 +98,20 @@ export interface ItineraryItem {
   Lng?: string | number;
 }
 
+export interface ItineraryAlternative {
+  Alt_ID: string;
+  Trip_ID: string;
+  Day_Number: number;
+  Time?: string;
+  Activity: string;
+  Activity_Name?: string;
+  Note?: string;
+  Location?: string;
+  Lat?: number;
+  Lng?: number;
+  Created_At: string;
+}
+
 export interface DayAccommodation {
   Day_Accommodation_ID: string;
   Trip_ID: string;
@@ -129,13 +143,23 @@ export interface Expense {
   Arrival_Location?: string;
   Flight_Date?: string;
   Departure_Time?: string;
+  Landing_Time?: string;
   Arrival_Date?: string;
   Arrival_Time?: string;
+  Return_Landing_Time?: string;
   Flight_Status?: string;
   // Accommodation-specific fields
+  Accommodation_Name?: string;
   Accommodation_Address?: string;
   Check_In_Date?: string;
   Check_Out_Date?: string;
+  // Rail pass fields
+  Rail_Start_Date?: string;
+  Rail_End_Date?: string;
+  Rail_Order_No?: string;
+  Rail_Platform?: string;
+  // Booking flag
+  Is_Booking?: boolean;
   Created_At: string;
   Updated_At: string;
 }
@@ -285,12 +309,20 @@ function rowToExpense(r: Record<string, unknown>): Expense {
     Arrival_Location: (r.arrival_location as string) || '',
     Flight_Date: (r.flight_date as string) || '',
     Departure_Time: (r.departure_time as string) || '',
+    Landing_Time: (r.landing_time as string) || '',
     Arrival_Date: (r.arrival_date as string) || '',
     Arrival_Time: (r.arrival_time as string) || '',
+    Return_Landing_Time: (r.return_landing_time as string) || '',
     Flight_Status: (r.flight_status as string) || '',
+    Accommodation_Name: (r.accommodation_name as string) || '',
     Accommodation_Address: (r.accommodation_address as string) || '',
     Check_In_Date: (r.check_in_date as string) || '',
     Check_Out_Date: (r.check_out_date as string) || '',
+    Rail_Start_Date: (r.rail_start_date as string) || '',
+    Rail_End_Date: (r.rail_end_date as string) || '',
+    Rail_Order_No: (r.rail_order_no as string) || '',
+    Rail_Platform: (r.rail_platform as string) || '',
+    Is_Booking: (r.is_booking as boolean) || false,
     Created_At: (r.created_at as string) || '',
     Updated_At: (r.updated_at as string) || '',
   };
@@ -807,6 +839,82 @@ export const api = {
     return ok((inserted || []).map(rowToItinerary));
   },
 
+  // ── Alternative Itinerary ────────────────────────────────
+  getAlternatives: async (tripId: string) => {
+    const { data, error } = await supabase
+      .from('itinerary_alternatives')
+      .select('*')
+      .eq('trip_id', tripId)
+      .order('day_number')
+      .order('created_at');
+    if (error) return err(error.message);
+    return ok((data || []).map((r: Record<string, unknown>) => ({
+      Alt_ID: r.id as string,
+      Trip_ID: r.trip_id as string,
+      Day_Number: r.day_number as number,
+      Time: (r.time as string) || '',
+      Activity: (r.activity as string) || '',
+      Activity_Name: (r.activity_name as string) || '',
+      Note: (r.note as string) || '',
+      Location: (r.location_name as string) || '',
+      Lat: r.lat as number | undefined,
+      Lng: r.lng as number | undefined,
+      Created_At: (r.created_at as string) || '',
+    } as ItineraryAlternative)));
+  },
+
+  createAlternative: async (body: Partial<ItineraryAlternative>) => {
+    const { data, error } = await supabase
+      .from('itinerary_alternatives')
+      .insert({
+        trip_id: body.Trip_ID,
+        day_number: Number(body.Day_Number) || 1,
+        time: body.Time || '',
+        activity: body.Activity || '',
+        activity_name: body.Activity_Name || '',
+        note: body.Note || '',
+        location_name: body.Location || '',
+        lat: body.Lat ? Number(body.Lat) : null,
+        lng: body.Lng ? Number(body.Lng) : null,
+      })
+      .select()
+      .single();
+    if (error) return err(error.message);
+    return ok({
+      Alt_ID: data.id as string,
+      Trip_ID: data.trip_id as string,
+      Day_Number: data.day_number as number,
+      Time: (data.time as string) || '',
+      Activity: (data.activity as string) || '',
+      Activity_Name: (data.activity_name as string) || '',
+      Note: (data.note as string) || '',
+      Location: (data.location_name as string) || '',
+      Lat: data.lat as number | undefined,
+      Lng: data.lng as number | undefined,
+      Created_At: (data.created_at as string) || '',
+    } as ItineraryAlternative);
+  },
+
+  updateAlternative: async (altId: string, body: Partial<ItineraryAlternative>) => {
+    const updates: Record<string, unknown> = {};
+    if (body.Time !== undefined) updates.time = body.Time;
+    if (body.Activity !== undefined) updates.activity = body.Activity;
+    if (body.Activity_Name !== undefined) updates.activity_name = body.Activity_Name;
+    if (body.Note !== undefined) updates.note = body.Note;
+    if (body.Location !== undefined) updates.location_name = body.Location;
+    if (body.Lat !== undefined) updates.lat = body.Lat ? Number(body.Lat) : null;
+    if (body.Lng !== undefined) updates.lng = body.Lng ? Number(body.Lng) : null;
+    const { error } = await supabase.from('itinerary_alternatives').update(updates).eq('id', altId);
+    if (error) return err(error.message);
+    return ok(null);
+  },
+
+  deleteAlternative: async (altId: string) => {
+    const { error } = await supabase.from('itinerary_alternatives').delete().eq('id', altId);
+    if (error) return err(error.message);
+    return ok(null);
+  },
+
   // ── Day Accommodations ───────────────────────────────────
   getDayAccommodations: async (tripId: string) => {
     const { data, error } = await supabase
@@ -819,7 +927,8 @@ export const api = {
       Trip_ID: r.trip_id as string,
       Day_Number: r.day_number as number,
       Date: '',
-      Accommodation_ID: (r.accommodation_id as string) || '',
+      // Use expense_id (new) or fall back to accommodation_id (legacy)
+      Accommodation_ID: (r.expense_id as string) || (r.accommodation_id as string) || '',
       Created_At: (r.created_at as string) || '',
       Updated_At: (r.created_at as string) || '',
     } as DayAccommodation)));
@@ -837,7 +946,7 @@ export const api = {
       const { error } = await supabase.from('day_accommodations').insert({
         trip_id: body.Trip_ID,
         day_number: body.Day_Number,
-        accommodation_id: body.Accommodation_ID,
+        expense_id: body.Accommodation_ID,  // Store as expense_id (references expenses table)
       });
       if (error) return err(error.message);
     }
@@ -893,12 +1002,20 @@ export const api = {
         arrival_location: body.Arrival_Location || null,
         flight_date: body.Flight_Date || null,
         departure_time: body.Departure_Time || null,
+        landing_time: body.Landing_Time || null,
         arrival_date: body.Arrival_Date || null,
         arrival_time: body.Arrival_Time || null,
+        return_landing_time: body.Return_Landing_Time || null,
         flight_status: body.Flight_Status || null,
+        accommodation_name: body.Accommodation_Name || null,
         accommodation_address: body.Accommodation_Address || null,
         check_in_date: body.Check_In_Date || null,
         check_out_date: body.Check_Out_Date || null,
+        rail_start_date: body.Rail_Start_Date || null,
+        rail_end_date: body.Rail_End_Date || null,
+        rail_order_no: body.Rail_Order_No || null,
+        rail_platform: body.Rail_Platform || null,
+        is_booking: body.Is_Booking || false,
       })
       .select()
       .single();
@@ -923,12 +1040,20 @@ export const api = {
     if (body.Arrival_Location !== undefined) updates.arrival_location = body.Arrival_Location;
     if (body.Flight_Date !== undefined) updates.flight_date = body.Flight_Date || null;
     if (body.Departure_Time !== undefined) updates.departure_time = body.Departure_Time;
+    if (body.Landing_Time !== undefined) updates.landing_time = body.Landing_Time;
     if (body.Arrival_Date !== undefined) updates.arrival_date = body.Arrival_Date || null;
     if (body.Arrival_Time !== undefined) updates.arrival_time = body.Arrival_Time;
+    if (body.Return_Landing_Time !== undefined) updates.return_landing_time = body.Return_Landing_Time;
     if (body.Flight_Status !== undefined) updates.flight_status = body.Flight_Status;
+    if (body.Accommodation_Name !== undefined) updates.accommodation_name = body.Accommodation_Name;
     if (body.Accommodation_Address !== undefined) updates.accommodation_address = body.Accommodation_Address;
     if (body.Check_In_Date !== undefined) updates.check_in_date = body.Check_In_Date || null;
     if (body.Check_Out_Date !== undefined) updates.check_out_date = body.Check_Out_Date || null;
+    if (body.Rail_Start_Date !== undefined) updates.rail_start_date = body.Rail_Start_Date || null;
+    if (body.Rail_End_Date !== undefined) updates.rail_end_date = body.Rail_End_Date || null;
+    if (body.Rail_Order_No !== undefined) updates.rail_order_no = body.Rail_Order_No;
+    if (body.Rail_Platform !== undefined) updates.rail_platform = body.Rail_Platform;
+    if (body.Is_Booking !== undefined) updates.is_booking = body.Is_Booking;
 
     // Recalculate base amount if amount or currency changed
     if (body.Original_Amount !== undefined || body.Currency !== undefined) {
@@ -1156,30 +1281,57 @@ export const api = {
     const itinerary = itinRes.success ? (itinRes as { success: true; data: ItineraryItem[] }).data : [];
     const expenses = expRes.success ? (expRes as { success: true; data: Expense[] }).data : [];
 
-    const prompt = `你是一個旅遊助手。請根據以下行程資料，提供旅遊注意事項和建議：
-行程：${trip?.Trip_Name}（${trip?.Start_Date} ~ ${trip?.End_Date}）
-行程項目：${itinerary.slice(0, 20).map(i => `Day${i.Day_Number} ${i.Time} ${i.Activity}`).join('、')}
+    // Build flight info
+    const flightExpenses = expenses.filter(e => e.Main_Category === '機票' || e.Sub_Category?.includes('機票'));
+    const accExpenses = expenses.filter(e => e.Main_Category === '住宿' || ['酒店','民宿','Airbnb'].some(k => e.Sub_Category?.includes(k)));
+
+    const prompt = `你是一個旅遊助手。請根據以下行程資料，提供詳細的旅遊注意事項和建議：
+
+行程名稱：${trip?.Trip_Name}
+旅遊日期：${trip?.Start_Date} 至 ${trip?.End_Date}
+基礎貨幣：${trip?.Base_Currency}
+
+航班資訊：${flightExpenses.map(f => `${f.Flight_No || ''} ${f.Departure_Location || ''}→${f.Arrival_Location || ''} ${f.Flight_Date || ''}`).join('；') || '未填寫'}
+住宿資訊：${accExpenses.map(a => `${a.Sub_Category || ''} ${a.Accommodation_Address || ''} (${a.Check_In_Date || ''}~${a.Check_Out_Date || ''})`).join('；') || '未填寫'}
+每日行程：${itinerary.slice(0, 30).map(i => `第${i.Day_Number}天 ${i.Time || ''} ${i.Activity}`).join('、')}
 支出概況：共 ${expenses.length} 筆，總計 ${expenses.reduce((s, e) => s + Number(e.Base_Amount || 0), 0).toFixed(0)} ${trip?.Base_Currency}
-請用繁體中文回答，提供 5-8 點實用建議。`;
+
+請用繁體中文回答，提供以下方面的實用建議（每點用 ## 標題分隔）：
+1. 入境要求（簽證、護照有效期）
+2. 當地天氣與穿著建議
+3. 交通注意事項
+4. 住宿注意事項
+5. 文化禮儀與當地習俗
+6. 緊急聯絡資訊
+7. 行李打包建議
+8. 其他重要提示`;
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Call Supabase Edge Function as secure proxy
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || '';
+      const supabaseUrl = 'https://skrdhktjyiiipxcuxknk.supabase.co';
+      const anonKey = 'sb_publishable_cf_O443CtcqqwgGGarU7wQ_CSdXr4MF';
+      const res = await fetch(`${supabaseUrl}/functions/v1/ai-advice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY || ''}`,
+          'Authorization': `Bearer ${token}`,
+          'apikey': anonKey,
         },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 1000,
-        }),
+        body: JSON.stringify({ prompt }),
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Edge Function error: ${res.status} ${errText}`);
+      }
       const data = await res.json();
-      const text = data.choices?.[0]?.message?.content || '無法生成建議';
-      return ok(text);
-    } catch {
-      return ok('AI 服務暫時不可用，請稍後再試。');
+      if (data.error) throw new Error(data.error);
+      const result = { ...ok(data.text as string), model: data.model };
+      return result;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'AI 服務暫時不可用';
+      return err(msg);
     }
   },
 
