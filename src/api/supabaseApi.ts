@@ -555,6 +555,16 @@ export const api = {
 
     if (tripError || !trip) return err('Invalid share code or password');
 
+    // Check if user is already the trip owner (prevent duplicate entry)
+    const { data: ownerCheck } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('id', trip.id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (ownerCheck) return ok({ Trip_ID: trip.id }); // Already the owner, skip adding as collaborator
+
     // Check if already a collaborator
     const { data: existing } = await supabase
       .from('trip_collaborators')
