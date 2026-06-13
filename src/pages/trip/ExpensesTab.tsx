@@ -3,6 +3,7 @@ import { Plus, Trash2, Edit2, DollarSign, Users, BarChart2, RefreshCw, ArrowRigh
 import { api, Trip, Expense, TripMember, Settlement } from '../../api/supabaseApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import ExpenseBreakdownTab from './ExpenseBreakdownTab';
 
 interface Props { trip: Trip; }
@@ -11,6 +12,7 @@ const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB',
 
 export default function ExpensesTab({ trip }: Props) {
   const { showToast, categories, fetchCategories } = useApp();
+  const { user: currentUser } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   const [settlement, setSettlement] = useState<Settlement | null>(null);
@@ -38,7 +40,7 @@ export default function ExpensesTab({ trip }: Props) {
   const [settlingExpenseId, setSettlingExpenseId] = useState<string | null>(null);
 
   // Member name editing
-  const [editingMemberName, setEditingMemberName] = useState(false);
+  const [editingMember, setEditingMember] = useState<TripMember | null>(null);
   const [newMemberName, setNewMemberName] = useState('');
   const [savingMemberName, setSavingMemberName] = useState(false);
 
@@ -247,13 +249,14 @@ export default function ExpensesTab({ trip }: Props) {
     finally { setDeletingExpense(false); }
   };
 
-  const handleSaveMemberName = async (member: TripMember) => {
+  const handleSaveMemberName = async () => {
+    if (!editingMember) return;
     if (!newMemberName.trim()) { showToast('請輸入名稱', 'error'); return; }
     setSavingMemberName(true);
     try {
-      await api.updateTripMemberName(trip.Trip_ID, member.Is_Owner, newMemberName.trim());
+      await api.updateTripMemberName(trip.Trip_ID, editingMember.Is_Owner, newMemberName.trim());
       showToast('名稱已更新');
-      setEditingMemberName(false);
+      setEditingMember(null);
       await fetchAll();
     } catch (e: any) { showToast(e.message || '更新失敗', 'error'); }
     finally { setSavingMemberName(false); }
@@ -483,27 +486,35 @@ export default function ExpensesTab({ trip }: Props) {
             成員由加入行程的帳號自動產生。每位成員可在「設定」頁面或此處修改自己的顯示名稱。
           </p>
           <div className="space-y-2">
-            {tripMembers.map(member => (
-              <div key={member.Trip_Member_ID} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white
-                    ${member.Is_Owner ? 'bg-blue-500' : 'bg-slate-400'}`}>
-                    {(member.Member_Name || '?').charAt(0).toUpperCase()}
+            {tripMembers.map(member => {
+              const isMe = currentUser && member.Member_ID === currentUser.id;
+              return (
+                <div key={member.Trip_Member_ID} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white
+                      ${member.Is_Owner ? 'bg-blue-500' : 'bg-slate-400'}`}>
+                      {(member.Member_Name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-slate-700">{member.Member_Name}</span>
+                      {member.Is_Owner && <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">擁有者</span>}
+                      {isMe && <span className="ml-2 text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">我</span>}
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-sm font-medium text-slate-700">{member.Member_Name}</span>
-                    {member.Is_Owner && <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">擁有者</span>}
-                  </div>
+                  {isMe ? (
+                    <button
+                      onClick={() => { setEditingMember(member); setNewMemberName(member.Member_Name); }}
+                      className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="修改我的顯示名稱"
+                    >
+                      <UserCog size={15} />
+                    </button>
+                  ) : (
+                    <div className="w-8" />
+                  )}
                 </div>
-                <button
-                  onClick={() => { setEditingMemberName(true); setNewMemberName(member.Member_Name); }}
-                  className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="修改名稱（只能修改自己的名稱）"
-                >
-                  <UserCog size={15} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
             {tripMembers.length === 0 && (
               <p className="text-sm text-slate-400 text-center py-3">尚無成員</p>
             )}
@@ -512,15 +523,11 @@ export default function ExpensesTab({ trip }: Props) {
       )}
 
       {/* ── 修改名稱 Modal ── */}
-      <Modal open={editingMemberName} onClose={() => setEditingMemberName(false)} title="修改我的顯示名稱"
+      <Modal open={!!editingMember} onClose={() => setEditingMember(null)} title="修改我的顯示名稱"
         footer={
           <>
-            <Button variant="outline" onClick={() => setEditingMemberName(false)}>取消</Button>
-            <Button onClick={async () => {
-              // Find current user's member record
-              const myMember = tripMembers.find(m => m.Is_Owner ? trip.Is_Owner : !m.Is_Owner);
-              if (myMember) await handleSaveMemberName(myMember);
-            }} loading={savingMemberName}>儲存</Button>
+            <Button variant="outline" onClick={() => setEditingMember(null)}>取消</Button>
+            <Button onClick={handleSaveMemberName} loading={savingMemberName}>儲存</Button>
           </>
         }
       >
