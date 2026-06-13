@@ -9,4 +9,8 @@ export default defineConfig({
     tailwindcss(),
   ],
   base: '/trip-webapp/',
+  build: {
+    // Target Safari 14+ and modern browsers for compatibility
+    target: ['es2020', 'safari14', 'chrome87', 'firefox78'],
+  },
 })

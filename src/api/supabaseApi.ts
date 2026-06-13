@@ -438,11 +438,12 @@ export const api = {
 
     if (ownedError) return err(ownedError.message);
 
-    // Get trips where user is a collaborator
+    // Get trips where user is a collaborator (using new trip_members table)
     const { data: collabRecords, error: collabError } = await supabase
-      .from('trip_collaborators')
+      .from('trip_members')
       .select('trip_id')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('role', 'collaborator');
 
     if (collabError) return err(collabError.message);
 
@@ -507,6 +508,24 @@ export const api = {
       .select()
       .single();
     if (error) return err(error.message);
+
+    // Add owner to trip_members table
+    if (user?.id) {
+      // Get owner's display name from user_profiles
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .single();
+      const displayName = profile?.display_name || user.email?.split('@')[0] || '擁有者';
+      await supabase.from('trip_members').insert({
+        trip_id: data.id,
+        user_id: user.id,
+        role: 'owner',
+        display_name: displayName,
+      });
+    }
+
     return ok(rowToTrip(data));
   },
 
@@ -565,9 +584,9 @@ export const api = {
 
     if (ownerCheck) return ok({ Trip_ID: trip.id }); // Already the owner, skip adding as collaborator
 
-    // Check if already a collaborator
+    // Check if already a member (collaborator) in trip_members
     const { data: existing } = await supabase
-      .from('trip_collaborators')
+      .from('trip_members')
       .select('id')
       .eq('trip_id', trip.id)
       .eq('user_id', user.id)
@@ -575,13 +594,22 @@ export const api = {
 
     if (existing) return ok({ Trip_ID: trip.id });
 
-    // Add as collaborator
+    // Get user's display name from user_profiles
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single();
+    const displayName = profile?.display_name || user.email?.split('@')[0] || '協作者';
+
+    // Add as collaborator in trip_members
     const { error: joinError } = await supabase
-      .from('trip_collaborators')
+      .from('trip_members')
       .insert({
         trip_id: trip.id,
         user_id: user.id,
-        role: 'collaborator'
+        role: 'collaborator',
+        display_name: displayName,
       });
 
     if (joinError) return err(joinError.message);
@@ -589,18 +617,29 @@ export const api = {
   },
 
   getTripCollaborators: async (tripId: string) => {
+    // Now reads from trip_members table
     const { data, error } = await supabase
-      .from('trip_collaborators')
+      .from('trip_members')
       .select('*')
       .eq('trip_id', tripId);
       
     if (error) return err(error.message);
-    return ok(data as TripCollaborator[]);
+    // Map trip_members rows to TripCollaborator interface for backward compat
+    const mapped = (data || []).map((r: any) => ({
+      id: r.id as string,
+      trip_id: r.trip_id as string,
+      user_id: r.user_id as string,
+      role: r.role as 'owner' | 'collaborator',
+      joined_at: r.joined_at as string,
+      display_name: r.display_name as string,
+    } as TripCollaborator));
+    return ok(mapped);
   },
 
   removeCollaborator: async (collaboratorId: string) => {
+    // Now deletes from trip_members table
     const { error } = await supabase
-      .from('trip_collaborators')
+      .from('trip_members')
       .delete()
       .eq('id', collaboratorId);
     if (error) return err(error.message);
@@ -971,14 +1010,47 @@ export const api = {
 
   // ── Expenses ─────────────────────────────────────────────
   getExpenses: async (tripId: string) => {
+    // Fetch expenses with their expense_details (JSONB sub-details)
     const { data, error } = await supabase
       .from('expenses')
-      .select('*')
+      .select('*, expense_details(*)')
       .eq('trip_id', tripId)
       .order('date')
       .order('created_at');
     if (error) return err(error.message);
-    return ok((data || []).map(rowToExpense));
+
+    return ok((data || []).map((r: any) => {
+      const base = rowToExpense(r);
+      // Merge expense_details JSONB into flat fields (overrides legacy flat columns)
+      const details: any[] = r.expense_details || [];
+      details.forEach((d: any) => {
+        const dd = d.detail_data || {};
+        if (d.detail_type === 'flight') {
+          if (dd.flight_no !== undefined) base.Flight_No = dd.flight_no || '';
+          if (dd.airline !== undefined) base.Airline = dd.airline || '';
+          if (dd.departure_location !== undefined) base.Departure_Location = dd.departure_location || '';
+          if (dd.arrival_location !== undefined) base.Arrival_Location = dd.arrival_location || '';
+          if (dd.flight_date !== undefined) base.Flight_Date = dd.flight_date || '';
+          if (dd.departure_time !== undefined) base.Departure_Time = dd.departure_time || '';
+          if (dd.landing_time !== undefined) base.Landing_Time = dd.landing_time || '';
+          if (dd.arrival_date !== undefined) base.Arrival_Date = dd.arrival_date || '';
+          if (dd.arrival_time !== undefined) base.Arrival_Time = dd.arrival_time || '';
+          if (dd.return_landing_time !== undefined) base.Return_Landing_Time = dd.return_landing_time || '';
+          if (dd.flight_status !== undefined) base.Flight_Status = dd.flight_status || '';
+        } else if (d.detail_type === 'accommodation') {
+          if (dd.accommodation_name !== undefined) base.Accommodation_Name = dd.accommodation_name || '';
+          if (dd.accommodation_address !== undefined) base.Accommodation_Address = dd.accommodation_address || '';
+          if (dd.check_in_date !== undefined) base.Check_In_Date = dd.check_in_date || '';
+          if (dd.check_out_date !== undefined) base.Check_Out_Date = dd.check_out_date || '';
+        } else if (d.detail_type === 'rail') {
+          if (dd.rail_start_date !== undefined) base.Rail_Start_Date = dd.rail_start_date || '';
+          if (dd.rail_end_date !== undefined) base.Rail_End_Date = dd.rail_end_date || '';
+          if (dd.rail_order_no !== undefined) base.Rail_Order_No = dd.rail_order_no || '';
+          if (dd.rail_platform !== undefined) base.Rail_Platform = dd.rail_platform || '';
+        }
+      });
+      return base;
+    }));
   },
 
   createExpense: async (body: Partial<Expense>) => {
@@ -1006,6 +1078,7 @@ export const api = {
         payer: body.Payer || '',
         splitters: body.Splitters || '',
         is_settled: false,
+        // Keep flat columns for backward compat
         flight_no: body.Flight_No || null,
         airline: body.Airline || null,
         departure_location: body.Departure_Location || null,
@@ -1030,6 +1103,57 @@ export const api = {
       .select()
       .single();
     if (error) return err(error.message);
+
+    // Also insert into expense_details for structured sub-category data
+    const expenseId = data.id as string;
+    const mainCat = (body.Main_Category || '').toLowerCase();
+    const subCat = (body.Sub_Category || '').toLowerCase();
+    const isFlightCat = mainCat.includes('機票') || subCat.includes('機票') || subCat.includes('flight');
+    const isAccomCat = mainCat.includes('住宿') || subCat.includes('之容') || subCat.includes('酒店') || subCat.includes('民宿') || subCat.includes('airbnb') || subCat.includes('accommodation');
+    const isRailCat = subCat.includes('鐵路') || subCat.includes('rail') || subCat.includes('火車');
+
+    if (isFlightCat && (body.Flight_No || body.Airline || body.Departure_Location)) {
+      await supabase.from('expense_details').insert({
+        expense_id: expenseId,
+        detail_type: 'flight',
+        detail_data: {
+          flight_no: body.Flight_No || '',
+          airline: body.Airline || '',
+          departure_location: body.Departure_Location || '',
+          arrival_location: body.Arrival_Location || '',
+          flight_date: body.Flight_Date || '',
+          departure_time: body.Departure_Time || '',
+          landing_time: body.Landing_Time || '',
+          arrival_date: body.Arrival_Date || '',
+          arrival_time: body.Arrival_Time || '',
+          return_landing_time: body.Return_Landing_Time || '',
+          flight_status: body.Flight_Status || '',
+        },
+      });
+    } else if (isAccomCat && (body.Accommodation_Name || body.Accommodation_Address || body.Check_In_Date)) {
+      await supabase.from('expense_details').insert({
+        expense_id: expenseId,
+        detail_type: 'accommodation',
+        detail_data: {
+          accommodation_name: body.Accommodation_Name || '',
+          accommodation_address: body.Accommodation_Address || '',
+          check_in_date: body.Check_In_Date || '',
+          check_out_date: body.Check_Out_Date || '',
+        },
+      });
+    } else if (isRailCat && (body.Rail_Order_No || body.Rail_Start_Date)) {
+      await supabase.from('expense_details').insert({
+        expense_id: expenseId,
+        detail_type: 'rail',
+        detail_data: {
+          rail_start_date: body.Rail_Start_Date || '',
+          rail_end_date: body.Rail_End_Date || '',
+          rail_order_no: body.Rail_Order_No || '',
+          rail_platform: body.Rail_Platform || '',
+        },
+      });
+    }
+
     return ok(rowToExpense(data));
   },
 
@@ -1090,6 +1214,84 @@ export const api = {
 
     const { error } = await supabase.from('expenses').update(updates).eq('id', expenseId);
     if (error) return err(error.message);
+
+    // Also update expense_details JSONB if flight/accommodation/rail fields are present
+    const hasFlightFields = body.Flight_No !== undefined || body.Airline !== undefined ||
+      body.Departure_Location !== undefined || body.Arrival_Location !== undefined ||
+      body.Flight_Date !== undefined || body.Departure_Time !== undefined ||
+      body.Landing_Time !== undefined || body.Arrival_Date !== undefined ||
+      body.Arrival_Time !== undefined || body.Return_Landing_Time !== undefined ||
+      body.Flight_Status !== undefined;
+    const hasAccomFields = body.Accommodation_Name !== undefined || body.Accommodation_Address !== undefined ||
+      body.Check_In_Date !== undefined || body.Check_Out_Date !== undefined;
+    const hasRailFields = body.Rail_Start_Date !== undefined || body.Rail_End_Date !== undefined ||
+      body.Rail_Order_No !== undefined || body.Rail_Platform !== undefined;
+
+    if (hasFlightFields) {
+      // Check if flight detail record exists
+      const { data: existingDetail } = await supabase
+        .from('expense_details')
+        .select('id, detail_data')
+        .eq('expense_id', expenseId)
+        .eq('detail_type', 'flight')
+        .single();
+      const newData: Record<string, unknown> = { ...(existingDetail?.detail_data as Record<string, unknown> || {}) };
+      if (body.Flight_No !== undefined) newData.flight_no = body.Flight_No;
+      if (body.Airline !== undefined) newData.airline = body.Airline;
+      if (body.Departure_Location !== undefined) newData.departure_location = body.Departure_Location;
+      if (body.Arrival_Location !== undefined) newData.arrival_location = body.Arrival_Location;
+      if (body.Flight_Date !== undefined) newData.flight_date = body.Flight_Date;
+      if (body.Departure_Time !== undefined) newData.departure_time = body.Departure_Time;
+      if (body.Landing_Time !== undefined) newData.landing_time = body.Landing_Time;
+      if (body.Arrival_Date !== undefined) newData.arrival_date = body.Arrival_Date;
+      if (body.Arrival_Time !== undefined) newData.arrival_time = body.Arrival_Time;
+      if (body.Return_Landing_Time !== undefined) newData.return_landing_time = body.Return_Landing_Time;
+      if (body.Flight_Status !== undefined) newData.flight_status = body.Flight_Status;
+      if (existingDetail) {
+        await supabase.from('expense_details').update({ detail_data: newData }).eq('id', existingDetail.id);
+      } else {
+        await supabase.from('expense_details').insert({ expense_id: expenseId, detail_type: 'flight', detail_data: newData });
+      }
+    }
+
+    if (hasAccomFields) {
+      const { data: existingDetail } = await supabase
+        .from('expense_details')
+        .select('id, detail_data')
+        .eq('expense_id', expenseId)
+        .eq('detail_type', 'accommodation')
+        .single();
+      const newData: Record<string, unknown> = { ...(existingDetail?.detail_data as Record<string, unknown> || {}) };
+      if (body.Accommodation_Name !== undefined) newData.accommodation_name = body.Accommodation_Name;
+      if (body.Accommodation_Address !== undefined) newData.accommodation_address = body.Accommodation_Address;
+      if (body.Check_In_Date !== undefined) newData.check_in_date = body.Check_In_Date;
+      if (body.Check_Out_Date !== undefined) newData.check_out_date = body.Check_Out_Date;
+      if (existingDetail) {
+        await supabase.from('expense_details').update({ detail_data: newData }).eq('id', existingDetail.id);
+      } else {
+        await supabase.from('expense_details').insert({ expense_id: expenseId, detail_type: 'accommodation', detail_data: newData });
+      }
+    }
+
+    if (hasRailFields) {
+      const { data: existingDetail } = await supabase
+        .from('expense_details')
+        .select('id, detail_data')
+        .eq('expense_id', expenseId)
+        .eq('detail_type', 'rail')
+        .single();
+      const newData: Record<string, unknown> = { ...(existingDetail?.detail_data as Record<string, unknown> || {}) };
+      if (body.Rail_Start_Date !== undefined) newData.rail_start_date = body.Rail_Start_Date;
+      if (body.Rail_End_Date !== undefined) newData.rail_end_date = body.Rail_End_Date;
+      if (body.Rail_Order_No !== undefined) newData.rail_order_no = body.Rail_Order_No;
+      if (body.Rail_Platform !== undefined) newData.rail_platform = body.Rail_Platform;
+      if (existingDetail) {
+        await supabase.from('expense_details').update({ detail_data: newData }).eq('id', existingDetail.id);
+      } else {
+        await supabase.from('expense_details').insert({ expense_id: expenseId, detail_type: 'rail', detail_data: newData });
+      }
+    }
+
     return ok(null);
   },
 
@@ -1187,85 +1389,71 @@ export const api = {
     return ok({ Display_Name: displayName });
   },
 
-  // ── Trip Members (now based on trip_collaborators + user_profiles) ─────
+  // ── Trip Members (now based on new trip_members table) ─────
   // Returns all participants of a trip: owner + collaborators with their display names
   getTripMembers: async (tripId: string) => {
-    // Get the trip to find the owner
-    const { data: tripData, error: tripError } = await supabase
-      .from('trips')
-      .select('id, user_id, owner_display_name')
-      .eq('id', tripId)
-      .single();
-    if (tripError) return err(tripError.message);
+    // Query the new trip_members table directly (has display_name and role)
+    const { data: members, error: membersError } = await supabase
+      .from('trip_members')
+      .select('id, user_id, role, display_name, joined_at')
+      .eq('trip_id', tripId)
+      .order('joined_at');
+    if (membersError) return err(membersError.message);
 
-    // Get collaborators
-    const { data: collabs, error: collabError } = await supabase
-      .from('trip_collaborators')
-      .select('id, user_id, display_name, joined_at')
-      .eq('trip_id', tripId);
-    if (collabError) return err(collabError.message);
+    // If no members found in trip_members, fall back to old logic for backward compat
+    if (!members || members.length === 0) {
+      // Fallback: get trip owner from trips table
+      const { data: tripData, error: tripError } = await supabase
+        .from('trips')
+        .select('id, user_id, owner_display_name')
+        .eq('id', tripId)
+        .single();
+      if (tripError) return err(tripError.message);
 
-    // Collect all user_ids to fetch profiles
-    const allUserIds = [tripData.user_id, ...(collabs || []).map((c: any) => c.user_id)].filter(Boolean);
-    const { data: profiles } = await supabase
-      .from('user_profiles')
-      .select('id, display_name')
-      .in('id', allUserIds);
-
-    const profileMap: Record<string, string> = {};
-    (profiles || []).forEach((p: any) => { profileMap[p.id] = p.display_name || ''; });
-
-    const members: TripMember[] = [];
-
-    // Add owner
-    const ownerName = tripData.owner_display_name || profileMap[tripData.user_id] || '擁有者';
-    members.push({
-      Trip_Member_ID: `owner-${tripId}`,
-      Trip_ID: tripId,
-      Member_ID: tripData.user_id,
-      Member_Name: ownerName,
-      Is_Owner: true,
-      Created_At: '',
-    });
-
-    // Add collaborators
-    (collabs || []).forEach((c: any) => {
-      const name = c.display_name || profileMap[c.user_id] || '協作者';
-      members.push({
-        Trip_Member_ID: c.id,
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('display_name')
+        .eq('id', tripData.user_id)
+        .single();
+      const ownerName = tripData.owner_display_name || profile?.display_name || '擁有者';
+      return ok([{
+        Trip_Member_ID: `owner-${tripId}`,
         Trip_ID: tripId,
-        Member_ID: c.user_id,
-        Member_Name: name,
-        Is_Owner: false,
-        Created_At: c.joined_at || '',
-      });
-    });
+        Member_ID: tripData.user_id,
+        Member_Name: ownerName,
+        Is_Owner: true,
+        Created_At: '',
+      }] as TripMember[]);
+    }
 
-    return ok(members);
+    // Map trip_members rows to TripMember interface
+    const result: TripMember[] = (members || []).map((m: any) => ({
+      Trip_Member_ID: m.id as string,
+      Trip_ID: tripId,
+      Member_ID: m.user_id as string,
+      Member_Name: (m.display_name as string) || '成員',
+      Is_Owner: m.role === 'owner',
+      Created_At: (m.joined_at as string) || '',
+    }));
+
+    return ok(result);
   },
 
   // Update display name for a user in a specific trip
-  // For owner: updates trips.owner_display_name
-  // For collaborator: updates trip_collaborators.display_name
-  updateTripMemberName: async (tripId: string, isOwner: boolean, newName: string) => {
+  // Updates trip_members.display_name for the current user in this trip
+  updateTripMemberName: async (tripId: string, _isOwner: boolean, newName: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return err('User not logged in');
-    if (isOwner) {
-      const { error } = await supabase
-        .from('trips')
-        .update({ owner_display_name: newName })
-        .eq('id', tripId)
-        .eq('user_id', user.id);
-      if (error) return err(error.message);
-    } else {
-      const { error } = await supabase
-        .from('trip_collaborators')
-        .update({ display_name: newName })
-        .eq('trip_id', tripId)
-        .eq('user_id', user.id);
-      if (error) return err(error.message);
-    }
-    // Also update global user profile
+
+    // Update in new trip_members table (works for both owner and collaborator)
+    const { error } = await supabase
+      .from('trip_members')
+      .update({ display_name: newName })
+      .eq('trip_id', tripId)
+      .eq('user_id', user.id);
+    if (error) return err(error.message);
+
+    // Also update global user profile for consistency
     await supabase.from('user_profiles')
       .upsert({ id: user.id, display_name: newName, updated_at: new Date().toISOString() });
     return ok(null);
