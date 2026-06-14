@@ -1021,9 +1021,14 @@ export const api = {
 
     return ok((data || []).map((r: any) => {
       const base = rowToExpense(r);
-      // Merge expense_details JSONB into flat fields (overrides legacy flat columns)
-      const details: any[] = r.expense_details || [];
-      details.forEach((d: any) => {
+      // expense_details has UNIQUE(expense_id) so PostgREST returns it as a single object (not array)
+      // Normalize: handle both object and array forms defensively
+      const rawDetail = r.expense_details;
+      const detailsArr: any[] = rawDetail
+        ? (Array.isArray(rawDetail) ? rawDetail : [rawDetail])
+        : [];
+      detailsArr.forEach((d: any) => {
+        if (!d) return;
         const dd = d.detail_data || {};
         if (d.detail_type === 'flight') {
           if (dd.flight_no !== undefined) base.Flight_No = dd.flight_no || '';
