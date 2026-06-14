@@ -5,6 +5,7 @@ import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import ExpenseBreakdownTab from './ExpenseBreakdownTab';
+import SettlementTab from './SettlementTab';
 
 interface Props { trip: Trip; }
 
@@ -152,7 +153,7 @@ export default function ExpensesTab({ trip }: Props) {
       });
     } else {
       setExpenseForm({
-        Date: trip.Start_Date || '',
+        Date: new Date().toISOString().slice(0, 10),
         Main_Category: mainCategories[0] || '',
         Sub_Category: '',
         Note: '',
@@ -288,7 +289,7 @@ export default function ExpensesTab({ trip }: Props) {
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
 
   return (
-    <div>
+    <div className="p-5">
       {/* Sub-tab bar */}
       <div className="flex gap-1 mb-5 bg-slate-100 rounded-xl p-1">
         {subTabs.map(tab => (
@@ -320,8 +321,24 @@ export default function ExpensesTab({ trip }: Props) {
           {expenses.length === 0 ? (
             <EmptyState icon={<DollarSign size={32} />} title="尚無支出記錄" description="點擊「新增支出」開始記錄" />
           ) : (
-            <div className="space-y-2">
-              {expenses.map(exp => (
+            <div className="space-y-1">
+              {(() => {
+                // Group expenses by date
+                const groups: Record<string, Expense[]> = {};
+                expenses.forEach(exp => {
+                  const d = exp.Date || '（未填日期）';
+                  if (!groups[d]) groups[d] = [];
+                  groups[d].push(exp);
+                });
+                const sortedDates = Object.keys(groups).sort();
+                return sortedDates.map(date => (
+                  <div key={date} className="mb-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{date}</span>
+                      <div className="flex-1 h-px bg-slate-100" />
+                    </div>
+                    <div className="space-y-2">
+                      {groups[date].map(exp => (
                 <div key={exp.Expense_ID}
                   className={`p-3.5 rounded-xl border transition-all ${isSettled(exp) ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-200'}`}>
                   <div className="flex items-start justify-between gap-2">
@@ -341,7 +358,6 @@ export default function ExpensesTab({ trip }: Props) {
                           {exp.Note && <span className="text-xs text-slate-400 truncate">{exp.Note}</span>}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="text-xs text-slate-400">{exp.Date}</span>
                           <span className="text-xs text-slate-400">付款：{exp.Payer}</span>
                           {exp.Splitters && <span className="text-xs text-slate-400">分帳：{exp.Splitters}</span>}
                         </div>
@@ -368,6 +384,10 @@ export default function ExpensesTab({ trip }: Props) {
                   </div>
                 </div>
               ))}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           )}
         </div>
@@ -386,94 +406,12 @@ export default function ExpensesTab({ trip }: Props) {
 
       {/* ── 分帳結算 ── */}
       {activeSubTab === 'settlement' && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">分帳結算</h3>
-            <Button size="sm" variant="outline" onClick={fetchSettlement} loading={settlementLoading}>
-              <RefreshCw size={13} /> 重新計算
-            </Button>
-          </div>
-          {settlementLoading ? (
-            <div className="flex justify-center py-8"><Spinner /></div>
-          ) : !settlement ? (
-            <EmptyState icon={<Table2 size={32} />} title="尚未計算" description="點擊「重新計算」開始分帳" />
-          ) : (
-            <div className="space-y-4">
-              {/* 成員餘額 */}
-              <Card className="p-4">
-                <h4 className="text-sm font-semibold text-slate-700 mb-3">成員餘額</h4>
-                <div className="space-y-2">
-                  {Object.entries(settlement.memberBalances || {}).map(([name, balance]) => (
-                    <div key={name} className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">{name}</span>
-                      <span className={`text-sm font-semibold ${Number(balance) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {Number(balance) >= 0 ? '+' : ''}{trip.Base_Currency} {Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* 轉帳矩陣 */}
-              {Object.keys(settlement.memberBalances || {}).length > 1 && (
-                <Card className="p-4 overflow-x-auto">
-                  <h4 className="text-sm font-semibold text-slate-700 mb-3">轉帳矩陣（行→列 表示付款方向）</h4>
-                  {(() => {
-                    const names = Object.keys(settlement.memberBalances || {});
-                    const matrix: Record<string, Record<string, number>> = {};
-                    names.forEach(n => { matrix[n] = {}; names.forEach(m => { matrix[n][m] = 0; }); });
-                    (settlement.settlements || []).forEach(s => { matrix[s.from][s.to] = s.amount; });
-                    return (
-                      <table className="text-xs w-full border-collapse">
-                        <thead>
-                          <tr>
-                            <th className="p-2 bg-slate-50 text-slate-500 font-medium text-left">付款 ↓ / 收款 →</th>
-                            {names.map(n => <th key={n} className="p-2 bg-slate-50 text-slate-600 font-medium text-center">{n}</th>)}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {names.map(from => (
-                            <tr key={from}>
-                              <td className="p-2 bg-slate-50 text-slate-600 font-medium">{from}</td>
-                              {names.map(to => (
-                                <td key={to} className={`p-2 text-center ${matrix[from][to] > 0 ? 'bg-red-50 text-red-600 font-semibold' : 'text-slate-300'}`}>
-                                  {matrix[from][to] > 0 ? `${trip.Base_Currency} ${matrix[from][to].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    );
-                  })()}
-                </Card>
-              )}
-
-              {/* 建議轉帳步驟 */}
-              {(settlement.settlements || []).length > 0 && (
-                <Card className="p-4">
-                  <h4 className="text-sm font-semibold text-slate-700 mb-3">建議轉帳步驟</h4>
-                  <div className="space-y-2">
-                    {settlement.settlements.map((s, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-slate-700">{s.from}</span>
-                        <ArrowRight size={14} className="text-slate-400" />
-                        <span className="font-medium text-slate-700">{s.to}</span>
-                        <span className="ml-auto font-bold text-blue-600">
-                          {trip.Base_Currency} {s.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {(settlement.settlements || []).length === 0 && Object.keys(settlement.memberBalances || {}).length > 0 && (
-                <div className="text-center py-4 text-sm text-emerald-600 font-medium">✓ 所有費用已平均分攤，無需轉帳</div>
-              )}
-            </div>
-          )}
-        </div>
+        <SettlementTab
+          trip={trip}
+          settlement={settlement}
+          settlementLoading={settlementLoading}
+          fetchSettlement={fetchSettlement}
+        />
       )}
 
       {/* ── 行程成員 ── */}
@@ -571,8 +509,8 @@ export default function ExpensesTab({ trip }: Props) {
             value={String(expenseForm.Original_Amount || '')}
             onChange={e => setExpenseForm(f => ({ ...f, Original_Amount: e.target.value }))} />
           <div className="flex gap-2 items-end">
-            <Input label={`匯率 (→ ${trip.Base_Currency})`} type="number" step="0.0001" min="0"
-              value={String(expenseForm.Exchange_Rate || '1')}
+            <Input label={`匯率 (→ ${trip.Base_Currency})`} type="text" inputMode="decimal"
+              value={String(expenseForm.Exchange_Rate ?? '1')}
               onChange={e => setExpenseForm(f => ({ ...f, Exchange_Rate: e.target.value }))}
               className="flex-1" />
             <Button size="sm" variant="outline" onClick={fetchExchangeRate} loading={exchangeRateLoading} className="mb-0.5">

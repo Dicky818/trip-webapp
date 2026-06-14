@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plane, Hotel, Ticket, ExternalLink, Clock, MapPin, Train } from 'lucide-react';
+import { Plane, Hotel, Ticket, ExternalLink, Clock, MapPin } from 'lucide-react';
 import { api, Trip, Expense } from '../../api/supabaseApi';
 import { Card, EmptyState, Spinner, Badge } from '../../components/ui';
 
@@ -21,7 +21,6 @@ function formatTime(t: string): string {
 // Flight category keywords
 const FLIGHT_KEYWORDS = ['機票', '航班', '飛機', 'flight'];
 const ACCOMMODATION_KEYWORDS = ['住宿', '酒店', '旅館', '民宿', '飯店', 'hotel', 'accommodation', 'airbnb'];
-const RAIL_KEYWORDS = ['鐵路', '套票', 'pass', 'rail', 'jr', '新幹線'];
 
 function isFlightExpense(exp: Expense): boolean {
   const cat = (exp.Main_Category + ' ' + exp.Sub_Category).toLowerCase();
@@ -33,10 +32,6 @@ function isAccommodationExpense(exp: Expense): boolean {
   return ACCOMMODATION_KEYWORDS.some(k => cat.includes(k.toLowerCase()));
 }
 
-function isRailExpense(exp: Expense): boolean {
-  const cat = (exp.Main_Category + ' ' + exp.Sub_Category).toLowerCase();
-  return RAIL_KEYWORDS.some(k => cat.includes(k.toLowerCase()));
-}
 
 interface Props { trip: Trip; }
 
@@ -58,7 +53,6 @@ export default function InfoTab({ trip }: Props) {
   // Filter expenses by category
   const flightExpenses = expenses.filter(isFlightExpense);
   const accommodationExpenses = expenses.filter(isAccommodationExpense);
-  const railExpenses = expenses.filter(isRailExpense);
   const bookingExpenses = expenses.filter(exp => exp.Is_Booking === true);
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
@@ -199,48 +193,6 @@ export default function InfoTab({ trip }: Props) {
           </div>
         )}
       </section>
-
-      {/* ── 鐵路套票資訊（從支出讀取） ── */}
-      {railExpenses.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Train size={18} className="text-blue-600" />
-              <h3 className="font-semibold text-slate-900">鐵路套票</h3>
-              <span className="text-xs text-slate-400">({railExpenses.length})</span>
-            </div>
-            <p className="text-xs text-slate-400">資料來自「支出」→「鐵路」分類</p>
-          </div>
-          <div className="space-y-2">
-            {railExpenses.map(exp => (
-              <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-900 mb-1">
-                    {exp.Sub_Category || exp.Note || '鐵路套票'}
-                    {exp.Note && exp.Sub_Category && <span className="font-normal text-slate-500 ml-1">— {exp.Note}</span>}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    {exp.Rail_Start_Date && <span>使用期間：{formatDateOnly(exp.Rail_Start_Date)}</span>}
-                    {exp.Rail_End_Date && <span>→ {formatDateOnly(exp.Rail_End_Date)}</span>}
-                    {exp.Rail_Order_No && <span>訂單：{exp.Rail_Order_No}</span>}
-                    {exp.Rail_Platform && <span>平台：{exp.Rail_Platform}</span>}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-                    <span className="font-medium text-slate-700">
-                      {exp.Currency} {Number(exp.Original_Amount).toLocaleString()}
-                    </span>
-                    {exp.Currency !== trip.Base_Currency && (
-                      <span>= {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString()}</span>
-                    )}
-                    <span>· 付款：{exp.Payer}</span>
-                    {exp.Splitters && <span>· 分帳：{exp.Splitters}</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* ── 預訂資訊（從支出中標記為「預訂」的項目） ── */}
       <section>
