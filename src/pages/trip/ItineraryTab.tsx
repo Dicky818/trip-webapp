@@ -93,11 +93,9 @@ function getWeatherInfo(code: number): { icon: React.ReactNode; label: string; c
   return { icon: <Cloud size={13} />, label: '多雲', color: 'text-slate-400' };
 }
 
-// Open Google Maps search for a place name
-function openGoogleMaps(name: string, lat?: string | number, lng?: string | number) {
-  if (lat && lng && lat !== '' && lng !== '') {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
-  } else if (name) {
+// Open Google Maps search for a place name (always use name-based search)
+function openGoogleMaps(name: string, _lat?: string | number, _lng?: string | number) {
+  if (name) {
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`, '_blank');
   }
 }

@@ -1195,7 +1195,7 @@ export const api = {
     if (body.Is_Booking !== undefined) updates.is_booking = body.Is_Booking;
 
     // Recalculate base amount if amount or currency changed
-    if (body.Original_Amount !== undefined || body.Currency !== undefined) {
+    if (body.Original_Amount !== undefined || body.Currency !== undefined || body.Exchange_Rate !== undefined) {
       const { data: existing } = await supabase.from('expenses').select('*').eq('id', expenseId).single();
       const currency = body.Currency || (existing?.currency as string) || 'HKD';
       const amount = Number(body.Original_Amount ?? existing?.original_amount) || 0;
@@ -1208,7 +1208,12 @@ export const api = {
       let exchangeRate = 1;
       let baseAmount = amount;
       if (currency !== baseCurrency) {
-        exchangeRate = await fetchExchangeRate(currency, baseCurrency);
+        // Use user-provided exchange rate if explicitly set; otherwise auto-fetch
+        if (body.Exchange_Rate !== undefined && body.Exchange_Rate !== null && Number(body.Exchange_Rate) > 0) {
+          exchangeRate = Number(body.Exchange_Rate);
+        } else {
+          exchangeRate = await fetchExchangeRate(currency, baseCurrency);
+        }
         baseAmount = Math.round(amount * exchangeRate * 100) / 100;
       }
       updates.original_amount = amount;

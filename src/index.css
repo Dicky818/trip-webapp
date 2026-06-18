@@ -19,6 +19,22 @@ body {
 .drag-handle { cursor: grab; }
 .drag-handle:active { cursor: grabbing; }
 
+/* iOS Safari date input fix - prevent cell overflow */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+input[type="date"]::-webkit-datetime-edit {
+  font-size: 0.875rem;
+  padding: 0;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* Hide scrollbar utility */
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }

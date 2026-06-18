@@ -266,12 +266,15 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
         </div>`,
       });
 
+      // Find the correct viewItems index (foundItems only contains geocoded items, so idx != viewItems idx)
+      const viewIdx = viewItems.findIndex(vi => vi.Itinerary_ID === item.Itinerary_ID);
       marker.addListener('click', () => {
         if (activeInfoWindowRef.current) activeInfoWindowRef.current.close();
         infoWindow.open(map, marker);
         activeInfoWindowRef.current = infoWindow;
-        setActiveIndex(idx);
-        scrollCarouselTo(idx);
+        const targetIdx = viewIdx >= 0 ? viewIdx : idx;
+        setActiveIndex(targetIdx);
+        scrollCarouselTo(targetIdx);
       });
 
       marker.setMap(map);

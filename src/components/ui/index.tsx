@@ -45,9 +45,10 @@ export function Input({ label, error, required, className = '', id, ...props }: 
       )}
       <input
         id={inputId}
-        className={`w-full px-3 py-2 text-sm border rounded-lg bg-white text-slate-900 placeholder-slate-400
+        className={`w-full min-w-0 px-3 py-2 text-sm border rounded-lg bg-white text-slate-900 placeholder-slate-400
           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
           disabled:bg-slate-50 disabled:text-slate-500
+          ${props.type === 'date' ? 'appearance-none' : ''}
           ${error ? 'border-red-400' : 'border-slate-300'}
           ${className}`}
         {...props}
@@ -134,10 +135,10 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
   if (!open) return null;
   const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl' };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
-        className={`relative w-full ${sizes[size]} bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]`}
+        className={`relative w-full ${sizes[size]} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[90vh]`}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">

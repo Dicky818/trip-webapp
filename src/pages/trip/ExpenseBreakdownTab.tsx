@@ -326,16 +326,16 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="text-xs border-collapse min-w-full">
           <thead>
-            <tr className="bg-[#c8a96e] text-white">
-              <th className="sticky left-0 z-10 bg-[#c8a96e] text-left px-3 py-2 font-semibold whitespace-nowrap min-w-[120px] border-r border-[#b8996e]">
+            <tr className="bg-blue-600 text-white">
+              <th className="sticky left-0 z-10 bg-blue-600 text-left px-3 py-2 font-semibold whitespace-nowrap min-w-[120px] border-r border-blue-500">
                 分類
               </th>
               {tripDates.map(date => (
-                <th key={date} className="px-2 py-2 text-center font-medium whitespace-nowrap min-w-[80px] border-r border-[#b8996e]">
+                <th key={date} className="px-2 py-2 text-center font-medium whitespace-nowrap min-w-[80px] border-r border-blue-500">
                   {formatShortDate(date)}
                 </th>
               ))}
-              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap min-w-[100px] border-r border-[#b8996e]">總計</th>
+              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap min-w-[100px] border-r border-blue-500">總計</th>
               <th className="px-3 py-2 text-right font-semibold whitespace-nowrap min-w-[60px]">佔比</th>
             </tr>
           </thead>
@@ -348,8 +348,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
               return (
                 <React.Fragment key={main}>
                   {/* 主分類標題行 */}
-                  <tr className={`${catIdx % 2 === 0 ? 'bg-[#f5efe6]' : 'bg-[#ede4d6]'} font-semibold`}>
-                    <td className={`sticky left-0 z-10 ${catIdx % 2 === 0 ? 'bg-[#f5efe6]' : 'bg-[#ede4d6]'} px-3 py-2 text-slate-800 border-r border-slate-200 whitespace-nowrap`}>
+                  <tr className={`${catIdx % 2 === 0 ? 'bg-blue-50' : 'bg-slate-50'} font-semibold`}>
+                    <td className={`sticky left-0 z-10 ${catIdx % 2 === 0 ? 'bg-blue-50' : 'bg-slate-50'} px-3 py-2 text-slate-800 border-r border-slate-200 whitespace-nowrap`}>
                       {main}
                     </td>
                     {tripDates.map(date => {
@@ -399,19 +399,19 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
             })}
 
             {/* 每日總計行 */}
-            <tr className="bg-[#c8a96e] text-white font-bold border-t-2 border-[#b8996e]">
-              <td className="sticky left-0 z-10 bg-[#c8a96e] px-3 py-2 border-r border-[#b8996e] whitespace-nowrap">
+            <tr className="bg-blue-600 text-white font-bold border-t-2 border-blue-500">
+              <td className="sticky left-0 z-10 bg-blue-600 px-3 py-2 border-r border-blue-500 whitespace-nowrap">
                 每日總計
               </td>
               {tripDates.map(date => {
                 const amt = dateTotals[date] || 0;
                 return (
-                  <td key={date} className="px-2 py-2 text-right border-r border-[#b8996e] whitespace-nowrap">
+                  <td key={date} className="px-2 py-2 text-right border-r border-blue-500 whitespace-nowrap">
                     {fmtAmt(amt)}
                   </td>
                 );
               })}
-              <td className="px-3 py-2 text-right border-r border-[#b8996e] whitespace-nowrap">
+              <td className="px-3 py-2 text-right border-r border-blue-500 whitespace-nowrap">
                 {displayCurrency} {grandTotalDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
               <td className="px-3 py-2 text-right whitespace-nowrap">100%</td>

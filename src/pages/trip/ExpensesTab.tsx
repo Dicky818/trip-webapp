@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Edit2, DollarSign, Users, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog } from 'lucide-react';
+import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { api, Trip, Expense, TripMember, Settlement } from '../../api/supabaseApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
@@ -10,6 +17,72 @@ import SettlementTab from './SettlementTab';
 interface Props { trip: Trip; }
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
+
+// Sortable expense item component
+function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, onToggleSettled, onEdit, onDelete }: {
+  exp: Expense;
+  trip: Trip;
+  isSettled: boolean;
+  settlingExpenseId: string | null;
+  onToggleSettled: (exp: Expense) => void;
+  onEdit: (exp: Expense) => void;
+  onDelete: (exp: Expense) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: exp.Expense_ID });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style}
+      className={`flex items-start gap-2 p-3 rounded-xl border transition-all ${
+        isSettled ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-200'
+      }`}>
+      {/* Drag handle */}
+      <button {...attributes} {...listeners}
+        className="drag-handle p-1 text-slate-300 hover:text-slate-500 flex-shrink-0 mt-0.5 cursor-grab active:cursor-grabbing touch-none">
+        <GripVertical size={15} />
+      </button>
+      {/* Settled toggle */}
+      <button onClick={() => onToggleSettled(exp)} className="mt-0.5 flex-shrink-0">
+        {settlingExpenseId === exp.Expense_ID
+          ? <Spinner />
+          : isSettled
+            ? <CheckCircle2 size={18} className="text-emerald-500" />
+            : <Circle size={18} className="text-slate-300" />}
+      </button>
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm font-semibold ${isSettled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+            {exp.Main_Category}{exp.Sub_Category ? ` / ${exp.Sub_Category}` : ''}
+          </span>
+          {exp.Note && <span className="text-xs text-slate-400 truncate">{exp.Note}</span>}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-xs text-slate-400">付款：{exp.Payer}</span>
+          {exp.Splitters && <span className="text-xs text-slate-400">分帳：{exp.Splitters}</span>}
+        </div>
+      </div>
+      {/* Amount + actions */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="text-right">
+          <p className="text-sm font-bold text-slate-900">
+            {trip.Base_Currency} {parseFloat(String(exp.Base_Amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          {exp.Currency !== trip.Base_Currency && (
+            <p className="text-xs text-slate-400">{exp.Currency} {parseFloat(String(exp.Original_Amount || 0)).toLocaleString()}</p>
+          )}
+        </div>
+        <button onClick={() => onEdit(exp)}
+          className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
+          <Edit2 size={14} />
+        </button>
+        <button onClick={() => onDelete(exp)}
+          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ExpensesTab({ trip }: Props) {
   const { showToast, categories, fetchCategories } = useApp();
@@ -44,6 +117,32 @@ export default function ExpensesTab({ trip }: Props) {
   const [editingMember, setEditingMember] = useState<TripMember | null>(null);
   const [newMemberName, setNewMemberName] = useState('');
   const [savingMemberName, setSavingMemberName] = useState(false);
+
+  // Collapsible date groups
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const toggleDate = (date: string) => {
+    setCollapsedDates(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
+  // Expense order (local-only, for drag-to-reorder within each date group)
+  const [expenseOrder, setExpenseOrder] = useState<Record<string, string[]>>({});
+
+  // DnD sensors
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleExpenseDragEnd = (event: DragEndEvent, date: string, dateExpenses: Expense[]) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = dateExpenses.findIndex(e => e.Expense_ID === active.id);
+    const newIndex = dateExpenses.findIndex(e => e.Expense_ID === over.id);
+    const reordered = arrayMove(dateExpenses, oldIndex, newIndex);
+    setExpenseOrder(prev => ({ ...prev, [date]: reordered.map(e => e.Expense_ID) }));
+  };
 
   const fetchAll = async () => {
     setLoading(true);
@@ -283,7 +382,6 @@ export default function ExpensesTab({ trip }: Props) {
     { id: 'list', label: '支出列表', icon: <DollarSign size={14} /> },
     { id: 'breakdown', label: '支出分析', icon: <BarChart2 size={14} /> },
     { id: 'settlement', label: '分帳結算', icon: <Table2 size={14} /> },
-    { id: 'members', label: '行程成員', icon: <Users size={14} /> },
   ];
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
@@ -321,7 +419,7 @@ export default function ExpensesTab({ trip }: Props) {
           {expenses.length === 0 ? (
             <EmptyState icon={<DollarSign size={32} />} title="尚無支出記錄" description="點擊「新增支出」開始記錄" />
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {(() => {
                 // Group expenses by date
                 const groups: Record<string, Expense[]> = {};
@@ -331,62 +429,67 @@ export default function ExpensesTab({ trip }: Props) {
                   groups[d].push(exp);
                 });
                 const sortedDates = Object.keys(groups).sort();
-                return sortedDates.map(date => (
-                  <div key={date} className="mb-3">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{date}</span>
-                      <div className="flex-1 h-px bg-slate-100" />
-                    </div>
-                    <div className="space-y-2">
-                      {groups[date].map(exp => (
-                <div key={exp.Expense_ID}
-                  className={`p-3.5 rounded-xl border transition-all ${isSettled(exp) ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-200'}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                      <button onClick={() => handleToggleSettled(exp)} className="mt-0.5 flex-shrink-0">
-                        {settlingExpenseId === exp.Expense_ID
-                          ? <Spinner />
-                          : isSettled(exp)
-                            ? <CheckCircle2 size={18} className="text-emerald-500" />
-                            : <Circle size={18} className="text-slate-300" />}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-sm font-semibold ${isSettled(exp) ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                            {exp.Main_Category}{exp.Sub_Category ? ` / ${exp.Sub_Category}` : ''}
+                return sortedDates.map(date => {
+                  const isCollapsed = collapsedDates.has(date);
+                  // Apply local drag order if exists
+                  const order = expenseOrder[date];
+                  const rawExpenses = groups[date];
+                  const dateExpenses = order
+                    ? [...rawExpenses].sort((a, b) => {
+                        const ai = order.indexOf(a.Expense_ID);
+                        const bi = order.indexOf(b.Expense_ID);
+                        if (ai === -1 && bi === -1) return 0;
+                        if (ai === -1) return 1;
+                        if (bi === -1) return -1;
+                        return ai - bi;
+                      })
+                    : rawExpenses;
+                  const dateTotal = dateExpenses.reduce((s, e) => s + (parseFloat(String(e.Base_Amount)) || 0), 0);
+                  return (
+                    <div key={date} className="border border-slate-200 rounded-xl overflow-hidden">
+                      {/* Date header - clickable to collapse */}
+                      <div
+                        className="flex items-center justify-between px-3 py-2.5 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                        onClick={() => toggleDate(date)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400">
+                            {isCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
                           </span>
-                          {exp.Note && <span className="text-xs text-slate-400 truncate">{exp.Note}</span>}
+                          <span className="text-xs font-semibold text-slate-700">{date}</span>
+                          <span className="text-xs text-slate-400">{dateExpenses.length} 項</span>
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="text-xs text-slate-400">付款：{exp.Payer}</span>
-                          {exp.Splitters && <span className="text-xs text-slate-400">分帳：{exp.Splitters}</span>}
+                        <span className="text-xs font-semibold text-slate-600">
+                          {trip.Base_Currency} {dateTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      {/* Date content */}
+                      {!isCollapsed && (
+                        <div className="p-2">
+                          <DndContext sensors={sensors} collisionDetection={closestCenter}
+                            onDragEnd={e => handleExpenseDragEnd(e, date, dateExpenses)}>
+                            <SortableContext items={dateExpenses.map(e => e.Expense_ID)} strategy={verticalListSortingStrategy}>
+                              <div className="space-y-1.5">
+                                {dateExpenses.map(exp => (
+                                  <SortableExpenseItem
+                                    key={exp.Expense_ID}
+                                    exp={exp}
+                                    trip={trip}
+                                    isSettled={isSettled(exp)}
+                                    settlingExpenseId={settlingExpenseId}
+                                    onToggleSettled={handleToggleSettled}
+                                    onEdit={openExpenseModal}
+                                    onDelete={setDeleteExpense}
+                                  />
+                                ))}
+                              </div>
+                            </SortableContext>
+                          </DndContext>
                         </div>
-                      </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-slate-900">
-                          {trip.Base_Currency} {parseFloat(String(exp.Base_Amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        {exp.Currency !== trip.Base_Currency && (
-                          <p className="text-xs text-slate-400">{exp.Currency} {parseFloat(String(exp.Original_Amount || 0)).toLocaleString()}</p>
-                        )}
-                      </div>
-                      <button onClick={() => openExpenseModal(exp)}
-                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
-                        <Edit2 size={14} />
-                      </button>
-                      <button onClick={() => setDeleteExpense(exp)}
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-                    </div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
           )}
@@ -414,51 +517,7 @@ export default function ExpensesTab({ trip }: Props) {
         />
       )}
 
-      {/* ── 行程成員 ── */}
-      {activeSubTab === 'members' && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-slate-900">行程成員</h3>
-          </div>
-          <p className="text-xs text-slate-400 mb-4">
-            成員由加入行程的帳號自動產生。每位成員可在「設定」頁面或此處修改自己的顯示名稱。
-          </p>
-          <div className="space-y-2">
-            {tripMembers.map(member => {
-              const isMe = currentUser && member.Member_ID === currentUser.id;
-              return (
-                <div key={member.Trip_Member_ID} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white
-                      ${member.Is_Owner ? 'bg-blue-500' : 'bg-slate-400'}`}>
-                      {(member.Member_Name || '?').charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">{member.Member_Name}</span>
-                      {member.Is_Owner && <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">擁有者</span>}
-                      {isMe && <span className="ml-2 text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">我</span>}
-                    </div>
-                  </div>
-                  {isMe ? (
-                    <button
-                      onClick={() => { setEditingMember(member); setNewMemberName(member.Member_Name); }}
-                      className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="修改我的顯示名稱"
-                    >
-                      <UserCog size={15} />
-                    </button>
-                  ) : (
-                    <div className="w-8" />
-                  )}
-                </div>
-              );
-            })}
-            {tripMembers.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-3">尚無成員</p>
-            )}
-          </div>
-        </div>
-      )}
+
 
       {/* ── 修改名稱 Modal ── */}
       <Modal open={!!editingMember} onClose={() => setEditingMember(null)} title="修改我的顯示名稱"

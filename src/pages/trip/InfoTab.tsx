@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plane, Hotel, Ticket, ExternalLink, Clock, MapPin } from 'lucide-react';
-import { api, Trip, Expense } from '../../api/supabaseApi';
-import { Card, EmptyState, Spinner, Badge } from '../../components/ui';
+import { Plane, Hotel, Ticket, Clock, MapPin, Users } from 'lucide-react';
+import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
+import { EmptyState, Spinner, Badge } from '../../components/ui';
 
 // 只取日期部分
 function formatDateOnly(d: string): string {
@@ -37,13 +37,18 @@ interface Props { trip: Trip; }
 
 export default function InfoTab({ trip }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const exp = await api.getExpenses(trip.Trip_ID);
+      const [exp, tm] = await Promise.all([
+        api.getExpenses(trip.Trip_ID),
+        api.getTripMembers(trip.Trip_ID),
+      ]);
       setExpenses((exp as any).data || []);
+      setTripMembers((tm as any).data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -59,6 +64,35 @@ export default function InfoTab({ trip }: Props) {
 
   return (
     <div className="p-5 space-y-6">
+
+      {/* ── 行程成員（第一個區塊） ── */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <Users size={18} className="text-blue-600" />
+          <h3 className="font-semibold text-slate-900">行程成員</h3>
+          <span className="text-xs text-slate-400">({tripMembers.length})</span>
+        </div>
+        {tripMembers.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-3">尚無成員</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {tripMembers.map(member => (
+              <div key={member.Trip_Member_ID}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0
+                  ${member.Is_Owner ? 'bg-blue-500' : 'bg-slate-400'}`}>
+                  {(member.Member_Name || '?').charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm font-medium text-slate-700">{member.Member_Name}</span>
+                {member.Is_Owner && (
+                  <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">擁有者</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* ── 航班資訊（從支出讀取） ── */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -73,7 +107,7 @@ export default function InfoTab({ trip }: Props) {
           <EmptyState icon={<Plane size={32} />} title="尚無航班記錄"
             description="請在「支出」頁面新增「機票」類別的支出，並填寫航班詳細資訊" />
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {flightExpenses.map(exp => {
               const statusColor = exp.Flight_Status === 'cancelled' ? 'red'
                 : exp.Flight_Status === 'pending' ? 'yellow' : 'slate';
@@ -82,60 +116,67 @@ export default function InfoTab({ trip }: Props) {
                 : exp.Flight_Status === 'cancelled' ? '已取消' : '';
               return (
                 <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {exp.Flight_No ? (
-                          <span className="font-semibold text-slate-900">{exp.Flight_No}</span>
-                        ) : (
-                          <span className="font-semibold text-slate-500 italic">（未填航班號）</span>
-                        )}
-                        {exp.Airline && <span className="text-xs text-slate-500">{exp.Airline}</span>}
-                        {statusLabel && <Badge color={statusColor}>{statusLabel}</Badge>}
-                        {exp.Note && <span className="text-xs text-slate-400">— {exp.Note}</span>}
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-slate-600">
+                  {/* Row 1: Flight number + airline + status badge */}
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="font-bold text-slate-900 text-base">
+                      {exp.Flight_No || '（未填航班號）'}
+                    </span>
+                    {exp.Airline && (
+                      <span className="text-sm text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">{exp.Airline}</span>
+                    )}
+                    {statusLabel && <Badge color={statusColor}>{statusLabel}</Badge>}
+                    {exp.Note && <span className="text-xs text-slate-400 italic">— {exp.Note}</span>}
+                  </div>
+                  {/* Row 2: Route + date */}
+                  <div className="flex items-center gap-2 text-sm text-slate-700 mb-1.5 flex-wrap">
+                    <span className="flex items-center gap-1 font-medium">
+                      <MapPin size={13} className="text-slate-400" />
+                      {exp.Departure_Location || '（未填出發地）'}
+                    </span>
+                    <span className="text-slate-400">→</span>
+                    <span className="font-medium">{exp.Arrival_Location || '（未填目的地）'}</span>
+                    {(exp.Flight_Date || exp.Date) && (
+                      <span className="text-xs text-slate-400 bg-white border border-slate-100 px-2 py-0.5 rounded-full">
+                        {formatDateOnly(exp.Flight_Date || exp.Date)}
+                      </span>
+                    )}
+                  </div>
+                  {/* Row 3: Times */}
+                  {(exp.Departure_Time || exp.Landing_Time || exp.Arrival_Time || exp.Return_Landing_Time) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mb-1.5">
+                      {(exp.Departure_Time || exp.Landing_Time) && (
                         <span className="flex items-center gap-1">
-                          <MapPin size={12} />{exp.Departure_Location || '（未填出發地）'}
+                          <Clock size={11} className="text-slate-400" />
+                          <span className="text-slate-400">去程：</span>
+                          <span className="font-mono">{exp.Departure_Time ? formatTime(exp.Departure_Time) : '?'} → {exp.Landing_Time ? formatTime(exp.Landing_Time) : '?'}</span>
                         </span>
-                        <span>→</span>
-                        <span>{exp.Arrival_Location || '（未填目的地）'}</span>
-                        {(exp.Flight_Date || exp.Date) && (
-                          <span className="text-slate-400">· {formatDateOnly(exp.Flight_Date || exp.Date)}</span>
-                        )}
-                      </div>
-                      {(exp.Departure_Time || exp.Landing_Time || exp.Arrival_Time || exp.Return_Landing_Time) && (
-                        <div className="text-xs text-slate-500 mt-1 space-y-0.5">
-                          {(exp.Departure_Time || exp.Landing_Time) && (
-                            <div className="flex items-center gap-1.5">
-                              <Clock size={11} />
-                              <span className="text-slate-400">去程：</span>
-                              <span>{exp.Departure_Time ? formatTime(exp.Departure_Time) : '?'} → {exp.Landing_Time ? formatTime(exp.Landing_Time) : '?'}</span>
-                            </div>
-                          )}
-                          {(exp.Arrival_Time || exp.Return_Landing_Time) && (
-                            <div className="flex items-center gap-1.5">
-                              <Clock size={11} />
-                              <span className="text-slate-400">回程：</span>
-                              {exp.Arrival_Date && <span className="text-slate-400">{formatDateOnly(exp.Arrival_Date)} </span>}
-                              <span>{exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '?'} → {exp.Return_Landing_Time ? formatTime(exp.Return_Landing_Time) : '?'}</span>
-                            </div>
-                          )}
-                        </div>
                       )}
-                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                        <span className="font-medium text-slate-700">
-                          {exp.Currency} {Number(exp.Original_Amount).toLocaleString()}
+                      {(exp.Arrival_Time || exp.Return_Landing_Time) && (
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} className="text-slate-400" />
+                          <span className="text-slate-400">回程：</span>
+                          {exp.Arrival_Date && <span className="text-slate-400">{formatDateOnly(exp.Arrival_Date)} </span>}
+                          <span className="font-mono">{exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '?'} → {exp.Return_Landing_Time ? formatTime(exp.Return_Landing_Time) : '?'}</span>
                         </span>
-                        {exp.Currency !== trip.Base_Currency && (
-                          <span>= {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString()}</span>
-                        )}
-                        <span>· 付款：{exp.Payer}</span>
-                        {exp.Splitters && (
-                          <span>· 分帳：{exp.Splitters}</span>
-                        )}
-                      </div>
+                      )}
                     </div>
+                  )}
+                  {/* Row 4: Amount + payer */}
+                  <div className="flex items-center gap-2 text-xs text-slate-500 pt-1.5 border-t border-slate-100 flex-wrap">
+                    <span className="font-semibold text-slate-700">
+                      {exp.Currency} {Number(exp.Original_Amount).toLocaleString()}
+                    </span>
+                    {exp.Currency !== trip.Base_Currency && (
+                      <span>= {trip.Base_Currency} {Number(exp.Base_Amount).toLocaleString()}</span>
+                    )}
+                    <span className="text-slate-300">·</span>
+                    <span>付款：{exp.Payer}</span>
+                    {exp.Splitters && (
+                      <>
+                        <span className="text-slate-300">·</span>
+                        <span>分帳：{exp.Splitters}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               );
