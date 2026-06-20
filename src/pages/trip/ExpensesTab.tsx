@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -362,6 +362,64 @@ export default function ExpensesTab({ trip }: Props) {
     finally { setSavingMemberName(false); }
   };
 
+  // Download expenses as CSV
+  const handleDownloadCSV = () => {
+    const headers = [
+      '日期', '主分類', '子分類', '備注',
+      '貨幣', '原始金額', '匯率', `基礎金額(${trip.Base_Currency})`,
+      '付款人', '分帳成員', '已付清',
+      '航班號', '航空公司', '出發地', '目的地', '航班日期', '出發時間', '到達時間', '回程日期', '回程時間', '到港時間', '航班狀態',
+      '住宿名稱', '住宿地址', '入住日期', '退房日期',
+      '鐵路開始日期', '鐵路結束日期', '鐵路訂單號', '購買平台',
+      '預訂資訊',
+    ];
+    const rows = expenses.map(exp => [
+      exp.Date || '',
+      exp.Main_Category || '',
+      exp.Sub_Category || '',
+      exp.Note || '',
+      exp.Currency || '',
+      exp.Original_Amount ?? '',
+      exp.Exchange_Rate ?? '',
+      exp.Base_Amount ?? '',
+      exp.Payer || '',
+      exp.Splitters || '',
+      (String(exp.Is_Settled).toUpperCase() === 'TRUE' || exp.Is_Settled === true) ? '是' : '否',
+      exp.Flight_No || '',
+      exp.Airline || '',
+      exp.Departure_Location || '',
+      exp.Arrival_Location || '',
+      exp.Flight_Date || '',
+      exp.Departure_Time || '',
+      exp.Landing_Time || '',
+      exp.Arrival_Date || '',
+      exp.Arrival_Time || '',
+      exp.Return_Landing_Time || '',
+      exp.Flight_Status || '',
+      exp.Accommodation_Name || '',
+      exp.Accommodation_Address || '',
+      exp.Check_In_Date || '',
+      exp.Check_Out_Date || '',
+      exp.Rail_Start_Date || '',
+      exp.Rail_End_Date || '',
+      exp.Rail_Order_No || '',
+      exp.Rail_Platform || '',
+      exp.Is_Booking ? '是' : '否',
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const bom = '\uFEFF'; // UTF-8 BOM for Excel compatibility
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${trip.Trip_Name || '支出記錄'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV 已下載');
+  };
+
   const toggleSplitter = (name: string) => {
     setExpenseForm(f => ({
       ...f,
@@ -411,9 +469,14 @@ export default function ExpensesTab({ trip }: Props) {
                 )}
               </p>
             </div>
-            <Button size="sm" onClick={() => openExpenseModal()}>
-              <Plus size={14} /> 新增支出
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={handleDownloadCSV} title="下載 CSV">
+                <Download size={14} /> CSV
+              </Button>
+              <Button size="sm" onClick={() => openExpenseModal()}>
+                <Plus size={14} /> 新增支出
+              </Button>
+            </div>
           </div>
 
           {expenses.length === 0 ? (
