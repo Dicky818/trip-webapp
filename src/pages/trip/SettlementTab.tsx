@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, ArrowRight, Table2 } from 'lucide-react';
+import { RefreshCw, ArrowRight, Table2, Zap, BookOpen } from 'lucide-react';
 import { api, Trip, Settlement } from '../../api/supabaseApi';
 import { Button, EmptyState, Spinner, Card, Select } from '../../components/ui';
 
@@ -20,6 +20,9 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
   });
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [rateLoading, setRateLoading] = useState(false);
+
+  // Matrix mode: 'optimised' = minimum transfers | 'raw' = per-person actual debts
+  const [matrixMode, setMatrixMode] = useState<'optimised' | 'raw'>('optimised');
 
   const handleCurrencyChange = (newCurrency: string) => {
     setDisplayCurrency(newCurrency);
@@ -94,8 +97,47 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
           {/* 轉帳矩陣 */}
           {Object.keys(settlement.memberBalances || {}).length > 1 && (
             <Card className="p-4 overflow-x-auto">
-              <h4 className="text-sm font-semibold text-slate-700 mb-3">轉帳矩陣（行→列 表示付款方向）</h4>
-              {(() => {
+              {/* Matrix header with switch button */}
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700">
+                    {matrixMode === 'optimised'
+                      ? '轉帳矩陣（行→列 表示付款方向）'
+                      : '原始欠款矩陣（每人對每人的實際欠款）'}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {matrixMode === 'optimised'
+                      ? '已最優化：最少步驟清零所有欠款'
+                      : '未最優化：直接從每筆支出計算的原始欠款'}
+                  </p>
+                </div>
+                {/* Switch button */}
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setMatrixMode('optimised')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      matrixMode === 'optimised'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Zap size={12} /> 最優化
+                  </button>
+                  <button
+                    onClick={() => setMatrixMode('raw')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      matrixMode === 'raw'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <BookOpen size={12} /> 原始欠款
+                  </button>
+                </div>
+              </div>
+
+              {/* Optimised matrix */}
+              {matrixMode === 'optimised' && (() => {
                 const names = Object.keys(settlement.memberBalances || {});
                 const matrix: Record<string, Record<string, number>> = {};
                 names.forEach(n => { matrix[n] = {}; names.forEach(m => { matrix[n][m] = 0; }); });
@@ -121,6 +163,55 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
                       ))}
                     </tbody>
                   </table>
+                );
+              })()}
+
+              {/* Raw debts matrix */}
+              {matrixMode === 'raw' && (() => {
+                const names = Object.keys(settlement.memberBalances || {});
+                const rawDebts = settlement.rawDebts || {};
+                // Net raw debts: if A owes B 100 and B owes A 30, show A→B 70, B→A 0
+                const netRaw: Record<string, Record<string, number>> = {};
+                names.forEach(n => { netRaw[n] = {}; names.forEach(m => { netRaw[n][m] = 0; }); });
+                names.forEach(from => {
+                  names.forEach(to => {
+                    if (from === to) return;
+                    const ab = (rawDebts[from]?.[to] || 0);
+                    const ba = (rawDebts[to]?.[from] || 0);
+                    const net = ab - ba;
+                    if (net > 0.01) netRaw[from][to] = Math.round(net * 100) / 100;
+                  });
+                });
+                const hasAny = names.some(from => names.some(to => netRaw[from][to] > 0));
+                return (
+                  <>
+                    <table className="text-xs w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="p-2 bg-slate-50 text-slate-500 font-medium text-left">欠款方 ↓ / 收款方 →</th>
+                          {names.map(n => <th key={n} className="p-2 bg-slate-50 text-slate-600 font-medium text-center">{n}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {names.map(from => (
+                          <tr key={from}>
+                            <td className="p-2 bg-slate-50 text-slate-600 font-medium">{from}</td>
+                            {names.map(to => (
+                              <td key={to} className={`p-2 text-center ${
+                                from === to ? 'text-slate-200' :
+                                netRaw[from][to] > 0 ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-slate-300'
+                              }`}>
+                                {from === to ? '—' : netRaw[from][to] > 0 ? fmt(netRaw[from][to]) : '—'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {!hasAny && (
+                      <p className="text-xs text-slate-400 text-center mt-2">所有費用由同一人墊付，無直接欠款</p>
+                    )}
+                  </>
                 );
               })()}
             </Card>

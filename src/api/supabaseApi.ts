@@ -199,6 +199,8 @@ export interface Settlement {
   memberPaid: Record<string, number>;
   memberOwed: Record<string, number>;
   settlements: Array<{ from: string; to: string; amount: number }>;
+  // rawDebts[from][to] = total amount 'from' owes 'to' (before optimisation)
+  rawDebts: Record<string, Record<string, number>>;
 }
 
 // ── Row mappers (DB columns → App interface) ───────────────
@@ -366,6 +368,13 @@ function calcSettlement(expenses: Expense[], members: string[]): Settlement {
 
   members.forEach(m => { memberPaid[m] = 0; memberOwed[m] = 0; });
 
+  // rawDebts[debtor][creditor] = amount debtor owes creditor
+  const rawDebts: Record<string, Record<string, number>> = {};
+  const initRaw = (a: string, b: string) => {
+    if (!rawDebts[a]) rawDebts[a] = {};
+    if (!rawDebts[a][b]) rawDebts[a][b] = 0;
+  };
+
   expenses.forEach(e => {
     const cat = e.Main_Category || '其他';
     categoryStats[cat] = (categoryStats[cat] || 0) + Number(e.Base_Amount || 0);
@@ -378,7 +387,14 @@ function calcSettlement(expenses: Expense[], members: string[]): Settlement {
       ? e.Splitters.split(',').map(s => s.trim()).filter(Boolean)
       : members;
     const share = splitterList.length > 0 ? amt / splitterList.length : 0;
-    splitterList.forEach(m => { memberOwed[m] = (memberOwed[m] || 0) + share; });
+    splitterList.forEach(m => {
+      memberOwed[m] = (memberOwed[m] || 0) + share;
+      // Raw debt: each splitter (except payer) owes the payer their share
+      if (payer && m !== payer) {
+        initRaw(m, payer);
+        rawDebts[m][payer] += share;
+      }
+    });
   });
 
   const memberBalances: Record<string, number> = {};
@@ -407,7 +423,7 @@ function calcSettlement(expenses: Expense[], members: string[]): Settlement {
     if (Math.abs(creditors[ci][1]) < 0.01) ci++;
   }
 
-  return { totalBase, categoryStats, memberBalances, memberPaid, memberOwed, settlements };
+  return { totalBase, categoryStats, memberBalances, memberPaid, memberOwed, settlements, rawDebts };
 }
 
 // ── Exchange Rate ──────────────────────────────────────────
