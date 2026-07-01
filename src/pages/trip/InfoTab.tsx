@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plane, Hotel, Ticket, Clock, MapPin, Users } from 'lucide-react';
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
@@ -55,6 +55,37 @@ export default function InfoTab({ trip }: Props) {
 
   useEffect(() => { fetchAll(); }, [trip.Trip_ID]);
 
+  // Derive all unique participant names from expenses (payer + splitters)
+  const expenseParticipants = useMemo(() => {
+    const names = new Set<string>();
+    expenses.forEach(exp => {
+      if (exp.Payer) names.add(exp.Payer.trim());
+      if (exp.Splitters) {
+        exp.Splitters.split(',').map(s => s.trim()).filter(Boolean).forEach(n => names.add(n));
+      }
+    });
+    return names;
+  }, [expenses]);
+
+  // Merge trip_members (real users) with virtual members from expenses
+  const allMembers = useMemo(() => {
+    const realNames = new Set(tripMembers.map(m => m.Member_Name));
+    const virtual: TripMember[] = [];
+    expenseParticipants.forEach(name => {
+      if (!realNames.has(name)) {
+        virtual.push({
+          Trip_Member_ID: `virtual-${name}`,
+          Trip_ID: trip.Trip_ID,
+          Member_ID: '',
+          Member_Name: name,
+          Is_Owner: false,
+          Created_At: '',
+        });
+      }
+    });
+    return [...tripMembers, ...virtual.sort((a, b) => a.Member_Name.localeCompare(b.Member_Name))];
+  }, [tripMembers, expenseParticipants, trip.Trip_ID]);
+
   // Filter expenses by category
   const flightExpenses = expenses.filter(isFlightExpense);
   const accommodationExpenses = expenses.filter(isAccommodationExpense);
@@ -70,17 +101,17 @@ export default function InfoTab({ trip }: Props) {
         <div className="flex items-center gap-2 mb-3">
           <Users size={18} className="text-blue-600" />
           <h3 className="font-semibold text-slate-900">行程成員</h3>
-          <span className="text-xs text-slate-400">({tripMembers.length})</span>
+          <span className="text-xs text-slate-400">({allMembers.length})</span>
         </div>
-        {tripMembers.length === 0 ? (
+        {allMembers.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-3">尚無成員</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {tripMembers.map(member => (
+            {allMembers.map(member => (
               <div key={member.Trip_Member_ID}
                 className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0
-                  ${member.Is_Owner ? 'bg-blue-500' : 'bg-slate-400'}`}>
+                  ${member.Is_Owner ? 'bg-blue-500' : member.Member_ID === '' ? 'bg-emerald-400' : 'bg-slate-400'}`}>
                   {(member.Member_Name || '?').charAt(0).toUpperCase()}
                 </div>
                 <span className="text-sm font-medium text-slate-700">{member.Member_Name}</span>
