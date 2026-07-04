@@ -220,7 +220,8 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
     foundItems.forEach(({ item, idx, geo }) => {
       const isActive = idx === activeIndex;
       const dayNum = Number(item.Day_Number);
-      const color = viewDay === ALL_DAYS ? getDayColor(dayNum) : (isActive ? '#2563eb' : '#64748b');
+      const dayColor2 = getDayColor(dayNum);
+      const color = viewDay === ALL_DAYS ? dayColor2 : (isActive ? dayColor2 : '#94a3b8');
       const position = { lat: geo!.lat!, lng: geo!.lng! };
 
       // In All mode, label shows per-day sequential index; in single day mode, shows overall index
@@ -315,9 +316,10 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
         const a = foundItems[i].geo!;
         const b = foundItems[i + 1].geo!;
         const farApart = isTooFar(a.lat!, a.lng!, b.lat!, b.lng!);
+        const singleDayColor = getDayColor(viewDay);
         const polyline = new (window.google.maps as any).Polyline({
           path: [{ lat: a.lat!, lng: a.lng! }, { lat: b.lat!, lng: b.lng! }],
-          strokeColor: farApart ? '#f59e0b' : '#3b82f6',
+          strokeColor: farApart ? '#f59e0b' : singleDayColor,
           strokeOpacity: 0.7,
           strokeWeight: 2.5,
           icons: farApart ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 }, offset: '0', repeat: '20px' }] : [],
@@ -508,11 +510,11 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
                     style={{
                       width: '85%',
                       minWidth: '85%',
-                      ...(isActive ? { borderColor: viewDay === ALL_DAYS ? dayColor : '#93c5fd', borderWidth: '2px' } : {})
+                      ...(isActive ? { borderColor: dayColor, borderWidth: '2px' } : {})
                     }}>
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                        style={{ backgroundColor: viewDay === ALL_DAYS ? dayColor : (isActive ? '#2563eb' : '#94a3b8') }}>
+                        style={{ backgroundColor: isActive ? dayColor : '#94a3b8' }}>
                         {cardLabel}
                       </div>
                       <div className="flex-1 min-w-0">
