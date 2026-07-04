@@ -147,53 +147,63 @@ export default function InfoTab({ trip }: Props) {
                 : exp.Flight_Status === 'cancelled' ? '已取消' : '';
               return (
                 <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
-                  {/* Row 1: Flight number + airline + status badge */}
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <span className="font-bold text-slate-900 text-base">
-                      {exp.Flight_No || '（未填航班號）'}
-                    </span>
+                  {/* Header row: Airline + Flight No + Status */}
+                  <div className="flex items-center gap-2 flex-wrap mb-3">
                     {exp.Airline && (
-                      <span className="text-sm text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">{exp.Airline}</span>
+                      <span className="text-sm font-semibold text-slate-700">{exp.Airline}</span>
                     )}
-                    {statusLabel && <Badge color={statusColor}>{statusLabel}</Badge>}
-                    {exp.Note && <span className="text-xs text-slate-400 italic">— {exp.Note}</span>}
-                  </div>
-                  {/* Row 2: Route + date */}
-                  <div className="flex items-center gap-2 text-sm text-slate-700 mb-1.5 flex-wrap">
-                    <span className="flex items-center gap-1 font-medium">
-                      <MapPin size={13} className="text-slate-400" />
-                      {exp.Departure_Location || '（未填出發地）'}
+                    <span className="font-bold text-blue-700 text-base tracking-wide">
+                      {exp.Flight_No || '—'}
                     </span>
-                    <span className="text-slate-400">→</span>
-                    <span className="font-medium">{exp.Arrival_Location || '（未填目的地）'}</span>
-                    {(exp.Flight_Date || exp.Date) && (
-                      <span className="text-xs text-slate-400 bg-white border border-slate-100 px-2 py-0.5 rounded-full">
-                        {formatDateOnly(exp.Flight_Date || exp.Date)}
-                      </span>
-                    )}
+                    {statusLabel && <Badge color={statusColor}>{statusLabel}</Badge>}
+                    {exp.Note && <span className="text-xs text-slate-400 italic ml-auto">— {exp.Note}</span>}
                   </div>
-                  {/* Row 3: Times */}
-                  {(exp.Departure_Time || exp.Landing_Time || exp.Arrival_Time || exp.Return_Landing_Time) && (
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mb-1.5">
-                      {(exp.Departure_Time || exp.Landing_Time) && (
-                        <span className="flex items-center gap-1">
-                          <Clock size={11} className="text-slate-400" />
-                          <span className="text-slate-400">去程：</span>
-                          <span className="font-mono">{exp.Departure_Time ? formatTime(exp.Departure_Time) : '?'} → {exp.Landing_Time ? formatTime(exp.Landing_Time) : '?'}</span>
-                        </span>
-                      )}
-                      {(exp.Arrival_Time || exp.Return_Landing_Time) && (
-                        <span className="flex items-center gap-1">
-                          <Clock size={11} className="text-slate-400" />
-                          <span className="text-slate-400">回程：</span>
-                          {exp.Arrival_Date && <span className="text-slate-400">{formatDateOnly(exp.Arrival_Date)} </span>}
-                          <span className="font-mono">{exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '?'} → {exp.Return_Landing_Time ? formatTime(exp.Return_Landing_Time) : '?'}</span>
-                        </span>
+
+                  {/* Main info grid: Route | Dep Time | Return Time */}
+                  <div className="grid grid-cols-3 gap-2 text-sm mb-3">
+                    {/* Route */}
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-slate-400 uppercase tracking-wide">航線</span>
+                      <span className="font-semibold text-slate-800">
+                        {exp.Departure_Location || 'HKG'}
+                        <span className="text-slate-400 mx-1">→</span>
+                        {exp.Arrival_Location || 'KIX'}
+                      </span>
+                      {(exp.Flight_Date || exp.Date) && (
+                        <span className="text-xs text-slate-400">{formatDateOnly(exp.Flight_Date || exp.Date)}</span>
                       )}
                     </div>
-                  )}
-                  {/* Row 4: Amount + payer */}
-                  <div className="flex items-center gap-2 text-xs text-slate-500 pt-1.5 border-t border-slate-100 flex-wrap">
+                    {/* Outbound time */}
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-slate-400 uppercase tracking-wide">去程</span>
+                      {(exp.Departure_Time || exp.Landing_Time) ? (
+                        <span className="font-mono text-slate-800">
+                          {exp.Departure_Time ? formatTime(exp.Departure_Time) : '—'}
+                          <span className="text-slate-400 mx-1">→</span>
+                          {exp.Landing_Time ? formatTime(exp.Landing_Time) : '—'}
+                        </span>
+                      ) : <span className="text-slate-300 text-xs">未填</span>}
+                    </div>
+                    {/* Return time */}
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-slate-400 uppercase tracking-wide">回程</span>
+                      {(exp.Arrival_Time || exp.Return_Landing_Time) ? (
+                        <>
+                          {exp.Arrival_Date && (
+                            <span className="text-xs text-slate-400">{formatDateOnly(exp.Arrival_Date)}</span>
+                          )}
+                          <span className="font-mono text-slate-800">
+                            {exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '—'}
+                            <span className="text-slate-400 mx-1">→</span>
+                            {exp.Return_Landing_Time ? formatTime(exp.Return_Landing_Time) : '—'}
+                          </span>
+                        </>
+                      ) : <span className="text-slate-300 text-xs">未填</span>}
+                    </div>
+                  </div>
+
+                  {/* Footer: Amount + payer */}
+                  <div className="flex items-center gap-2 text-xs text-slate-500 pt-2 border-t border-slate-100 flex-wrap">
                     <span className="font-semibold text-slate-700">
                       {exp.Currency} {Number(exp.Original_Amount).toLocaleString()}
                     </span>

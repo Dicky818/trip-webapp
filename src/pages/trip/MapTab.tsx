@@ -32,7 +32,8 @@ const DAY_COLORS = [
 ];
 
 function getDayColor(day: number): string {
-  return DAY_COLORS[(day - 1) % DAY_COLORS.length];
+  const idx = ((day - 1) % DAY_COLORS.length + DAY_COLORS.length) % DAY_COLORS.length;
+  return DAY_COLORS[idx];
 }
 
 // Load Google Maps script once
@@ -504,8 +505,11 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
                   <div key={item.Itinerary_ID} onClick={() => { userClickedCardRef.current = true; setActiveIndex(idx); scrollCarouselTo(idx); }}
                     className={`flex-shrink-0 snap-center rounded-2xl p-4 cursor-pointer transition-all duration-200 border
                       ${isActive ? 'bg-white shadow-md' : 'bg-white border-slate-200 shadow-sm opacity-80'}`}
-                    style={isActive ? { borderColor: viewDay === ALL_DAYS ? dayColor : '#93c5fd', borderWidth: '2px' } : {}}
-                    data-width="85%">
+                    style={{
+                      width: '85%',
+                      minWidth: '85%',
+                      ...(isActive ? { borderColor: viewDay === ALL_DAYS ? dayColor : '#93c5fd', borderWidth: '2px' } : {})
+                    }}>
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
                         style={{ backgroundColor: viewDay === ALL_DAYS ? dayColor : (isActive ? '#2563eb' : '#94a3b8') }}>
