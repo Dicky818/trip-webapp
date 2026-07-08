@@ -1,4 +1,4 @@
-import React, { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import React, { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 // ── Button ─────────────────────────────────────────────────
@@ -132,6 +132,21 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+  const scrollYRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (open) {
+      // Save scroll position when modal opens
+      scrollYRef.current = window.scrollY;
+    } else {
+      // Restore scroll position after modal closes
+      const saved = scrollYRef.current;
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: saved, behavior: 'instant' as ScrollBehavior });
+      });
+    }
+  }, [open]);
+
   if (!open) return null;
   const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl' };
   return (
