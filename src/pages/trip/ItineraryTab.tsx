@@ -236,8 +236,8 @@ export default function ItineraryTab({ trip }: Props) {
 
   const tripDays = useMemo(() => getTripDays(trip.Start_Date, trip.End_Date), [trip.Start_Date, trip.End_Date]);
 
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [it, acc, da, exp] = await Promise.all([
         api.getItinerary(trip.Trip_ID),
@@ -425,7 +425,7 @@ export default function ItineraryTab({ trip }: Props) {
       }
       showToast(editItem ? '行程已更新' : '行程已新增');
       setShowItemModal(false);
-      await fetchAll();
+      await fetchAll(true);
     } catch (e: any) { showToast(e.message || '儲存失敗', 'error'); }
     finally { setSavingItem(false); }
   };
@@ -437,7 +437,7 @@ export default function ItineraryTab({ trip }: Props) {
       await api.deleteItineraryItem(deleteItem.Itinerary_ID);
       showToast('行程已刪除');
       setDeleteItem(null);
-      await fetchAll();
+      await fetchAll(true);
     } catch (e: any) { showToast(e.message || '刪除失敗', 'error'); }
     finally { setDeletingItem(false); }
   };
@@ -473,7 +473,7 @@ export default function ItineraryTab({ trip }: Props) {
       setShowMoveModal(false);
       setSelectMode(false);
       setSelectedItems(new Set());
-      await fetchAll();
+      await fetchAll(true);
     } catch (e: any) { showToast(e.message || '移動失敗', 'error'); }
     finally { setMoving(false); }
   };
@@ -554,7 +554,7 @@ export default function ItineraryTab({ trip }: Props) {
       }
       showToast(editAlt ? '替代行程已更新' : '替代行程已新增');
       setShowAltModal(false);
-      await fetchAll();
+      await fetchAll(true);
     } catch (e: any) { showToast(e.message || '儲存失敗', 'error'); }
     finally { setSavingAlt(false); }
   };
@@ -566,7 +566,7 @@ export default function ItineraryTab({ trip }: Props) {
       await api.deleteAlternative(deleteAlt.Alt_ID);
       showToast('替代行程已刪除');
       setDeleteAlt(null);
-      await fetchAll();
+      await fetchAll(true);
     } catch (e: any) { showToast(e.message || '刪除失敗', 'error'); }
     finally { setDeletingAlt(false); }
   };
@@ -586,7 +586,7 @@ export default function ItineraryTab({ trip }: Props) {
       });
       showToast(`第 ${copyFrom} 天的行程已複製到第 ${copyTo} 天`);
       setShowCopyModal(false);
-      await fetchAll();
+      await fetchAll(true);
     } catch (e: any) { showToast(e.message || '複製失敗', 'error'); }
     finally { setCopying(false); }
   };
@@ -610,7 +610,7 @@ export default function ItineraryTab({ trip }: Props) {
         console.error('setDayAccommodation error:', res.error);
         return;
       }
-      await fetchAll();
+      await fetchAll(true);
       showToast('住宿已設定');
     } catch (e: any) { showToast(e.message || '設定失敗', 'error'); }
   };
@@ -676,7 +676,7 @@ export default function ItineraryTab({ trip }: Props) {
               const dayInfo = tripDays.find(d => d.day === day);
               await api.createItineraryItem({ Trip_ID: trip.Trip_ID, Day_Number: day, Date: dayInfo?.date || '', Time: '', Activity: activity, Lat: lat.toFixed(6), Lng: lng.toFixed(6) });
               showToast('景點已新增');
-              await fetchAll();
+              await fetchAll(true);
             } catch (e: any) { showToast(e.message || '新增失敗', 'error'); }
           }}
         />
