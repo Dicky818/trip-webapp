@@ -1,6 +1,65 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { MapPin, AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { ItineraryItem, Trip } from '../../api/supabaseApi';
+import { supabase } from '../../lib/supabase';
+
+// Decode Google encoded polyline to lat/lng array
+function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
+  const points: Array<{ lat: number; lng: number }> = [];
+  let idx = 0;
+  let lat = 0;
+  let lng = 0;
+  while (idx < encoded.length) {
+    let b: number;
+    let shift = 0;
+    let result = 0;
+    do {
+      b = encoded.charCodeAt(idx++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(idx++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+    points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return points;
+}
+
+// Fetch cached polylines for a set of coordinate pairs
+async function fetchCachedPolylines(
+  pairs: Array<{ originCoords: string; destCoords: string }>
+): Promise<Record<string, string>> {
+  if (pairs.length === 0) return {};
+  const result: Record<string, string> = {};
+  try {
+    const orFilters = pairs.map(p =>
+      `and(origin_coords.eq.${p.originCoords},dest_coords.eq.${p.destCoords},travel_mode.eq.TRANSIT)`
+    );
+    const { data } = await supabase
+      .from('route_cache')
+      .select('origin_coords,dest_coords,polyline')
+      .or(orFilters.join(','));
+    if (data) {
+      for (const row of data) {
+        if (row.polyline) {
+          result[`${row.origin_coords}|${row.dest_coords}`] = row.polyline;
+        }
+      }
+    }
+  } catch {
+    // Ignore errors (table may not exist)
+  }
+  return result;
+}
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCgBcqumEfwXfqwdSVwj7q8GOymnY_C6fY';
 
@@ -98,6 +157,7 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
   const [geocoding, setGeocoding] = useState(false);
   // viewDay: 0 = All, otherwise specific day
   const [viewDay, setViewDay] = useState<number>(ALL_DAYS);
+  const [cachedPolylines, setCachedPolylines] = useState<Record<string, string>>({});
 
   // Items for the current view
   const viewItems = useMemo(() => {
@@ -186,6 +246,32 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
     };
     fetchAll();
   }, [viewDay, items, mapsReady]);
+
+  // Fetch cached polylines when geoResults change
+  useEffect(() => {
+    const foundItems = viewItems
+      .map(item => ({ item, geo: geoResults[item.Itinerary_ID] }))
+      .filter(({ geo }) => geo?.status === 'found' && geo.lat !== undefined);
+    if (foundItems.length < 2) return;
+    const pairs: Array<{ originCoords: string; destCoords: string }> = [];
+    for (let i = 0; i < foundItems.length - 1; i++) {
+      const a = foundItems[i].geo!;
+      const b = foundItems[i + 1].geo!;
+      const originCoords = `${a.lat!.toFixed(4)},${a.lng!.toFixed(4)}`;
+      const destCoords = `${b.lat!.toFixed(4)},${b.lng!.toFixed(4)}`;
+      const key = `${originCoords}|${destCoords}`;
+      if (!cachedPolylines[key]) {
+        pairs.push({ originCoords, destCoords });
+      }
+    }
+    if (pairs.length > 0) {
+      fetchCachedPolylines(pairs).then(result => {
+        if (Object.keys(result).length > 0) {
+          setCachedPolylines(prev => ({ ...prev, ...result }));
+        }
+      });
+    }
+  }, [geoResults, viewDay]);
 
   // Track if activeIndex change was user-triggered (card click) vs day-change reset
   const userClickedCardRef = useRef(false);
@@ -284,6 +370,35 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
       bounds.extend(position);
     });
 
+    // Helper to draw a segment (with cached polyline if available, else straight line)
+    const drawSegment = (a: GeoResult, b: GeoResult, color: string, weight: number, opacity: number) => {
+      const originCoords = `${a.lat!.toFixed(4)},${a.lng!.toFixed(4)}`;
+      const destCoords = `${b.lat!.toFixed(4)},${b.lng!.toFixed(4)}`;
+      const cacheKey = `${originCoords}|${destCoords}`;
+      const encoded = cachedPolylines[cacheKey];
+      const farApart = isTooFar(a.lat!, a.lng!, b.lat!, b.lng!);
+
+      let path: Array<{ lat: number; lng: number }> = [{ lat: a.lat!, lng: a.lng! }, { lat: b.lat!, lng: b.lng! }];
+      let usedCached = false;
+      if (encoded) {
+        const decoded = decodePolyline(encoded);
+        if (decoded.length > 2) {
+          path = decoded;
+          usedCached = true;
+        }
+      }
+
+      const polyline = new (window.google.maps as any).Polyline({
+        path,
+        strokeColor: usedCached ? color : (farApart ? '#f59e0b' : color),
+        strokeOpacity: usedCached ? opacity : (farApart ? 0 : opacity),
+        strokeWeight: usedCached ? weight + 0.5 : weight,
+        icons: (!usedCached && farApart) ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '15px' }] : [],
+        map,
+      });
+      polylinesRef.current.push(polyline);
+    };
+
     // Draw polylines - in All mode, draw per day; in single day mode, draw all
     if (viewDay === ALL_DAYS) {
       // Group by day and draw per-day polylines
@@ -297,35 +412,13 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
         const dayNum = Number(dayStr);
         const color = getDayColor(dayNum);
         for (let i = 0; i < dayFoundItems.length - 1; i++) {
-          const a = dayFoundItems[i].geo!;
-          const b = dayFoundItems[i + 1].geo!;
-          const farApart = isTooFar(a.lat!, a.lng!, b.lat!, b.lng!);
-          const polyline = new (window.google.maps as any).Polyline({
-            path: [{ lat: a.lat!, lng: a.lng! }, { lat: b.lat!, lng: b.lng! }],
-            strokeColor: color,
-            strokeOpacity: farApart ? 0 : 0.6,
-            strokeWeight: 2,
-            icons: farApart ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '15px' }] : [],
-            map,
-          });
-          polylinesRef.current.push(polyline);
+          drawSegment(dayFoundItems[i].geo!, dayFoundItems[i + 1].geo!, color, 2, 0.6);
         }
       });
     } else {
+      const singleDayColor = getDayColor(viewDay);
       for (let i = 0; i < foundItems.length - 1; i++) {
-        const a = foundItems[i].geo!;
-        const b = foundItems[i + 1].geo!;
-        const farApart = isTooFar(a.lat!, a.lng!, b.lat!, b.lng!);
-        const singleDayColor = getDayColor(viewDay);
-        const polyline = new (window.google.maps as any).Polyline({
-          path: [{ lat: a.lat!, lng: a.lng! }, { lat: b.lat!, lng: b.lng! }],
-          strokeColor: farApart ? '#f59e0b' : singleDayColor,
-          strokeOpacity: 0.7,
-          strokeWeight: 2.5,
-          icons: farApart ? [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 }, offset: '0', repeat: '20px' }] : [],
-          map,
-        });
-        polylinesRef.current.push(polyline);
+        drawSegment(foundItems[i].geo!, foundItems[i + 1].geo!, singleDayColor, 2.5, 0.7);
       }
     }
 
@@ -353,7 +446,7 @@ export default function MapTab({ items, selectedDay, onDayChange, tripDays }: Pr
         }
       }
     }
-  }, [geoResults, viewDay, activeIndex, mapsReady]);
+  }, [geoResults, viewDay, activeIndex, mapsReady, cachedPolylines]);
 
   const scrollCarouselTo = useCallback((idx: number) => {
     if (!carouselRef.current) return;

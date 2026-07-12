@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind } from 'lucide-react';
+import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Calendar } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -11,6 +11,8 @@ import { api, Trip, ItineraryItem, Accommodation, DayAccommodation, Expense, Iti
 import { Button, Modal, Input, Select, Textarea, EmptyState, ConfirmDialog, Spinner } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import MapTab from './MapTab';
+import TimetableTab from './TimetableTab';
+import TransportCard from './TransportCard';
 
 // Google Maps API key
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCgBcqumEfwXfqwdSVwj7q8GOymnY_C6fY';
@@ -91,6 +93,18 @@ function getWeatherInfo(code: number): { icon: React.ReactNode; label: string; c
   if (code >= 85 && code <= 86) return { icon: <CloudSnow size={13} />, label: '陣雪', color: 'text-sky-400' };
   if (code >= 95 && code <= 99) return { icon: <CloudLightning size={13} />, label: '雷雨', color: 'text-purple-500' };
   return { icon: <Cloud size={13} />, label: '多雲', color: 'text-slate-400' };
+}
+
+// Day colors (matches MapTab)
+const DAY_COLORS = [
+  '#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea',
+  '#0891b2', '#db2777', '#65a30d', '#ea580c', '#7c3aed',
+  '#0284c7', '#be185d', '#15803d', '#b45309', '#6d28d9',
+  '#0e7490',
+];
+function getDayColor(day: number): string {
+  const idx = ((day - 1) % DAY_COLORS.length + DAY_COLORS.length) % DAY_COLORS.length;
+  return DAY_COLORS[idx];
 }
 
 // Open Google Maps search for a place name (always use name-based search)
@@ -183,7 +197,7 @@ export default function ItineraryTab({ trip }: Props) {
   const [alternatives, setAlternatives] = useState<ItineraryAlternative[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
-  const [activeSubTab, setActiveSubTab] = useState<'list' | 'map'>('list');
+  const [activeSubTab, setActiveSubTab] = useState<'list' | 'map' | 'timetable'>('list');
   const [selectedDay, setSelectedDay] = useState<number>(1);
 
   // Cross-day move selection
@@ -655,7 +669,18 @@ export default function ItineraryTab({ trip }: Props) {
           className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${activeSubTab === 'map' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <MapPin size={14} /> 地圖
         </button>
+        <button onClick={() => setActiveSubTab('timetable')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${activeSubTab === 'timetable' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          <Calendar size={14} /> 時間表
+        </button>
       </div>
+
+      {/* Timetable sub-tab */}
+      {activeSubTab === 'timetable' && (
+        <div className="h-[calc(100vh-200px)] min-h-[500px]">
+          <TimetableTab trip={trip} items={items} tripDays={tripDays} />
+        </div>
+      )}
 
       {/* Map sub-tab */}
       {activeSubTab === 'map' && (
@@ -793,15 +818,35 @@ export default function ItineraryTab({ trip }: Props) {
                           <DndContext sensors={sensors} collisionDetection={closestCenter}
                             onDragEnd={e => handleDragEnd(e, dayItems)}>
                             <SortableContext items={dayItems.map(i => i.Itinerary_ID)} strategy={verticalListSortingStrategy}>
-                              <div className="space-y-1.5">
-                                {dayItems.map(item => (
-                                  <SortableItem key={item.Itinerary_ID} item={item}
-                                    onEdit={i => openItemModal(day, i)}
-                                    onDelete={i => setDeleteItem(i)}
-                                    isSelected={selectedItems.has(item.Itinerary_ID)}
-                                    onToggleSelect={toggleItemSelect}
-                                    selectMode={selectMode}
-                                  />
+                              <div className="space-y-0">
+                                {dayItems.map((item, idx) => (
+                                  <>
+                                    <div key={item.Itinerary_ID} className="mb-1.5">
+                                      <SortableItem item={item}
+                                        onEdit={i => openItemModal(day, i)}
+                                        onDelete={i => setDeleteItem(i)}
+                                        isSelected={selectedItems.has(item.Itinerary_ID)}
+                                        onToggleSelect={toggleItemSelect}
+                                        selectMode={selectMode}
+                                      />
+                                    </div>
+                                    {idx < dayItems.length - 1 &&
+                                      parseFloat(String(item.Lat || '')) !== 0 &&
+                                      parseFloat(String(item.Lng || '')) !== 0 &&
+                                      parseFloat(String(dayItems[idx + 1].Lat || '')) !== 0 &&
+                                      parseFloat(String(dayItems[idx + 1].Lng || '')) !== 0 &&
+                                      !isNaN(parseFloat(String(item.Lat || ''))) &&
+                                      !isNaN(parseFloat(String(item.Lng || ''))) &&
+                                      !isNaN(parseFloat(String(dayItems[idx + 1].Lat || ''))) &&
+                                      !isNaN(parseFloat(String(dayItems[idx + 1].Lng || ''))) && (
+                                      <TransportCard
+                                        key={`transport-${item.Itinerary_ID}-${dayItems[idx + 1].Itinerary_ID}`}
+                                        from={item}
+                                        to={dayItems[idx + 1]}
+                                        dayColor={getDayColor(day)}
+                                      />
+                                    )}
+                                  </>
                                 ))}
                               </div>
                             </SortableContext>
