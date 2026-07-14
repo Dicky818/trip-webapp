@@ -124,7 +124,14 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
   selectMode: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.Itinerary_ID });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.85 : 1,
+    zIndex: isDragging ? 50 : undefined,
+    boxShadow: isDragging ? '0 8px 25px -5px rgba(0,0,0,0.15), 0 4px 10px -5px rgba(0,0,0,0.1)' : undefined,
+    scale: isDragging ? '1.02' : undefined,
+  };
   const activityName = item.Activity_Name || item.Activity;
 
   return (
@@ -724,6 +731,46 @@ export default function ItineraryTab({ trip }: Props) {
               <Button size="sm" variant="outline" onClick={() => setShowCopyModal(true)}>
                 <Copy size={14} /> 複製行程
               </Button>
+              <Button size="sm" variant="outline" onClick={() => {
+                // Generate .ics calendar export
+                const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TripWebApp//TW//EN', 'CALSCALE:GREGORIAN'];
+                tripDays.forEach(({ day, date }) => {
+                  const dayItems = items.filter(i => Number(i.Day_Number) === day).sort((a, b) => Number(a.Sort_Order) - Number(b.Sort_Order));
+                  dayItems.forEach(item => {
+                    const name = item.Activity_Name || item.Activity || '';
+                    const dateClean = date.replace(/-/g, '');
+                    let dtStart = dateClean;
+                    let dtEnd = dateClean;
+                    if (item.Time) {
+                      const parts = item.Time.split(':');
+                      const hh = (parts[0] || '00').padStart(2, '0');
+                      const mm = (parts[1] || '00').padStart(2, '0');
+                      dtStart = `${dateClean}T${hh}${mm}00`;
+                      // 1 hour default duration
+                      const endH = String(Math.min(parseInt(hh) + 1, 23)).padStart(2, '0');
+                      dtEnd = `${dateClean}T${endH}${mm}00`;
+                    }
+                    lines.push('BEGIN:VEVENT');
+                    lines.push(`DTSTART:${dtStart}`);
+                    lines.push(`DTEND:${dtEnd}`);
+                    lines.push(`SUMMARY:${name}`);
+                    if (item.Note) lines.push(`DESCRIPTION:${item.Note.replace(/\n/g, '\\n')}`);
+                    lines.push(`UID:${item.Itinerary_ID}@tripwebapp`);
+                    lines.push('END:VEVENT');
+                  });
+                });
+                lines.push('END:VCALENDAR');
+                const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${trip.Trip_Name || 'trip'}.ics`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('行程已匯出為 .ics 檔案');
+              }}>
+                <Calendar size={14} /> 匯出日曆
+              </Button>
             </div>
           </div>
 
@@ -786,12 +833,34 @@ export default function ItineraryTab({ trip }: Props) {
                         )}
                       </div>
                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        {/* Daily summary stats */}
+                        {dayItems.length > 0 && (() => {
+                          const times = dayItems.map(i => i.Time).filter(Boolean).sort();
+                          const firstTime = times[0] || '';
+                          const lastTime = times[times.length - 1] || '';
+                          const timeRange = firstTime && lastTime && firstTime !== lastTime
+                            ? `${firstTime.slice(0,5)}-${lastTime.slice(0,5)}`
+                            : firstTime ? firstTime.slice(0,5) : '';
+                          return timeRange ? (
+                            <span className="text-xs text-slate-400 hidden sm:inline">{timeRange}</span>
+                          ) : null;
+                        })()}
                         <span className="text-xs text-slate-400">{dayItems.length} 項活動</span>
                         <Button size="sm" variant="ghost" onClick={() => openItemModal(day)}>
                           <Plus size={14} />
                         </Button>
                       </div>
                     </div>
+
+                    {/* Collapsed Summary */}
+                    {isCollapsed && dayItems.length > 0 && (
+                      <div className="px-4 py-2 border-t border-slate-100 bg-white">
+                        <p className="text-xs text-slate-400 truncate">
+                          {dayItems.slice(0, 4).map(i => i.Activity_Name || i.Activity).join(' → ')}
+                          {dayItems.length > 4 && ` ...+${dayItems.length - 4}`}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Day Content */}
                     {!isCollapsed && (

@@ -368,7 +368,25 @@ interface TripCardProps {
   onShare: (() => void) | null;
 }
 
+function getTripStatus(start: string, end: string): { label: string; color: string; daysText: string } {
+  const parseDate = (d: string) => { const s = d.includes('T') ? d.slice(0, 10) : d; const [y, m, day] = s.split('-').map(Number); return new Date(y, m - 1, day); };
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const startDate = parseDate(start);
+  const endDate = parseDate(end);
+  const diffStart = Math.ceil((startDate.getTime() - now.getTime()) / 86400000);
+  const diffEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86400000);
+  if (diffStart > 0) {
+    return { label: '計劃中', color: 'bg-blue-100 text-blue-700', daysText: `${diffStart} 天後出發` };
+  } else if (diffEnd >= 0) {
+    const dayNum = Math.abs(diffStart) + 1;
+    return { label: '旅行中', color: 'bg-emerald-100 text-emerald-700', daysText: `第 ${dayNum} 天` };
+  } else {
+    return { label: '已結束', color: 'bg-slate-100 text-slate-500', daysText: '已完成' };
+  }
+}
+
 function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete, onShare }: TripCardProps) {
+  const status = getTripStatus(trip.Start_Date, trip.End_Date);
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer group">
       <div onClick={onNavigate} className="p-5">
@@ -377,6 +395,9 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete
             {isOwner ? <Plane size={20} className="text-blue-600" /> : <Users size={20} className="text-purple-600" />}
           </div>
           <div className="flex items-center gap-1.5">
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>
+              {status.label}
+            </span>
             {!isOwner && (
               <span className="text-xs font-medium bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">協作</span>
             )}
@@ -390,9 +411,14 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete
           <Calendar size={13} />
           <span>{formatDate(trip.Start_Date)} — {formatDate(trip.End_Date)}</span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <MapPin size={13} />
-          <span>{getDuration(trip.Start_Date, trip.End_Date)}</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <MapPin size={13} />
+            <span>{getDuration(trip.Start_Date, trip.End_Date)}</span>
+          </div>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status.color}`}>
+            {status.daysText}
+          </span>
         </div>
       </div>
       {isOwner && (

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X } from 'lucide-react';
+import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api, Trip } from '../../api/supabaseApi';
 import { Button, TabBar, Spinner, Input, Select } from '../../components/ui';
@@ -8,6 +8,7 @@ import InfoTab from './InfoTab';
 import ItineraryTab from './ItineraryTab';
 import ExpensesTab from './ExpensesTab';
 import AITab from './AITab';
+import PackingListTab from './PackingListTab';
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'info', label: '資訊總結', icon: <Plane size={15} /> },
   { id: 'itinerary', label: '行程總表', icon: <Map size={15} /> },
   { id: 'expenses', label: '支出總表', icon: <DollarSign size={15} /> },
+  { id: 'packing', label: '行李清單', icon: <Package size={15} /> },
   { id: 'ai', label: 'AI 注意事項', icon: <Sparkles size={15} /> },
 ];
 
@@ -123,6 +125,45 @@ export default function TripDetailPage() {
                   <span className="mx-2">·</span>
                   <span className="font-medium text-blue-600">{trip.Base_Currency}</span>
                 </p>
+                {/* Countdown Badge */}
+                {(() => {
+                  const parseD = (d: string) => { const s = d.includes('T') ? d.slice(0, 10) : d; const [y, m, day] = s.split('-').map(Number); return new Date(y, m - 1, day); };
+                  const now = new Date(); now.setHours(0, 0, 0, 0);
+                  const startDate = parseD(trip.Start_Date);
+                  const endDate = parseD(trip.End_Date);
+                  const diffStart = Math.ceil((startDate.getTime() - now.getTime()) / 86400000);
+                  const diffEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86400000);
+                  const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+                  if (diffStart > 0) {
+                    return (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Clock size={14} className="text-blue-500" />
+                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                          距離出發還有 {diffStart} 天
+                        </span>
+                      </div>
+                    );
+                  } else if (diffEnd >= 0) {
+                    const dayNum = Math.abs(diffStart) + 1;
+                    return (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Clock size={14} className="text-emerald-500" />
+                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          旅行中 · 第 {dayNum}/{totalDays} 天
+                        </span>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Clock size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full">
+                          行程已結束
+                        </span>
+                      </div>
+                    );
+                  }
+                })()}
               </div>
               <button
                 onClick={() => {
@@ -151,6 +192,7 @@ export default function TripDetailPage() {
         {activeTab === 'info' && <InfoTab trip={trip} />}
         {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
         {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
+        {activeTab === 'packing' && <PackingListTab trip={trip} />}
         {activeTab === 'ai' && <AITab trip={trip} />}
       </div>
     </div>

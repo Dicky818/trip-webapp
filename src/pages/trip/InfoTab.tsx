@@ -93,8 +93,35 @@ export default function InfoTab({ trip }: Props) {
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
 
+  // Trip overview stats
+  const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.Base_Amount) || 0), 0);
+  const tripDuration = (() => {
+    const parseD = (d: string) => { const s = d.includes('T') ? d.slice(0, 10) : d; const [y, m, day] = s.split('-').map(Number); return new Date(y, m - 1, day); };
+    return Math.round((parseD(trip.End_Date).getTime() - parseD(trip.Start_Date).getTime()) / 86400000) + 1;
+  })();
+
   return (
     <div className="p-5 space-y-6">
+
+      {/* ── 行程總覽卡片 ── */}
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-100 text-center">
+          <p className="text-2xl font-bold text-blue-600">{tripDuration}</p>
+          <p className="text-xs text-slate-500 mt-0.5">旅行天數</p>
+        </div>
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-3 border border-emerald-100 text-center">
+          <p className="text-2xl font-bold text-emerald-600">{allMembers.length}</p>
+          <p className="text-xs text-slate-500 mt-0.5">行程成員</p>
+        </div>
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-3 border border-amber-100 text-center">
+          <p className="text-2xl font-bold text-amber-600">{expenses.length}</p>
+          <p className="text-xs text-slate-500 mt-0.5">支出筆數</p>
+        </div>
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 border border-purple-100 text-center">
+          <p className="text-lg font-bold text-purple-600">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+          <p className="text-xs text-slate-500 mt-0.5">總支出</p>
+        </div>
+      </section>
 
       {/* ── 行程成員（第一個區塊） ── */}
       <section>
