@@ -1,4 +1,4 @@
-import React, { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, useRef, useEffect } from 'react';
+import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 // ── Button ─────────────────────────────────────────────────
@@ -133,32 +133,60 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
   const scrollYRef = useRef<number>(0);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
-      // Save scroll position when modal opens
+      // Save scroll position and lock body scroll
       scrollYRef.current = window.scrollY;
+      document.body.style.overflow = 'hidden';
+
+      // Focus the modal container for keyboard events
+      setTimeout(() => modalRef.current?.focus(), 50);
     } else {
-      // Restore scroll position after modal closes
+      // Restore body scroll and scroll position
+      document.body.style.overflow = '';
       const saved = scrollYRef.current;
       requestAnimationFrame(() => {
         window.scrollTo({ top: saved, behavior: 'instant' as ScrollBehavior });
       });
     }
+    return () => { document.body.style.overflow = ''; };
   }, [open]);
+
+  // ESC key to close
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
 
   if (!open) return null;
   const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl' };
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
-        className={`relative w-full ${sizes[size]} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[90vh]`}
+        ref={modalRef}
+        tabIndex={-1}
+        className={`relative w-full ${sizes[size]} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[90vh] outline-none`}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+          <h3 id="modal-title" className="text-base font-semibold text-slate-900">{title}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" aria-label="關閉">
             <X size={18} />
           </button>
         </div>
@@ -256,16 +284,18 @@ export function TabBar({ tabs, activeTab, onChange }: {
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex border-b border-slate-200 bg-white">
+    <div className="flex border-b border-slate-200 bg-white overflow-x-auto scrollbar-hide">
       {tabs.map(tab => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors
+          className={`flex items-center gap-2 px-4 sm:px-5 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0
             ${activeTab === tab.id
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
             }`}
+          role="tab"
+          aria-selected={activeTab === tab.id}
         >
           {tab.icon}
           {tab.label}

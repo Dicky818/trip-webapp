@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Train, Car, PersonStanding, Bike, RefreshCw, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Train, Car, PersonStanding, Bike, RefreshCw, ChevronDown, ChevronUp, AlertCircle, Navigation } from 'lucide-react';
 import { ItineraryItem } from '../../api/supabaseApi';
 import { supabase } from '../../lib/supabase';
 
@@ -252,6 +252,9 @@ export default function TransportCard({ from, to, dayColor }: Props) {
   const [loading, setLoading] = useState<Partial<Record<TravelMode, boolean>>>({});
   const [expanded, setExpanded] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const fromLat = parseFloat(String(from.Lat || ''));
   const fromLng = parseFloat(String(from.Lng || ''));
@@ -262,6 +265,22 @@ export default function TransportCard({ from, to, dayColor }: Props) {
   const originCoords = hasCoords ? `${fromLat.toFixed(4)},${fromLng.toFixed(4)}` : '';
   const destCoords = hasCoords ? `${toLat.toFixed(4)},${toLng.toFixed(4)}` : '';
   const distKm = hasCoords ? haversineKm(fromLat, fromLng, toLat, toLng) : 0;
+
+  // IntersectionObserver: only activate when card is visible in viewport
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const fetchRoute = useCallback(async (mode: TravelMode, forceRefresh = false) => {
     if (!hasCoords) return;
@@ -301,16 +320,17 @@ export default function TransportCard({ from, to, dayColor }: Props) {
     setLoading(prev => ({ ...prev, [mode]: false }));
   }, [hasCoords, originCoords, destCoords, distKm, fromLat, fromLng, toLat, toLng, results]);
 
-  // Auto-fetch TRANSIT on mount
+  // Only fetch when visible AND has not fetched yet (lazy loading)
   useEffect(() => {
-    if (hasCoords) {
+    if (isVisible && hasCoords && !hasFetched) {
+      setHasFetched(true);
       fetchRoute('TRANSIT');
     }
-  }, [hasCoords, originCoords, destCoords]);
+  }, [isVisible, hasCoords, hasFetched]);
 
-  // Fetch when mode changes
+  // Fetch when mode changes (only if already activated)
   useEffect(() => {
-    if (hasCoords) {
+    if (hasFetched && hasCoords) {
       fetchRoute(activeMode);
     }
   }, [activeMode]);
@@ -320,8 +340,23 @@ export default function TransportCard({ from, to, dayColor }: Props) {
   const activeResult = results[activeMode];
   const isLoading = loading[activeMode];
 
+  // Show compact placeholder before visible/fetched
+  if (!hasFetched) {
+    return (
+      <div ref={containerRef} className="mx-0 my-1.5 rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <Navigation size={12} className="text-slate-300" />
+          <span className="text-xs text-slate-400">
+            {distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`}
+          </span>
+          <span className="text-xs text-slate-300">· 滑動至此查看交通資訊</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-0 my-1.5 rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
+    <div ref={containerRef} className="mx-0 my-1.5 rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
       {/* Compact summary row */}
       <div className="flex items-center gap-2 px-3 py-2">
         {/* Mode selector */}
@@ -337,6 +372,7 @@ export default function TransportCard({ from, to, dayColor }: Props) {
               }`}
               style={activeMode === mode ? { backgroundColor: dayColor } : {}}
               title={MODE_LABELS[mode]}
+              aria-label={MODE_LABELS[mode]}
             >
               {MODE_ICONS[mode]}
             </button>
@@ -381,6 +417,7 @@ export default function TransportCard({ from, to, dayColor }: Props) {
             onClick={() => fetchRoute(activeMode, true)}
             className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
             title="重新查詢"
+            aria-label="重新查詢交通資訊"
           >
             <RefreshCw size={11} />
           </button>
@@ -388,6 +425,7 @@ export default function TransportCard({ from, to, dayColor }: Props) {
             <button
               onClick={() => setExpanded(e => !e)}
               className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+              aria-label={expanded ? '收合詳情' : '展開詳情'}
             >
               {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
             </button>

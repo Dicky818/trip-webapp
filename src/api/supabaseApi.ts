@@ -1032,6 +1032,7 @@ export const api = {
       .select('*, expense_details(*)')
       .eq('trip_id', tripId)
       .order('date')
+      .order('sort_order', { ascending: true, nullsFirst: false })
       .order('created_at');
     if (error) return err(error.message);
 
@@ -1559,6 +1560,20 @@ export const api = {
     }
   },
 
+  // ── Expense Reorder ─────────────────────────────────────
+  reorderExpenses: async (orderedIds: string[]) => {
+    try {
+      // Update sort_order for each expense in batch
+      const updates = orderedIds.map((id, idx) =>
+        supabase.from('expenses').update({ sort_order: idx }).eq('id', id)
+      );
+      await Promise.all(updates);
+      return ok(null);
+    } catch (e: any) {
+      return err(e.message || 'Reorder failed');
+    }
+  },
+
   // ── Exchange Rate ────────────────────────────────────────
   getExchangeRate: async (from: string, to: string) => {
     const rate = await fetchExchangeRate(from, to);
@@ -1573,6 +1588,3 @@ export function normalizeDateStr(d: string | null | undefined): string {
   return d;
 }
 
-// Keep getGasUrl/setGasUrl for settings page (now no-ops)
-export function getGasUrl(): string { return ''; }
-export function setGasUrl(_url: string): void { /* no-op */ }

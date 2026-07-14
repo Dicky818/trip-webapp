@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { api, Trip, Member, Category, UserProfile } from '../api/supabaseApi';
+import { api, Trip, Category, UserProfile } from '../api/supabaseApi';
 
 interface AppContextType {
   // Trips
@@ -7,7 +7,7 @@ interface AppContextType {
   tripsLoading: boolean;
   fetchTrips: () => Promise<void>;
 
-  // User Profile (replaces global members)
+  // User Profile
   userProfile: UserProfile | null;
   profileLoading: boolean;
   fetchUserProfile: () => Promise<void>;
@@ -20,14 +20,6 @@ interface AppContextType {
   // Toast notifications
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
-
-  // Legacy compatibility (no-op stubs kept so old imports don't break)
-  gasUrl: string;
-  setGasUrl: (url: string) => void;
-  isConfigured: boolean;
-  members: Member[];
-  membersLoading: boolean;
-  fetchMembers: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -94,13 +86,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userProfile, profileLoading, fetchUserProfile,
       categories, categoriesLoading, fetchCategories,
       toast, showToast,
-      // Legacy no-ops
-      gasUrl: 'supabase',
-      setGasUrl: () => {},
-      isConfigured: true,
-      members: [],
-      membersLoading: false,
-      fetchMembers: async () => {},
     }}>
       {children}
       {toast && (

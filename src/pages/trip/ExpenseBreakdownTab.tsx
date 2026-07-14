@@ -88,10 +88,13 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   const tripDates = useMemo(() => getTripDates(trip.Start_Date, trip.End_Date), [trip.Start_Date, trip.End_Date]);
 
   // 篩選後的支出
+  // Fix: 當 Splitters 為空時，代表全體成員平分，應包含在每個人的視圖中
   const filteredExpenses = useMemo(() => {
     if (selectedSplitter === 'ALL') return expenses;
     return expenses.filter(e => {
       const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
+      // Empty splitters means ALL members share this expense
+      if (splitters.length === 0) return true;
       return splitters.includes(selectedSplitter);
     });
   }, [expenses, selectedSplitter]);
@@ -116,12 +119,15 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   }, [activeCategories]);
 
   // 計算每筆支出的分攤金額（base currency）
+  // Fix: 當 Splitters 為空時，代表全體成員平分，應除以全部成員數
   const getEffectiveAmount = (e: Expense): number => {
     const total = parseFloat(String(e.Base_Amount)) || 0;
     if (selectedSplitter === 'ALL') return total;
     const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
-    const count = splitters.length;
-    return count > 0 ? total / count : total;
+    if (splitters.length > 0) return total / splitters.length;
+    // Empty splitters = all members share equally
+    const memberCount = tripMemberObjects.length || 1;
+    return total / memberCount;
   };
 
   // 判斷某分類是否需要日期分攤
@@ -162,10 +168,24 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
       return spreadDates(start, end);
     }
     if (isAccommodation) {
-      // 酒店/民宿：Check_In_Date 到 Check_Out_Date（含頭尾）
+      // 酒店/民宿：Check_In_Date 到 Check_Out_Date（不含退房日）
+      // Fix: 住宿費用只攝提到實際過夜的日期，不含 checkout 當天
       const start = toDateStr(e.Check_In_Date || e.Date || '');
       const end = toDateStr(e.Check_Out_Date || e.Date || '');
-      return spreadDates(start, end);
+      if (!start || !end || start === end) return start ? [start] : [];
+      // Exclude checkout day: generate dates from start to day before end
+      const dates: string[] = [];
+      const s = parseLocalDate(start);
+      const e2 = parseLocalDate(end);
+      let cur = new Date(s);
+      while (cur < e2) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, '0');
+        const d2 = String(cur.getDate()).padStart(2, '0');
+        dates.push(`${y}-${m}-${d2}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates.length > 0 ? dates : [start];
     }
     if (isFlight) {
       // 機票：出發日 + 回程日（Arrival_Date 作為回程日）
@@ -322,8 +342,44 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
         )}
       </div>
 
-      {/* 表格（橫向捲動） */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
+      {/* Mobile: card view for small screens */}
+      <div className="sm:hidden space-y-3">
+        {categoryStructure.map(({ main, subs }) => {
+          const mainTotal = mainCategoryTotal[main] || 0;
+          const mainPct = grandTotal > 0 ? (mainTotal / grandTotal * 100) : 0;
+          if (mainTotal === 0) return null;
+          return (
+            <div key={main} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="bg-blue-50 px-4 py-2.5 flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-800">{main}</span>
+                <div className="text-right">
+                  <span className="text-sm font-bold text-slate-900">{fmtAmt(mainTotal, true)}</span>
+                  <span className="text-xs text-slate-500 ml-2">{mainPct.toFixed(1)}%</span>
+                </div>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {subs.map(sub => {
+                  const subTotal = subCategoryTotal[main]?.[sub] || 0;
+                  if (subTotal === 0) return null;
+                  const subPct = grandTotal > 0 ? (subTotal / grandTotal * 100) : 0;
+                  return (
+                    <div key={sub} className="px-4 py-2 flex items-center justify-between">
+                      <span className="text-xs text-slate-600">{sub}</span>
+                      <div className="text-right">
+                        <span className="text-xs font-medium text-slate-800">{fmtAmt(subTotal, true)}</span>
+                        <span className="text-xs text-slate-400 ml-1.5">{subPct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: table view (hidden on mobile) */}
+      <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200">
         <table className="text-xs border-collapse min-w-full">
           <thead>
             <tr className="bg-blue-600 text-white">

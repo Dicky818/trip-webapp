@@ -141,7 +141,10 @@ export default function ExpensesTab({ trip }: Props) {
     const oldIndex = dateExpenses.findIndex(e => e.Expense_ID === active.id);
     const newIndex = dateExpenses.findIndex(e => e.Expense_ID === over.id);
     const reordered = arrayMove(dateExpenses, oldIndex, newIndex);
-    setExpenseOrder(prev => ({ ...prev, [date]: reordered.map(e => e.Expense_ID) }));
+    const orderedIds = reordered.map(e => e.Expense_ID);
+    setExpenseOrder(prev => ({ ...prev, [date]: orderedIds }));
+    // Persist order to database (fire-and-forget)
+    api.reorderExpenses(orderedIds).catch(console.error);
   };
 
   const fetchAll = async () => {

@@ -12,5 +12,6 @@ export default defineConfig({
   build: {
     // Target Safari 14+ and modern browsers for compatibility
     target: ['es2020', 'safari14', 'chrome87', 'firefox78'],
+    chunkSizeWarningLimit: 600,
   },
 })

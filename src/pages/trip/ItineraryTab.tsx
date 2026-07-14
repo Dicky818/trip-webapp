@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Calendar } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -820,8 +820,8 @@ export default function ItineraryTab({ trip }: Props) {
                             <SortableContext items={dayItems.map(i => i.Itinerary_ID)} strategy={verticalListSortingStrategy}>
                               <div className="space-y-0">
                                 {dayItems.map((item, idx) => (
-                                  <>
-                                    <div key={item.Itinerary_ID} className="mb-1.5">
+                                  <React.Fragment key={item.Itinerary_ID}>
+                                    <div className="mb-1.5">
                                       <SortableItem item={item}
                                         onEdit={i => openItemModal(day, i)}
                                         onDelete={i => setDeleteItem(i)}
@@ -846,7 +846,7 @@ export default function ItineraryTab({ trip }: Props) {
                                         dayColor={getDayColor(day)}
                                       />
                                     )}
-                                  </>
+                                  </React.Fragment>
                                 ))}
                               </div>
                             </SortableContext>

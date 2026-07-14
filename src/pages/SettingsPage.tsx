@@ -5,7 +5,7 @@ import { api, Category } from '../api/supabaseApi';
 import { Button, Card, Input, Modal, ConfirmDialog, Badge, Spinner } from '../components/ui';
 
 export default function SettingsPage() {
-  const { isConfigured, userProfile, fetchUserProfile, profileLoading, categories, fetchCategories, categoriesLoading, showToast } = useApp();
+  const { userProfile, fetchUserProfile, profileLoading, categories, fetchCategories, categoriesLoading, showToast } = useApp();
 
   // Display name state
   const [displayNameInput, setDisplayNameInput] = useState('');
@@ -138,11 +138,9 @@ export default function SettingsPage() {
             <Tag size={18} className="text-blue-600" />
             <h2 className="font-semibold text-slate-900">支出分類</h2>
           </div>
-          {isConfigured && (
-            <Button size="sm" variant="outline" onClick={() => setShowAddCategory(true)}>
-              <Plus size={14} /> 新增分類
-            </Button>
-          )}
+          <Button size="sm" variant="outline" onClick={() => setShowAddCategory(true)}>
+            <Plus size={14} /> 新增分類
+          </Button>
         </div>
 
         {categoriesLoading ? (

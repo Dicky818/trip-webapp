@@ -9,7 +9,7 @@ const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB',
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { trips, tripsLoading, fetchTrips, isConfigured, showToast } = useApp();
+  const { trips, tripsLoading, fetchTrips, showToast } = useApp();
 
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null);
@@ -34,8 +34,8 @@ export default function HomePage() {
   const [joinError, setJoinError] = useState('');
 
   useEffect(() => {
-    if (isConfigured) fetchTrips();
-  }, [isConfigured, fetchTrips]);
+    fetchTrips();
+  }, [fetchTrips]);
 
   const handleCreate = async () => {
     if (!form.Trip_Name.trim()) { setFormError('請輸入行程名稱'); return; }
@@ -164,7 +164,7 @@ export default function HomePage() {
           <Button variant="outline" onClick={() => setShowJoin(true)}>
             <LogIn size={15} /> 加入行程
           </Button>
-          <Button onClick={() => setShowCreate(true)} disabled={!isConfigured}>
+          <Button onClick={() => setShowCreate(true)}>
             <Plus size={16} /> 新增行程
           </Button>
         </div>
@@ -176,13 +176,13 @@ export default function HomePage() {
         <EmptyState
           icon={<Plane size={48} />}
           title="還沒有行程"
-          description={isConfigured ? '點擊「新增行程」開始規劃您的旅程，或「加入行程」使用分享碼加入他人行程' : '請先在設定頁面輸入後端 URL'}
-          action={isConfigured ? (
+          description="點擊「新增行程」開始規劃您的旅程，或「加入行程」使用分享碼加入他人行程"
+          action={
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowJoin(true)}><LogIn size={15} /> 加入行程</Button>
               <Button onClick={() => setShowCreate(true)}><Plus size={16} /> 新增行程</Button>
             </div>
-          ) : undefined}
+          }
         />
       ) : (
         <div className="space-y-6">

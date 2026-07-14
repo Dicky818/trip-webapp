@@ -96,7 +96,7 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
 
           {/* 轉帳矩陣 */}
           {Object.keys(settlement.memberBalances || {}).length > 1 && (
-            <Card className="p-4 overflow-x-auto">
+            <Card className="p-4">
               {/* Matrix header with switch button */}
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <div>
@@ -143,26 +143,52 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
                 names.forEach(n => { matrix[n] = {}; names.forEach(m => { matrix[n][m] = 0; }); });
                 (settlement.settlements || []).forEach(s => { matrix[s.from][s.to] = s.amount; });
                 return (
-                  <table className="text-xs w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="p-2 bg-slate-50 text-slate-500 font-medium text-left">付款 ↓ / 收款 →</th>
-                        {names.map(n => <th key={n} className="p-2 bg-slate-50 text-slate-600 font-medium text-center">{n}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {names.map(from => (
-                        <tr key={from}>
-                          <td className="p-2 bg-slate-50 text-slate-600 font-medium">{from}</td>
-                          {names.map(to => (
-                            <td key={to} className={`p-2 text-center ${matrix[from][to] > 0 ? 'bg-red-50 text-red-600 font-semibold' : 'text-slate-300'}`}>
-                              {matrix[from][to] > 0 ? fmt(matrix[from][to]) : '—'}
-                            </td>
+                  <>
+                    {/* Desktop: table view */}
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="text-xs w-full border-collapse">
+                        <thead>
+                          <tr>
+                            <th className="p-2 bg-slate-50 text-slate-500 font-medium text-left sticky left-0 z-10">付款 ↓ / 收款 →</th>
+                            {names.map(n => <th key={n} className="p-2 bg-slate-50 text-slate-600 font-medium text-center">{n}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {names.map(from => (
+                            <tr key={from}>
+                              <td className="p-2 bg-slate-50 text-slate-600 font-medium sticky left-0 z-10">{from}</td>
+                              {names.map(to => (
+                                <td key={to} className={`p-2 text-center ${matrix[from][to] > 0 ? 'bg-red-50 text-red-600 font-semibold' : 'text-slate-300'}`}>
+                                  {matrix[from][to] > 0 ? fmt(matrix[from][to]) : '—'}
+                                </td>
+                              ))}
+                            </tr>
                           ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Mobile: card view */}
+                    <div className="sm:hidden space-y-2">
+                      {names.map(from => {
+                        const debts = names.filter(to => matrix[from][to] > 0);
+                        if (debts.length === 0) return null;
+                        return (
+                          <div key={from} className="bg-red-50 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-slate-700 mb-1.5">{from} 需付款：</p>
+                            {debts.map(to => (
+                              <div key={to} className="flex items-center justify-between text-xs py-0.5">
+                                <span className="text-slate-600">→ {to}</span>
+                                <span className="font-semibold text-red-600">{fmt(matrix[from][to])}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {names.every(from => names.every(to => matrix[from][to] === 0)) && (
+                        <p className="text-xs text-slate-400 text-center py-2">無需轉帳</p>
+                      )}
+                    </div>
+                  </>
                 );
               })()}
 
@@ -185,31 +211,55 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
                 const hasAny = names.some(from => names.some(to => netRaw[from][to] > 0));
                 return (
                   <>
-                    <table className="text-xs w-full border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="p-2 bg-slate-50 text-slate-500 font-medium text-left">欠款方 ↓ / 收款方 →</th>
-                          {names.map(n => <th key={n} className="p-2 bg-slate-50 text-slate-600 font-medium text-center">{n}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {names.map(from => (
-                          <tr key={from}>
-                            <td className="p-2 bg-slate-50 text-slate-600 font-medium">{from}</td>
-                            {names.map(to => (
-                              <td key={to} className={`p-2 text-center ${
-                                from === to ? 'text-slate-200' :
-                                netRaw[from][to] > 0 ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-slate-300'
-                              }`}>
-                                {from === to ? '—' : netRaw[from][to] > 0 ? fmt(netRaw[from][to]) : '—'}
-                              </td>
-                            ))}
+                    {/* Desktop: table view */}
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="text-xs w-full border-collapse">
+                        <thead>
+                          <tr>
+                            <th className="p-2 bg-slate-50 text-slate-500 font-medium text-left sticky left-0 z-10">欠款方 ↓ / 收款方 →</th>
+                            {names.map(n => <th key={n} className="p-2 bg-slate-50 text-slate-600 font-medium text-center">{n}</th>)}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {names.map(from => (
+                            <tr key={from}>
+                              <td className="p-2 bg-slate-50 text-slate-600 font-medium sticky left-0 z-10">{from}</td>
+                              {names.map(to => (
+                                <td key={to} className={`p-2 text-center ${
+                                  from === to ? 'text-slate-200' :
+                                  netRaw[from][to] > 0 ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-slate-300'
+                                }`}>
+                                  {from === to ? '—' : netRaw[from][to] > 0 ? fmt(netRaw[from][to]) : '—'}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Mobile: card view */}
+                    <div className="sm:hidden space-y-2">
+                      {names.map(from => {
+                        const debts = names.filter(to => netRaw[from][to] > 0);
+                        if (debts.length === 0) return null;
+                        return (
+                          <div key={from} className="bg-amber-50 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-slate-700 mb-1.5">{from} 欠款：</p>
+                            {debts.map(to => (
+                              <div key={to} className="flex items-center justify-between text-xs py-0.5">
+                                <span className="text-slate-600">→ {to}</span>
+                                <span className="font-semibold text-amber-700">{fmt(netRaw[from][to])}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {!hasAny && (
+                        <p className="text-xs text-slate-400 text-center py-2">所有費用由同一人墊付，無直接欠款</p>
+                      )}
+                    </div>
                     {!hasAny && (
-                      <p className="text-xs text-slate-400 text-center mt-2">所有費用由同一人墊付，無直接欠款</p>
+                      <p className="hidden sm:block text-xs text-slate-400 text-center mt-2">所有費用由同一人墊付，無直接欠款</p>
                     )}
                   </>
                 );
