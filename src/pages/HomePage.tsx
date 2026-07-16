@@ -290,20 +290,34 @@ export default function HomePage() {
                 </div>
                 <div className="flex-1">
                   <label className="text-xs font-medium text-slate-500 block mb-1">密碼</label>
-                  <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
-                    <span className="font-mono font-bold text-lg text-slate-900 tracking-widest flex-1">{sharePassword}</span>
-                    <button onClick={() => handleCopy(sharePassword, 'pw')}
-                      className="p-1 text-slate-400 hover:text-blue-500 transition-colors">
-                      {copiedPw ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
-                    </button>
-                  </div>
+                  {sharePassword ? (
+                    <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                      <span className="font-mono font-bold text-lg text-slate-900 tracking-widest flex-1">{sharePassword}</span>
+                      <button onClick={() => handleCopy(sharePassword, 'pw')}
+                        className="p-1 text-slate-400 hover:text-blue-500 transition-colors">
+                        {copiedPw ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                      <span className="text-xs text-amber-700">密碼僅在產生時顯示一次，如遺忘請重新產生</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={() => handleCopy(`分享碼：${shareCode}\n密碼：${sharePassword}`, 'code')}
-                className="w-full flex items-center justify-center gap-2 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
-                <Link2 size={14} /> 複製分享碼和密碼
-              </button>
+              {sharePassword ? (
+                <button
+                  onClick={() => handleCopy(`分享碼：${shareCode}\n密碼：${sharePassword}`, 'code')}
+                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
+                  <Link2 size={14} /> 複製分享碼和密碼
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleCopy(shareCode, 'code')}
+                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
+                  <Link2 size={14} /> 複製分享碼
+                </button>
+              )}
               <Button variant="outline" size="sm" onClick={handleGenerateShareCode} loading={generatingShare} className="w-full">
                 重新產生分享碼
               </Button>
