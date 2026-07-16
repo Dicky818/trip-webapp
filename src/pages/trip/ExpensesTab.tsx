@@ -144,7 +144,7 @@ export default function ExpensesTab({ trip }: Props) {
     const orderedIds = reordered.map(e => e.Expense_ID);
     setExpenseOrder(prev => ({ ...prev, [date]: orderedIds }));
     // Persist order to database (fire-and-forget)
-    api.reorderExpenses(orderedIds).catch(console.error);
+    api.reorderExpenses(trip.Trip_ID, orderedIds).catch(console.error);
   };
 
   const fetchAll = async () => {

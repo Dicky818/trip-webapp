@@ -3,7 +3,7 @@ import { Train, Car, PersonStanding, Bike, RefreshCw, ChevronDown, ChevronUp, Al
 import { ItineraryItem } from '../../api/supabaseApi';
 import { supabase } from '../../lib/supabase';
 
-const GOOGLE_ROUTES_API_KEY = 'AIzaSyCgBcqumEfwXfqwdSVwj7q8GOymnY_C6fY';
+const GOOGLE_ROUTES_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 const CACHE_TTL_DAYS = 30;
 const DAILY_API_LIMIT = 300;
 const DAILY_LIMIT_KEY = 'transport_api_daily';

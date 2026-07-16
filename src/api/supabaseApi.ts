@@ -216,7 +216,8 @@ function rowToTrip(r: Record<string, unknown>): Trip {
     Updated_At: (r.updated_at as string) || '',
     Status: 'active',
     Share_Code: (r.share_code as string) || '',
-    Share_Password: (r.share_password as string) || '',
+    // NOTE: share_password is intentionally NOT mapped here to prevent exposure in API responses.
+    // Password verification is handled server-side via verify_share_password() RPC.
   };
 }
 
@@ -564,15 +565,25 @@ export const api = {
 
   // ── Trip Sharing ─────────────────────────────────────────
   generateShareCode: async (tripId: string) => {
-    const shareCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const sharePassword = Math.random().toString(36).substring(2, 8).toUpperCase();
-    
+    // Use crypto.getRandomValues for cryptographically secure random codes
+    const array = new Uint8Array(6);
+    crypto.getRandomValues(array);
+    const shareCode = Array.from(array, b => b.toString(36)).join('').substring(0, 6).toUpperCase();
+    const sharePassword = Array.from(new Uint8Array(6).map((_, i) => { crypto.getRandomValues(new Uint8Array(1)); return new Uint8Array(1)[0]; }), b => b.toString(36)).join('').substring(0, 6).toUpperCase();
+
+    // Store plaintext password temporarily so DB trigger can hash it via pgcrypto
+    // The share_password column will be cleared after hashing via the migration
     const { error } = await supabase
       .from('trips')
       .update({ share_code: shareCode, share_password: sharePassword })
       .eq('id', tripId);
-      
+
+    // Also update the bcrypt hash column directly via RPC
+    await supabase.rpc('update_share_password_hash', { p_trip_id: tripId, p_password: sharePassword }).maybeSingle();
+
     if (error) return err(error.message);
+    // Return the plaintext password ONCE to the owner so they can share it
+    // It is NOT stored in the Trip object returned by rowToTrip
     return ok({ shareCode, sharePassword });
   },
 
@@ -580,12 +591,17 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return err('User not logged in');
 
-    // Find the trip
+    // Verify password server-side using bcrypt via RPC (never compare plaintext client-side)
+    const { data: isValid, error: verifyError } = await supabase
+      .rpc('verify_share_password', { p_share_code: shareCode, p_password: sharePassword });
+
+    if (verifyError || !isValid) return err('Invalid share code or password');
+
+    // Find the trip ID (password already verified above)
     const { data: trip, error: tripError } = await supabase
       .from('trips')
       .select('id')
       .eq('share_code', shareCode)
-      .eq('share_password', sharePassword)
       .single();
 
     if (tripError || !trip) return err('Invalid share code or password');
@@ -1561,11 +1577,17 @@ export const api = {
   },
 
   // ── Expense Reorder ─────────────────────────────────────
-  reorderExpenses: async (orderedIds: string[]) => {
+  // tripId is required to scope updates and prevent cross-trip manipulation (defence-in-depth)
+  reorderExpenses: async (tripId: string, orderedIds: string[]) => {
+    if (!tripId) return err('tripId is required for reorderExpenses');
     try {
-      // Update sort_order for each expense in batch
+      // Update sort_order for each expense, scoped to the specific trip
       const updates = orderedIds.map((id, idx) =>
-        supabase.from('expenses').update({ sort_order: idx }).eq('id', id)
+        supabase
+          .from('expenses')
+          .update({ sort_order: idx })
+          .eq('id', id)
+          .eq('trip_id', tripId)  // ← scope to trip for defence-in-depth
       );
       await Promise.all(updates);
       return ok(null);

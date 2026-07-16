@@ -1,7 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://skrdhktjyiiipxcuxknk.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrcmRoa3RqeWlpaXB4Y3V4a25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MDY3ODksImV4cCI6MjA5NTQ4Mjc4OX0.EhuDYdzQguQ-Bc098P7ZYepAGRwwyJFdSySXrEsol10';
+// Keys are loaded from environment variables (.env.local for dev, CI secrets for production builds).
+// NEVER hardcode these values in source code.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing Supabase environment variables. ' +
+    'Please create a .env.local file with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
+  );
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
