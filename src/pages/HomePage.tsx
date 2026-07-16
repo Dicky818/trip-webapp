@@ -77,7 +77,7 @@ export default function HomePage() {
   const handleOpenShare = async (trip: Trip) => {
     setShareTrip(trip);
     setShareCode(trip.Share_Code || '');
-    setSharePassword(trip.Share_Password || '');
+    setSharePassword(''); // Password is never stored/returned; only shown after generation
   };
 
   const handleGenerateShareCode = async () => {

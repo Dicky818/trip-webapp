@@ -18,12 +18,12 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-// ── Simple in-memory rate limiter (per user, resets on cold start) ────────────
+// ── In-memory rate limiter (fast path — still useful as first line of defense) ─
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 10;           // max requests
 const RATE_WINDOW_MS = 60_000;   // per 60 seconds
 
-function checkRateLimit(userId: string): boolean {
+function checkRateLimitMemory(userId: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(userId);
   if (!entry || now > entry.resetAt) {
@@ -35,11 +35,35 @@ function checkRateLimit(userId: string): boolean {
   return true;
 }
 
+// ── Persistent rate limiter (DB-backed, survives cold starts) ────────────────
+async function checkRateLimitDB(userId: string, serviceClient: ReturnType<typeof createClient>): Promise<boolean> {
+  try {
+    const { data, error } = await serviceClient.rpc('check_rate_limit', {
+      p_user_id: userId,
+      p_endpoint: 'ai-advice',
+      p_max_requests: RATE_LIMIT,
+      p_window_seconds: 60,
+    });
+    if (error) {
+      console.error('Rate limit DB check failed:', error.message);
+      // Fall back to in-memory if DB fails
+      return true;
+    }
+    return data === true;
+  } catch (e) {
+    console.error('Rate limit DB error:', e);
+    return true; // Fail open if DB is unreachable
+  }
+}
+
 // ── Prompt sanitisation: strip obvious injection attempts ─────────────────────
 function sanitisePrompt(raw: string): string {
   return raw
     .replace(/\bignore\s+(all\s+)?previous\s+instructions?\b/gi, '[removed]')
     .replace(/\bsystem\s*:\s*/gi, '[removed]')
+    .replace(/\bact\s+as\b/gi, '[removed]')
+    .replace(/\byou\s+are\s+now\b/gi, '[removed]')
+    .replace(/\bforget\s+(everything|all)\b/gi, '[removed]')
     .slice(0, 4000); // hard cap
 }
 
@@ -80,6 +104,8 @@ serve(async (req) => {
   // Verify JWT against Supabase
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
@@ -92,12 +118,27 @@ serve(async (req) => {
     });
   }
 
-  // ── Rate limiting (per authenticated user) ───────────────────────────────────
-  if (!checkRateLimit(user.id)) {
+  // ── Rate limiting (dual-layer: memory + DB) ─────────────────────────────────
+  // Fast path: in-memory check (catches repeated abuse within same instance)
+  if (!checkRateLimitMemory(user.id)) {
     return new Response(JSON.stringify({ error: 'Too many requests. Please wait a minute.' }), {
       status: 429,
       headers: { ...headers, 'Content-Type': 'application/json', 'Retry-After': '60' },
     });
+  }
+
+  // Persistent check: DB-backed (survives cold starts, works across instances)
+  if (supabaseServiceKey) {
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
+      db: { schema: 'trip_planner' },
+    });
+    const allowed = await checkRateLimitDB(user.id, serviceClient);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Too many requests. Please wait a minute.' }), {
+        status: 429,
+        headers: { ...headers, 'Content-Type': 'application/json', 'Retry-After': '60' },
+      });
+    }
   }
 
   // ── Parse and validate body ──────────────────────────────────────────────────
@@ -147,7 +188,7 @@ serve(async (req) => {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 2000, temperature: 0.7 },
+          generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
         }),
       }
     );
@@ -162,7 +203,10 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const candidate = data.candidates?.[0];
+    const text = candidate?.content?.parts?.[0]?.text ?? '';
+    const finishReason = candidate?.finishReason ?? '';
+
     if (!text) {
       console.error('Empty Gemini response:', JSON.stringify(data));
       return new Response(JSON.stringify({ error: 'AI 回應為空，請稍後再試' }), {
@@ -171,7 +215,12 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ text, model }), {
+    // If truncated due to token limit, append a notice
+    const finalText = finishReason === 'MAX_TOKENS'
+      ? text + '\n\n> ⚠️ 內容因長度限制被截斷，請嘗試重新生成。'
+      : text;
+
+    return new Response(JSON.stringify({ text: finalText, model, finishReason }), {
       headers: { ...headers, 'Content-Type': 'application/json' },
     });
   } catch (e) {

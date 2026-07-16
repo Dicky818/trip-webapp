@@ -16,7 +16,7 @@ export interface Trip {
   Updated_At: string;
   Status: string;
   Share_Code?: string;
-  Share_Password?: string;
+  // Share_Password removed — column dropped from DB for security
   Is_Owner?: boolean;
 }
 
@@ -566,24 +566,28 @@ export const api = {
   // ── Trip Sharing ─────────────────────────────────────────
   generateShareCode: async (tripId: string) => {
     // Use crypto.getRandomValues for cryptographically secure random codes
-    const array = new Uint8Array(6);
-    crypto.getRandomValues(array);
-    const shareCode = Array.from(array, b => b.toString(36)).join('').substring(0, 6).toUpperCase();
-    const sharePassword = Array.from(new Uint8Array(6).map((_, i) => { crypto.getRandomValues(new Uint8Array(1)); return new Uint8Array(1)[0]; }), b => b.toString(36)).join('').substring(0, 6).toUpperCase();
+    const codeArray = new Uint8Array(6);
+    crypto.getRandomValues(codeArray);
+    const shareCode = Array.from(codeArray, b => b.toString(36)).join('').substring(0, 6).toUpperCase();
 
-    // Store plaintext password temporarily so DB trigger can hash it via pgcrypto
-    // The share_password column will be cleared after hashing via the migration
+    const pwArray = new Uint8Array(6);
+    crypto.getRandomValues(pwArray);
+    const sharePassword = Array.from(pwArray, b => b.toString(36)).join('').substring(0, 6).toUpperCase();
+
+    // Update share_code only (NO plaintext password stored in DB)
     const { error } = await supabase
       .from('trips')
-      .update({ share_code: shareCode, share_password: sharePassword })
+      .update({ share_code: shareCode })
       .eq('id', tripId);
-
-    // Also update the bcrypt hash column directly via RPC
-    await supabase.rpc('update_share_password_hash', { p_trip_id: tripId, p_password: sharePassword }).maybeSingle();
-
     if (error) return err(error.message);
+
+    // Store bcrypt hash via SECURITY DEFINER RPC (never store plaintext)
+    const { error: hashError } = await supabase
+      .rpc('update_share_password_hash', { p_trip_id: tripId, p_password: sharePassword });
+    if (hashError) return err(hashError.message);
+
     // Return the plaintext password ONCE to the owner so they can share it
-    // It is NOT stored in the Trip object returned by rowToTrip
+    // It is NOT stored anywhere in the database — only the bcrypt hash is persisted
     return ok({ shareCode, sharePassword });
   },
 
@@ -591,40 +595,32 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return err('User not logged in');
 
-    // Verify password server-side using bcrypt via RPC (never compare plaintext client-side)
-    const { data: isValid, error: verifyError } = await supabase
-      .rpc('verify_share_password', { p_share_code: shareCode, p_password: sharePassword });
+    // Verify password AND get trip_id in one atomic SECURITY DEFINER RPC call
+    // This avoids needing a permissive SELECT policy on trips table
+    const { data: tripId, error: verifyError } = await supabase
+      .rpc('get_trip_id_by_share_code', { p_share_code: shareCode, p_password: sharePassword });
 
-    if (verifyError || !isValid) return err('Invalid share code or password');
-
-    // Find the trip ID (password already verified above)
-    const { data: trip, error: tripError } = await supabase
-      .from('trips')
-      .select('id')
-      .eq('share_code', shareCode)
-      .single();
-
-    if (tripError || !trip) return err('Invalid share code or password');
+    if (verifyError || !tripId) return err('Invalid share code or password');
 
     // Check if user is already the trip owner (prevent duplicate entry)
     const { data: ownerCheck } = await supabase
       .from('trips')
       .select('id')
-      .eq('id', trip.id)
+      .eq('id', tripId)
       .eq('user_id', user.id)
       .single();
 
-    if (ownerCheck) return ok({ Trip_ID: trip.id }); // Already the owner, skip adding as collaborator
+    if (ownerCheck) return ok({ Trip_ID: tripId }); // Already the owner, skip adding as collaborator
 
     // Check if already a member (collaborator) in trip_members
     const { data: existing } = await supabase
       .from('trip_members')
       .select('id')
-      .eq('trip_id', trip.id)
+      .eq('trip_id', tripId)
       .eq('user_id', user.id)
       .single();
 
-    if (existing) return ok({ Trip_ID: trip.id });
+    if (existing) return ok({ Trip_ID: tripId });
 
     // Get user's display name from user_profiles
     const { data: profile } = await supabase
@@ -635,17 +631,19 @@ export const api = {
     const displayName = profile?.display_name || user.email?.split('@')[0] || '協作者';
 
     // Add as collaborator in trip_members
+    // RLS policy tm_self_insert now validates: user_id = auth.uid(), role = 'collaborator',
+    // AND trip has share_code enabled (via verify_trip_join_allowed)
     const { error: joinError } = await supabase
       .from('trip_members')
       .insert({
-        trip_id: trip.id,
+        trip_id: tripId,
         user_id: user.id,
         role: 'collaborator',
         display_name: displayName,
       });
 
     if (joinError) return err(joinError.message);
-    return ok({ Trip_ID: trip.id });
+    return ok({ Trip_ID: tripId });
   },
 
   getTripCollaborators: async (tripId: string) => {
