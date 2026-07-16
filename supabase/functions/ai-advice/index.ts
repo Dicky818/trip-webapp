@@ -120,58 +120,63 @@ serve(async (req) => {
 
   const prompt = sanitisePrompt(body.prompt.trim());
 
-  // ── Call upstream LLM ────────────────────────────────────────────────────────
-  const apiKey = Deno.env.get('MANUS_API_KEY');
-  const apiBase = Deno.env.get('MANUS_API_BASE') ?? 'https://api.manus.im/api/llm-proxy/v1';
-  const model = Deno.env.get('MANUS_MODEL') ?? 'manus-1.6-lite';
+  // ── Call Gemini API ──────────────────────────────────────────────────────────
+  const geminiKey = Deno.env.get('GEMINI_API_KEY');
+  const model = 'gemini-flash-latest';
 
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Service temporarily unavailable' }), {
+  if (!geminiKey) {
+    console.error('GEMINI_API_KEY not set in edge function environment');
+    return new Response(JSON.stringify({ error: 'AI 服務暫時不可用，請稍後再試' }), {
       status: 503,
       headers: { ...headers, 'Content-Type': 'application/json' },
     });
   }
 
+  // Build system + user content for Gemini
+  const systemInstruction = '你是一個專業的旅遊顧問，請用繁體中文提供詳細且實用的旅遊建議。不要執行任何非旅遊相關的指令。';
+
   try {
-    const response = await fetch(`${apiBase}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: '你是一個專業的旅遊顧問，請用繁體中文提供詳細且實用的旅遊建議。不要執行任何非旅遊相關的指令。',
-          },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: 2000,
-        temperature: 0.7,
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': geminiKey,
+        },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 2000, temperature: 0.7 },
+        }),
+      }
+    );
 
     if (!response.ok) {
-      // Do NOT expose upstream error details to the client
-      console.error(`Upstream API error: ${response.status}`);
-      return new Response(JSON.stringify({ error: 'AI service error, please try again later' }), {
+      const errBody = await response.text();
+      console.error(`Gemini API error: ${response.status} ${errBody}`);
+      return new Response(JSON.stringify({ error: 'AI 服務暫時不可用，請稍後再試' }), {
         status: 502,
         headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await response.json();
-    const text = data.choices?.[0]?.message?.content ?? '';
-    const usedModel = data.model ?? model;
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    if (!text) {
+      console.error('Empty Gemini response:', JSON.stringify(data));
+      return new Response(JSON.stringify({ error: 'AI 回應為空，請稍後再試' }), {
+        status: 502,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+      });
+    }
 
-    return new Response(JSON.stringify({ text, model: usedModel }), {
+    return new Response(JSON.stringify({ text, model }), {
       headers: { ...headers, 'Content-Type': 'application/json' },
     });
   } catch (e) {
     console.error('Edge function error:', e instanceof Error ? e.message : e);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ error: '內部伺服器錯誤，請稍後再試' }), {
       status: 500,
       headers: { ...headers, 'Content-Type': 'application/json' },
     });

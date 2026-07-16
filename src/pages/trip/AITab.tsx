@@ -105,7 +105,7 @@ export default function AITab({ trip }: Props) {
               <p className="font-medium text-red-800 mb-1">生成失敗</p>
               <p className="text-sm text-red-700">{error}</p>
               <p className="text-xs text-red-600 mt-2">
-                請確認 GAS 後端已正確設定 Gemini API Key，並確認網路連線正常。
+                請確認網路連線正常，或稍後再試。如問題持續，請聯絡管理員。
               </p>
             </div>
           </div>
