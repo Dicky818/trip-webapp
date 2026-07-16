@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/trip-webapp/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>旅遊規劃</title>
+
+    <!-- ── Security Headers (via meta tags, best effort on GitHub Pages) ── -->
+    <!-- Prevent MIME type sniffing -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <!-- Prevent clickjacking via iframe embedding -->
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
+    <!-- Control referrer information sent to external sites -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <!-- Content Security Policy: restrict resource origins -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com;
+      connect-src 'self'
+        https://skrdhktjyiiipxcuxknk.supabase.co
+        https://routes.googleapis.com
+        https://maps.googleapis.com
+        https://api.exchangerate-api.com
+        https://api.manus.im;
+      img-src 'self' data: blob: https: http:;
+      font-src 'self' https://fonts.gstatic.com;
+      frame-src 'none';
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+    " />
+    <!-- Permissions Policy: restrict sensitive browser APIs -->
+    <meta http-equiv="Permissions-Policy" content="
+      camera=(),
+      microphone=(),
+      geolocation=(self),
+      payment=()
+    " />
+
+    <!-- ── GitHub Pages SPA redirect (with input validation) ── -->
+    <script type="text/javascript">
+      (function(l) {
+        // Only process if the search param looks like a SPA redirect path
+        // Validate: must start with '/' and only contain safe URL characters
+        if (l.search[1] === '/') {
+          var redirectPath = l.search.slice(1);
+          // Sanitize: allow only safe path characters, reject anything suspicious
+          if (/^[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+$/.test(redirectPath)) {
+            var decoded = redirectPath.split('&').map(function(s) {
+              return s.replace(/~and~/g, '&');
+            }).join('?');
+            // Ensure the resulting path starts with '/' (prevent open redirect)
+            var newPath = l.pathname.slice(0, -1) + decoded + l.hash;
+            if (newPath.charAt(0) === '/') {
+              window.history.replaceState(null, null, newPath);
+            }
+          }
+        }
+      }(window.location));
+    </script>
+    <script type="module" crossorigin src="/trip-webapp/assets/index-BOXAXTCZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/trip-webapp/assets/index-DhNJ1ETm.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
