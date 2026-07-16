@@ -91,13 +91,19 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   // Fix: 當 Splitters 為空時，代表全體成員平分，應包含在每個人的視圖中
   const filteredExpenses = useMemo(() => {
     if (selectedSplitter === 'ALL') return expenses;
+    // Find the member ID for the selected splitter name
+    const selectedMemberId = tripMemberObjects.find(m => m.Member_Name === selectedSplitter)?.Member_ID;
     return expenses.filter(e => {
+      // Prefer UUID-based matching when Splitter_IDs are available
+      if (e.Splitter_IDs && e.Splitter_IDs.length > 0 && selectedMemberId) {
+        return e.Splitter_IDs.includes(selectedMemberId);
+      }
       const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
       // Empty splitters means ALL members share this expense
       if (splitters.length === 0) return true;
       return splitters.includes(selectedSplitter);
     });
-  }, [expenses, selectedSplitter]);
+  }, [expenses, selectedSplitter, tripMemberObjects]);
 
   // 建立分類結構
   const activeCategories = categories.filter(c => String(c.Is_Active).toUpperCase() === 'TRUE');
@@ -123,6 +129,10 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   const getEffectiveAmount = (e: Expense): number => {
     const total = parseFloat(String(e.Base_Amount)) || 0;
     if (selectedSplitter === 'ALL') return total;
+    // Prefer UUID-based count for accuracy
+    if (e.Splitter_IDs && e.Splitter_IDs.length > 0) {
+      return total / e.Splitter_IDs.length;
+    }
     const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
     if (splitters.length > 0) return total / splitters.length;
     // Empty splitters = all members share equally

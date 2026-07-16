@@ -289,7 +289,9 @@ export default function ExpensesTab({ trip }: Props) {
         Exchange_Rate: parseFloat(String(expenseForm.Exchange_Rate)) || 1,
         Base_Amount: parseFloat(baseAmount),
         Payer: expenseForm.Payer,
+        Payer_ID: tripMembers.find(m => m.Member_Name === expenseForm.Payer)?.Member_ID || undefined,
         Splitters: expenseForm.splitterIds?.join(',') || '',
+        Splitter_IDs: (expenseForm.splitterIds || []).map(name => tripMembers.find(m => m.Member_Name === name)?.Member_ID).filter(Boolean) as string[],
         ...(isFlightCategory ? {
           Flight_No: expenseForm.Flight_No,
           Airline: expenseForm.Airline,

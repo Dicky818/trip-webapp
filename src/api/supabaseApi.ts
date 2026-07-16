@@ -134,7 +134,9 @@ export interface Expense {
   Exchange_Rate: string | number;
   Base_Amount: string | number;
   Payer: string;
+  Payer_ID?: string;  // UUID reference to user_profiles.id
   Splitters: string;
+  Splitter_IDs?: string[];  // UUID[] references to user_profiles.id
   Is_Settled?: string | boolean;
   // Flight-specific fields
   Flight_No?: string;
@@ -304,27 +306,30 @@ function rowToExpense(r: Record<string, unknown>): Expense {
     Exchange_Rate: (r.exchange_rate as number) || 1,
     Base_Amount: (r.base_amount as number) || 0,
     Payer: (r.payer as string) || '',
+    Payer_ID: (r.payer_id as string) || undefined,
     Splitters: (r.splitters as string) || '',
+    Splitter_IDs: (r.splitter_ids as string[]) || undefined,
     Is_Settled: r.is_settled as boolean,
-    Flight_No: (r.flight_no as string) || '',
-    Airline: (r.airline as string) || '',
-    Departure_Location: (r.departure_location as string) || '',
-    Arrival_Location: (r.arrival_location as string) || '',
-    Flight_Date: (r.flight_date as string) || '',
-    Departure_Time: (r.departure_time as string) || '',
-    Landing_Time: (r.landing_time as string) || '',
-    Arrival_Date: (r.arrival_date as string) || '',
-    Arrival_Time: (r.arrival_time as string) || '',
-    Return_Landing_Time: (r.return_landing_time as string) || '',
-    Flight_Status: (r.flight_status as string) || '',
-    Accommodation_Name: (r.accommodation_name as string) || '',
-    Accommodation_Address: (r.accommodation_address as string) || '',
-    Check_In_Date: (r.check_in_date as string) || '',
-    Check_Out_Date: (r.check_out_date as string) || '',
-    Rail_Start_Date: (r.rail_start_date as string) || '',
-    Rail_End_Date: (r.rail_end_date as string) || '',
-    Rail_Order_No: (r.rail_order_no as string) || '',
-    Rail_Platform: (r.rail_platform as string) || '',
+    // Detail fields populated by getExpenses from expense_details table
+    Flight_No: '',
+    Airline: '',
+    Departure_Location: '',
+    Arrival_Location: '',
+    Flight_Date: '',
+    Departure_Time: '',
+    Landing_Time: '',
+    Arrival_Date: '',
+    Arrival_Time: '',
+    Return_Landing_Time: '',
+    Flight_Status: '',
+    Accommodation_Name: '',
+    Accommodation_Address: '',
+    Check_In_Date: '',
+    Check_Out_Date: '',
+    Rail_Start_Date: '',
+    Rail_End_Date: '',
+    Rail_Order_No: '',
+    Rail_Platform: '',
     Is_Booking: (r.is_booking as boolean) || false,
     Created_At: (r.created_at as string) || '',
     Updated_At: (r.updated_at as string) || '',
@@ -361,7 +366,7 @@ function err(msg: string): { success: false; error: string } {
 }
 
 // ── Settlement calculation (client-side) ───────────────────
-function calcSettlement(expenses: Expense[], members: string[]): Settlement {
+function calcSettlement(expenses: Expense[], members: string[], memberIdToName?: Record<string, string>): Settlement {
   const totalBase = expenses.reduce((s, e) => s + Number(e.Base_Amount || 0), 0);
   const categoryStats: Record<string, number> = {};
   const memberPaid: Record<string, number> = {};
@@ -376,17 +381,29 @@ function calcSettlement(expenses: Expense[], members: string[]): Settlement {
     if (!rawDebts[a][b]) rawDebts[a][b] = 0;
   };
 
+  // Helper: resolve UUID to display name (for UUID-based settlement)
+  const resolveName = (id: string): string => {
+    if (memberIdToName && memberIdToName[id]) return memberIdToName[id];
+    return id; // fallback to raw value
+  };
+
   expenses.forEach(e => {
     const cat = e.Main_Category || '其他';
     categoryStats[cat] = (categoryStats[cat] || 0) + Number(e.Base_Amount || 0);
 
-    const payer = e.Payer;
+    // Prefer UUID-based payer/splitters for accuracy (no name collision)
+    const payer = e.Payer_ID ? resolveName(e.Payer_ID) : e.Payer;
     const amt = Number(e.Base_Amount || 0);
     if (payer) memberPaid[payer] = (memberPaid[payer] || 0) + amt;
 
-    const splitterList = e.Splitters
-      ? e.Splitters.split(',').map(s => s.trim()).filter(Boolean)
-      : members;
+    let splitterList: string[];
+    if (e.Splitter_IDs && e.Splitter_IDs.length > 0) {
+      splitterList = e.Splitter_IDs.map(id => resolveName(id));
+    } else if (e.Splitters) {
+      splitterList = e.Splitters.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      splitterList = members;
+    }
     const share = splitterList.length > 0 ? amt / splitterList.length : 0;
     splitterList.forEach(m => {
       memberOwed[m] = (memberOwed[m] || 0) + share;
@@ -1112,28 +1129,10 @@ export const api = {
         exchange_rate: exchangeRate,
         base_amount: baseAmount,
         payer: body.Payer || '',
+        payer_id: body.Payer_ID || null,
         splitters: body.Splitters || '',
+        splitter_ids: body.Splitter_IDs || [],
         is_settled: false,
-        // Keep flat columns for backward compat
-        flight_no: body.Flight_No || null,
-        airline: body.Airline || null,
-        departure_location: body.Departure_Location || null,
-        arrival_location: body.Arrival_Location || null,
-        flight_date: body.Flight_Date || null,
-        departure_time: body.Departure_Time || null,
-        landing_time: body.Landing_Time || null,
-        arrival_date: body.Arrival_Date || null,
-        arrival_time: body.Arrival_Time || null,
-        return_landing_time: body.Return_Landing_Time || null,
-        flight_status: body.Flight_Status || null,
-        accommodation_name: body.Accommodation_Name || null,
-        accommodation_address: body.Accommodation_Address || null,
-        check_in_date: body.Check_In_Date || null,
-        check_out_date: body.Check_Out_Date || null,
-        rail_start_date: body.Rail_Start_Date || null,
-        rail_end_date: body.Rail_End_Date || null,
-        rail_order_no: body.Rail_Order_No || null,
-        rail_platform: body.Rail_Platform || null,
         is_booking: body.Is_Booking || false,
       })
       .select()
@@ -1200,29 +1199,12 @@ export const api = {
     if (body.Sub_Category !== undefined) updates.sub_category = body.Sub_Category;
     if (body.Note !== undefined) updates.note = body.Note;
     if (body.Payer !== undefined) updates.payer = body.Payer;
+    if (body.Payer_ID !== undefined) updates.payer_id = body.Payer_ID;
     if (body.Splitters !== undefined) updates.splitters = body.Splitters;
+    if (body.Splitter_IDs !== undefined) updates.splitter_ids = body.Splitter_IDs;
     if (body.Is_Settled !== undefined) {
       updates.is_settled = body.Is_Settled === true || String(body.Is_Settled).toUpperCase() === 'TRUE';
     }
-    if (body.Flight_No !== undefined) updates.flight_no = body.Flight_No;
-    if (body.Airline !== undefined) updates.airline = body.Airline;
-    if (body.Departure_Location !== undefined) updates.departure_location = body.Departure_Location;
-    if (body.Arrival_Location !== undefined) updates.arrival_location = body.Arrival_Location;
-    if (body.Flight_Date !== undefined) updates.flight_date = body.Flight_Date || null;
-    if (body.Departure_Time !== undefined) updates.departure_time = body.Departure_Time;
-    if (body.Landing_Time !== undefined) updates.landing_time = body.Landing_Time;
-    if (body.Arrival_Date !== undefined) updates.arrival_date = body.Arrival_Date || null;
-    if (body.Arrival_Time !== undefined) updates.arrival_time = body.Arrival_Time;
-    if (body.Return_Landing_Time !== undefined) updates.return_landing_time = body.Return_Landing_Time;
-    if (body.Flight_Status !== undefined) updates.flight_status = body.Flight_Status;
-    if (body.Accommodation_Name !== undefined) updates.accommodation_name = body.Accommodation_Name;
-    if (body.Accommodation_Address !== undefined) updates.accommodation_address = body.Accommodation_Address;
-    if (body.Check_In_Date !== undefined) updates.check_in_date = body.Check_In_Date || null;
-    if (body.Check_Out_Date !== undefined) updates.check_out_date = body.Check_Out_Date || null;
-    if (body.Rail_Start_Date !== undefined) updates.rail_start_date = body.Rail_Start_Date || null;
-    if (body.Rail_End_Date !== undefined) updates.rail_end_date = body.Rail_End_Date || null;
-    if (body.Rail_Order_No !== undefined) updates.rail_order_no = body.Rail_Order_No;
-    if (body.Rail_Platform !== undefined) updates.rail_platform = body.Rail_Platform;
     if (body.Is_Booking !== undefined) updates.is_booking = body.Is_Booking;
 
     // Recalculate base amount if amount or currency changed
@@ -1352,11 +1334,17 @@ export const api = {
     const expenses = (expRes as { success: true; data: Expense[] }).data.filter(
       e => String(e.Is_Settled).toUpperCase() !== 'TRUE' && e.Is_Settled !== true
     );
-    const members = memberRes.success
-      ? (memberRes as { success: true; data: TripMember[] }).data.map(m => m.Member_Name || '')
+    const tripMembers = memberRes.success
+      ? (memberRes as { success: true; data: TripMember[] }).data
       : [];
+    const members = tripMembers.map(m => m.Member_Name || '');
+    // Build UUID→display_name map for accurate settlement (avoids name collision)
+    const memberIdToName: Record<string, string> = {};
+    tripMembers.forEach(m => {
+      if (m.Member_ID) memberIdToName[m.Member_ID] = m.Member_Name || '';
+    });
 
-    return ok(calcSettlement(expenses, members));
+    return ok(calcSettlement(expenses, members, memberIdToName));
   },
 
   // ── Categories ───────────────────────────────────────────
