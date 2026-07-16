@@ -165,7 +165,7 @@ export default function ExpensesTab({ trip }: Props) {
     try {
       const result = await api.getSettlement(trip.Trip_ID);
       setSettlement((result as any).data);
-    } catch (e: any) { showToast(e.message || '計算失敗', 'error'); }
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : '計算失敗', 'error'); }
     finally { setSettlementLoading(false); }
   };
 
@@ -204,8 +204,8 @@ export default function ExpensesTab({ trip }: Props) {
       const result = await api.getExchangeRate(expenseForm.Currency, trip.Base_Currency);
       setExpenseForm(f => ({ ...f, Exchange_Rate: String(result.rate) }));
       showToast(`匯率已更新：1 ${expenseForm.Currency} = ${result.rate} ${trip.Base_Currency}`);
-    } catch (e: any) {
-      showToast(e.message || '取得匯率失敗', 'error');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '取得匯率失敗', 'error');
     } finally {
       setExchangeRateLoading(false);
     }
@@ -323,7 +323,7 @@ export default function ExpensesTab({ trip }: Props) {
       showToast(editExpense ? '支出已更新' : '支出已新增');
       setShowExpenseModal(false);
       await fetchAll();
-    } catch (e: any) { showToast(e.message || '儲存失敗', 'error'); }
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : '儲存失敗', 'error'); }
     finally { setSavingExpense(false); }
   };
 
@@ -336,7 +336,7 @@ export default function ExpensesTab({ trip }: Props) {
         e.Expense_ID === exp.Expense_ID ? { ...e, Is_Settled: newVal ? 'TRUE' : 'FALSE' } : e
       ));
       showToast(newVal ? '已標記為付清' : '已取消付清標記');
-    } catch (e: any) { showToast(e.message || '更新失敗', 'error'); }
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : '更新失敗', 'error'); }
     finally { setSettlingExpenseId(null); }
   };
 
@@ -348,7 +348,7 @@ export default function ExpensesTab({ trip }: Props) {
       showToast('支出已刪除');
       setDeleteExpense(null);
       await fetchAll();
-    } catch (e: any) { showToast(e.message || '刪除失敗', 'error'); }
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : '刪除失敗', 'error'); }
     finally { setDeletingExpense(false); }
   };
 
@@ -361,7 +361,7 @@ export default function ExpensesTab({ trip }: Props) {
       showToast('名稱已更新');
       setEditingMember(null);
       await fetchAll();
-    } catch (e: any) { showToast(e.message || '更新失敗', 'error'); }
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : '更新失敗', 'error'); }
     finally { setSavingMemberName(false); }
   };
 

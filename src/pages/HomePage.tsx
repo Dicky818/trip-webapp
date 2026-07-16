@@ -52,8 +52,8 @@ export default function HomePage() {
         await fetchTrips();
         navigate(`/trip/${result.data.Trip_ID}`);
       }
-    } catch (e: any) {
-      setFormError(e.message || '建立失敗');
+    } catch (e: unknown) {
+      setFormError(e instanceof Error ? e.message : '建立失敗');
     } finally {
       setSaving(false);
     }
@@ -67,8 +67,8 @@ export default function HomePage() {
       showToast('行程已刪除');
       setDeleteTarget(null);
       await fetchTrips();
-    } catch (e: any) {
-      showToast(e.message || '刪除失敗', 'error');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '刪除失敗', 'error');
     } finally {
       setDeleting(false);
     }
@@ -91,8 +91,8 @@ export default function HomePage() {
         showToast('分享碼已產生');
         await fetchTrips();
       }
-    } catch (e: any) {
-      showToast(e.message || '產生失敗', 'error');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '產生失敗', 'error');
     } finally {
       setGeneratingShare(false);
     }
@@ -128,8 +128,8 @@ export default function HomePage() {
       } else {
         setJoinError('分享碼或密碼不正確，請重新確認');
       }
-    } catch (e: any) {
-      setJoinError(e.message || '加入失敗');
+    } catch (e: unknown) {
+      setJoinError(e instanceof Error ? e.message : '加入失敗');
     } finally {
       setJoining(false);
     }

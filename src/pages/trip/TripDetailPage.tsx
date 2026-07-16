@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api, Trip } from '../../api/supabaseApi';
 import { Button, TabBar, Spinner, Input, Select } from '../../components/ui';
-import InfoTab from './InfoTab';
-import ItineraryTab from './ItineraryTab';
-import ExpensesTab from './ExpensesTab';
-import AITab from './AITab';
-import PackingListTab from './PackingListTab';
+
+// Lazy-loaded tab components for code splitting
+const InfoTab = React.lazy(() => import('./InfoTab'));
+const ItineraryTab = React.lazy(() => import('./ItineraryTab'));
+const ExpensesTab = React.lazy(() => import('./ExpensesTab'));
+const AITab = React.lazy(() => import('./AITab'));
+const PackingListTab = React.lazy(() => import('./PackingListTab'));
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
@@ -19,6 +21,14 @@ const TABS = [
   { id: 'packing', label: '行李清單', icon: <Package size={15} /> },
   { id: 'ai', label: 'AI 注意事項', icon: <Sparkles size={15} /> },
 ];
+
+function TabSpinner() {
+  return (
+    <div className="flex justify-center py-12">
+      <Spinner size="md" />
+    </div>
+  );
+}
 
 export default function TripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -65,8 +75,8 @@ export default function TripDetailPage() {
       showToast('行程資訊已更新');
       setEditingName(false);
       await fetchTrip();
-    } catch (e: any) {
-      showToast(e.message || '更新失敗', 'error');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '更新失敗', 'error');
     } finally {
       setSavingName(false);
     }
@@ -74,7 +84,6 @@ export default function TripDetailPage() {
 
   const formatDate = (d: string) => {
     if (!d) return '';
-    // normalizeDateStr 已在 API 層處理，這裡直接解析 YYYY-MM-DD
     const dateStr = d.includes('T') ? d.slice(0, 10) : d;
     const [y, m, day] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, day).toLocaleDateString('zh-TW', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -187,13 +196,15 @@ export default function TripDetailPage() {
         <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
-      {/* Tab 內容 */}
+      {/* Tab 內容 - lazy loaded */}
       <div className="bg-white rounded-b-2xl border border-slate-200 border-t-0 shadow-sm min-h-96">
-        {activeTab === 'info' && <InfoTab trip={trip} />}
-        {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
-        {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
-        {activeTab === 'packing' && <PackingListTab trip={trip} />}
-        {activeTab === 'ai' && <AITab trip={trip} />}
+        <Suspense fallback={<TabSpinner />}>
+          {activeTab === 'info' && <InfoTab trip={trip} />}
+          {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
+          {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
+          {activeTab === 'packing' && <PackingListTab trip={trip} />}
+          {activeTab === 'ai' && <AITab trip={trip} />}
+        </Suspense>
       </div>
     </div>
   );

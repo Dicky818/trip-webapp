@@ -39,8 +39,8 @@ export default function SettingsPage() {
       await api.upsertUserProfile(displayNameInput.trim());
       showToast('顯示名稱已儲存');
       await fetchUserProfile();
-    } catch (e: any) {
-      showToast(e.message || '儲存失敗', 'error');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '儲存失敗', 'error');
     } finally {
       setSavingName(false);
     }
@@ -55,8 +55,8 @@ export default function SettingsPage() {
       setShowAddCategory(false);
       setNewCat({ Main_Category: '', Sub_Category: '' });
       await fetchCategories();
-    } catch (e: any) {
-      showToast(e.message || '新增失敗', 'error');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '新增失敗', 'error');
     } finally {
       setAddingCat(false);
     }
@@ -70,8 +70,8 @@ export default function SettingsPage() {
       showToast('分類已停用');
       setDeleteCategory(null);
       await fetchCategories();
-    } catch (e: any) {
-      showToast(e.message || '停用失敗', 'error');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '停用失敗', 'error');
     } finally {
       setDeletingCat(false);
     }

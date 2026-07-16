@@ -28,8 +28,8 @@ export default function AITab({ trip }: Props) {
       } else {
         throw new Error('回應格式異常');
       }
-    } catch (e: any) {
-      const msg = e.message || 'AI 生成失敗';
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'AI 生成失敗';
       setError(msg);
       showToast(msg, 'error');
     } finally {

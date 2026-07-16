@@ -1589,8 +1589,8 @@ export const api = {
       );
       await Promise.all(updates);
       return ok(null);
-    } catch (e: any) {
-      return err(e.message || 'Reorder failed');
+    } catch (e: unknown) {
+      return err(e instanceof Error ? e.message : 'Reorder failed');
     }
   },
 
