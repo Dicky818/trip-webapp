@@ -78,6 +78,20 @@ export default defineConfig({
                 maxAgeSeconds: 60 * 60 * 24 * 365
               }
             }
+          },
+          {
+            urlPattern: /\/fonts\/NotoSansTC.*\.ttf$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'cjk-font-cache',
+              expiration: {
+                maxEntries: 2,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ]
       }
