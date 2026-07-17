@@ -55,6 +55,8 @@ async function loadCJKFont(): Promise<string> {
 function registerCJKFont(doc: jsPDF, fontBase64: string): void {
   doc.addFileToVFS('NotoSansTC-subset.ttf', fontBase64);
   doc.addFont('NotoSansTC-subset.ttf', 'NotoSansTC', 'normal');
+  // Register same font as 'bold' since autoTable uses bold for headers by default
+  doc.addFont('NotoSansTC-subset.ttf', 'NotoSansTC', 'bold');
 }
 
 // Helper: format currency amount
