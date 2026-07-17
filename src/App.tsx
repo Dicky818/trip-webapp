@@ -3,6 +3,8 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import { InstallPrompt } from './components/InstallPrompt';
 
 // Lazy-loaded route components for code splitting
 const HomePage = React.lazy(() => import('./pages/HomePage'));
@@ -60,6 +62,8 @@ export default function App() {
     <AuthProvider>
       <HashRouter>
         <ProtectedRoutes />
+        <OfflineIndicator />
+        <InstallPrompt />
       </HashRouter>
     </AuthProvider>
   );

@@ -11,6 +11,7 @@ import { api, Trip, Expense, TripMember, Settlement } from '../../api/supabaseAp
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+// Offline sync is dynamically imported when needed (see handleSaveExpense)
 import ExpenseBreakdownTab from './ExpenseBreakdownTab';
 import SettlementTab from './SettlementTab';
 
@@ -320,6 +321,18 @@ export default function ExpensesTab({ trip }: Props) {
       if (editExpense) {
         await api.updateExpense(editExpense.Expense_ID, payload);
       } else {
+        if (!navigator.onLine) {
+          // Offline mode: queue for later sync
+          const { addOfflineExpense } = await import('../../hooks/useOfflineSync').then(m => ({ addOfflineExpense: async (tripId: string, exp: Partial<Expense>) => {
+            const { addToQueue } = await import('../../lib/offlineSync');
+            await addToQueue({ id: crypto.randomUUID(), tripId, expense: exp, action: 'create', createdAt: new Date().toISOString() });
+          }}));
+          await addOfflineExpense(trip.Trip_ID, payload);
+          showToast('已離線儲存，上線後自動同步', 'info');
+          setShowExpenseModal(false);
+          setSavingExpense(false);
+          return;
+        }
         await api.createExpense(payload);
       }
       showToast(editExpense ? '支出已更新' : '支出已新增');

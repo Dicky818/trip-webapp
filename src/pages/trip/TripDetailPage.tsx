@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock } from 'lucide-react';
+import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock, FileDown } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api, Trip } from '../../api/supabaseApi';
 import { Button, TabBar, Spinner, Input, Select } from '../../components/ui';
@@ -38,6 +38,8 @@ export default function TripDetailPage() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('info');
+
+  const [exporting, setExporting] = useState(false);
 
   // 編輯行程名稱
   const [editingName, setEditingName] = useState(false);
@@ -174,18 +176,56 @@ export default function TripDetailPage() {
                   }
                 })()}
               </div>
-              <button
-                onClick={() => {
-                  setEditName(trip.Trip_Name);
-                  setEditStartDate(trip.Start_Date);
-                  setEditEndDate(trip.End_Date);
-                  setEditCurrency(trip.Base_Currency);
-                  setEditingName(true);
-                }}
-                className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-              >
-                <Edit2 size={16} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={async () => {
+                    if (exporting) return;
+                    setExporting(true);
+                    try {
+                      const [expRes, itiRes, fliRes, accRes, memRes] = await Promise.all([
+                        api.getExpenses(trip.Trip_ID),
+                        api.getItinerary(trip.Trip_ID),
+                        api.getFlights(trip.Trip_ID),
+                        api.getAccommodations(trip.Trip_ID),
+                        api.getTripMembers(trip.Trip_ID),
+                      ]);
+                      const settlement = await api.getSettlement(trip.Trip_ID);
+                      const { generateTravelBooklet } = await import('../../lib/pdfExport');
+                      await generateTravelBooklet({
+                        trip,
+                        expenses: expRes.success ? expRes.data : [],
+                        itinerary: itiRes.success ? itiRes.data : [],
+                        flights: fliRes.success ? fliRes.data : [],
+                        accommodations: accRes.success ? accRes.data : [],
+                        members: memRes.success ? memRes.data : [],
+                        settlement: settlement.success ? settlement.data : null,
+                      });
+                      showToast('PDF 旅行小冊子已下載');
+                    } catch (e: unknown) {
+                      showToast(e instanceof Error ? e.message : '匯出失敗', 'error');
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                  disabled={exporting}
+                  className="p-2 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                  title="匯出旅行小冊子 PDF"
+                >
+                  <FileDown size={16} className={exporting ? 'animate-pulse' : ''} />
+                </button>
+                <button
+                  onClick={() => {
+                    setEditName(trip.Trip_Name);
+                    setEditStartDate(trip.Start_Date);
+                    setEditEndDate(trip.End_Date);
+                    setEditCurrency(trip.Base_Currency);
+                    setEditingName(true);
+                  }}
+                  className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                  <Edit2 size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>
