@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download } from 'lucide-react';
+import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download, Tag, X } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -7,7 +7,7 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { api, Trip, Expense, TripMember, Settlement } from '../../api/supabaseApi';
+import { api, Trip, Expense, TripMember, Settlement, Category } from '../../api/supabaseApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -86,7 +86,7 @@ function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, onToggle
 }
 
 export default function ExpensesTab({ trip }: Props) {
-  const { showToast, categories, fetchCategories } = useApp();
+  const { showToast, categories, fetchCategories, categoriesLoading } = useApp();
   const { user: currentUser } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
@@ -118,6 +118,14 @@ export default function ExpensesTab({ trip }: Props) {
   const [editingMember, setEditingMember] = useState<TripMember | null>(null);
   const [newMemberName, setNewMemberName] = useState('');
   const [savingMemberName, setSavingMemberName] = useState(false);
+
+  // Category management
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCat, setNewCat] = useState({ Main_Category: '', Sub_Category: '' });
+  const [addingCat, setAddingCat] = useState(false);
+  const [deleteCategory, setDeleteCategory] = useState<Category | null>(null);
+  const [deletingCat, setDeletingCat] = useState(false);
 
   // Collapsible date groups
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
@@ -488,6 +496,9 @@ export default function ExpensesTab({ trip }: Props) {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowCategoryModal(true)} title="管理分類">
+                <Tag size={14} /> 分類
+              </Button>
               <Button size="sm" variant="outline" onClick={handleDownloadCSV} title="下載 CSV">
                 <Download size={14} /> CSV
               </Button>
@@ -788,6 +799,109 @@ export default function ExpensesTab({ trip }: Props) {
       <ConfirmDialog open={!!deleteExpense} onClose={() => setDeleteExpense(null)} onConfirm={handleDeleteExpense}
         title="刪除支出" message={`確定要刪除「${deleteExpense?.Main_Category}${deleteExpense?.Sub_Category ? ` / ${deleteExpense.Sub_Category}` : ''}」嗎？`}
         confirmText="確認刪除" loading={deletingExpense} />
+
+      {/* 分類管理 Modal */}
+      <Modal open={showCategoryModal} onClose={() => setShowCategoryModal(false)} title="管理支出分類"
+        footer={
+          <Button variant="outline" onClick={() => setShowCategoryModal(false)}>關閉</Button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-500">新增或停用支出分類（全域設定，所有行程共用）</p>
+            <Button size="sm" onClick={() => setShowAddCategory(true)}>
+              <Plus size={14} /> 新增
+            </Button>
+          </div>
+
+          {categoriesLoading ? (
+            <div className="flex justify-center py-4"><Spinner /></div>
+          ) : (
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+              {(() => {
+                const activeCats = categories.filter(c => String(c.Is_Active).toUpperCase() === 'TRUE');
+                const groups: Record<string, Category[]> = {};
+                activeCats.forEach(cat => {
+                  if (!groups[cat.Main_Category]) groups[cat.Main_Category] = [];
+                  groups[cat.Main_Category].push(cat);
+                });
+                return Object.keys(groups).length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-3">尚無分類</p>
+                ) : (
+                  Object.entries(groups).map(([mainCat, subCats]) => (
+                    <div key={mainCat}>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{mainCat}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {subCats.map(cat => (
+                          <div key={cat.Category_ID} className="flex items-center gap-1 bg-slate-100 rounded-full px-3 py-1">
+                            <span className="text-sm text-slate-700">{cat.Sub_Category}</span>
+                            <button onClick={() => setDeleteCategory(cat)}
+                              className="text-slate-400 hover:text-red-500 transition-colors ml-1">
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* 新增分類 Modal */}
+      <Modal open={showAddCategory} onClose={() => setShowAddCategory(false)} title="新增支出分類"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowAddCategory(false)}>取消</Button>
+            <Button onClick={async () => {
+              if (!newCat.Main_Category.trim() || !newCat.Sub_Category.trim()) {
+                showToast('請填寫主分類和子分類', 'error');
+                return;
+              }
+              setAddingCat(true);
+              try {
+                await api.createCategory(newCat);
+                showToast('分類已新增');
+                setShowAddCategory(false);
+                setNewCat({ Main_Category: '', Sub_Category: '' });
+                await fetchCategories();
+              } catch (e: unknown) {
+                showToast(e instanceof Error ? e.message : '新增失敗', 'error');
+              } finally {
+                setAddingCat(false);
+              }
+            }} loading={addingCat}>新增</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Input label="主分類" required placeholder="例如：交通、餐飲、住宿" value={newCat.Main_Category}
+            onChange={e => setNewCat(c => ({ ...c, Main_Category: e.target.value }))} />
+          <Input label="子分類" required placeholder="例如：機票、午餐、Airbnb" value={newCat.Sub_Category}
+            onChange={e => setNewCat(c => ({ ...c, Sub_Category: e.target.value }))} />
+        </div>
+      </Modal>
+
+      {/* 停用分類確認 */}
+      <ConfirmDialog open={!!deleteCategory} onClose={() => setDeleteCategory(null)} onConfirm={async () => {
+        if (!deleteCategory) return;
+        setDeletingCat(true);
+        try {
+          await api.deactivateCategory(deleteCategory.Category_ID);
+          showToast('分類已停用');
+          setDeleteCategory(null);
+          await fetchCategories();
+        } catch (e: unknown) {
+          showToast(e instanceof Error ? e.message : '停用失敗', 'error');
+        } finally {
+          setDeletingCat(false);
+        }
+      }}
+        title="停用分類" message={`確定要停用分類「${deleteCategory?.Main_Category} / ${deleteCategory?.Sub_Category}」嗎？`}
+        confirmText="確認停用" loading={deletingCat} />
     </div>
   );
 }
