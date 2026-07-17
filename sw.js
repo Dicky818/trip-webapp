@@ -87,7 +87,7 @@ define(['./workbox-8d0d8005'], (function (workbox) { 'use strict';
     "revision": "db6f82a4f109cd29d90bec86b7932f90"
   }, {
     "url": "index.html",
-    "revision": "ad0dcdf312a3ba0fe03cd96f1df0fef8"
+    "revision": "5f7a256be2403d63979592fd945e1cd7"
   }, {
     "url": "icons.svg",
     "revision": "3b4fcfcf393eca4d264dca4a4663bc37"
@@ -101,100 +101,100 @@ define(['./workbox-8d0d8005'], (function (workbox) { 'use strict';
     "url": "404.html",
     "revision": "921f0c88b4dd6f4a0399dbe6b70d82ac"
   }, {
-    "url": "assets/users-BdAdxOz9.js",
+    "url": "assets/users-3gLGGd8b.js",
     "revision": null
   }, {
-    "url": "assets/ui-B-GSBmpd.js",
+    "url": "assets/ui-C0ne25DO.js",
     "revision": null
   }, {
     "url": "assets/typeof-DnEaHBYB.js",
     "revision": null
   }, {
-    "url": "assets/trash-2-C08Ydsri.js",
+    "url": "assets/trash-2-DXe-pC0n.js",
     "revision": null
   }, {
-    "url": "assets/square-BbBsjp7w.js",
+    "url": "assets/square-B00rUcZr.js",
     "revision": null
   }, {
-    "url": "assets/sparkles-BzKuiIPm.js",
+    "url": "assets/sparkles-C09pAFOa.js",
     "revision": null
   }, {
-    "url": "assets/sortable.esm-DKHG3lmz.js",
+    "url": "assets/sortable.esm-Bq8nJD3M.js",
     "revision": null
   }, {
     "url": "assets/purify.es-DpI42Eu2.js",
     "revision": null
   }, {
-    "url": "assets/plus-B5KwnMZU.js",
+    "url": "assets/plus-DCyu0Qju.js",
     "revision": null
   }, {
-    "url": "assets/pen-BblXDtR-.js",
+    "url": "assets/pen-BokAYNKD.js",
     "revision": null
   }, {
-    "url": "assets/pdfExport-B-J583B5.js",
+    "url": "assets/pdfExport-vD2iuvEz.js",
     "revision": null
   }, {
-    "url": "assets/package-BLG5ALVa.js",
+    "url": "assets/package-CxivJs29.js",
     "revision": null
   }, {
-    "url": "assets/map-pin-fASGQZpz.js",
+    "url": "assets/map-pin-DTewZOWp.js",
     "revision": null
   }, {
-    "url": "assets/index.es-Bbu-OluQ.js",
+    "url": "assets/index.es-Bwau7Y0U.js",
     "revision": null
   }, {
     "url": "assets/index-DZr-dKzI.css",
     "revision": null
   }, {
-    "url": "assets/index-BudohlZa.js",
+    "url": "assets/index-CBMFjo3f.js",
     "revision": null
   }, {
-    "url": "assets/html2canvas-DofgkEv3.js",
+    "url": "assets/html2canvas-DmccN4BW.js",
     "revision": null
   }, {
-    "url": "assets/hotel-BaaFiNhY.js",
+    "url": "assets/hotel-C1zVuIfk.js",
     "revision": null
   }, {
-    "url": "assets/dollar-sign-BZO62Mgv.js",
+    "url": "assets/dollar-sign-DdvhxieL.js",
     "revision": null
   }, {
     "url": "assets/defineProperty-6SPQQdOH.js",
     "revision": null
   }, {
-    "url": "assets/copy-QoLLDElE.js",
+    "url": "assets/copy-DhxiOopk.js",
     "revision": null
   }, {
-    "url": "assets/circle-alert-Bf7pEsyY.js",
+    "url": "assets/circle-alert-DxaX3gUW.js",
     "revision": null
   }, {
-    "url": "assets/chevron-right-4ysGG8iD.js",
+    "url": "assets/chevron-right-kzhyuDuk.js",
     "revision": null
   }, {
-    "url": "assets/TripDetailPage-D5IlVzlg.js",
+    "url": "assets/TripDetailPage-BKjbhyyX.js",
     "revision": null
   }, {
-    "url": "assets/SettingsPage-BBTlgsms.js",
+    "url": "assets/SettingsPage-DjlO0grO.js",
     "revision": null
   }, {
-    "url": "assets/PackingListTab-gzgAZIQT.js",
+    "url": "assets/PackingListTab-D77SxjLA.js",
     "revision": null
   }, {
-    "url": "assets/LoginPage-DvGz4FBb.js",
+    "url": "assets/LoginPage-I9SDLmrv.js",
     "revision": null
   }, {
-    "url": "assets/ItineraryTab-B_gdDubn.js",
+    "url": "assets/ItineraryTab-CiPnaVj3.js",
     "revision": null
   }, {
-    "url": "assets/InfoTab-CdiSHDu8.js",
+    "url": "assets/InfoTab-BExsa4qs.js",
     "revision": null
   }, {
-    "url": "assets/HomePage-TbXImFjJ.js",
+    "url": "assets/HomePage-pzkqCQ4y.js",
     "revision": null
   }, {
-    "url": "assets/ExpensesTab-B2iavSpX.js",
+    "url": "assets/ExpensesTab-C74srtv6.js",
     "revision": null
   }, {
-    "url": "assets/AITab-DKaRroj7.js",
+    "url": "assets/AITab-BO__0xsk.js",
     "revision": null
   }, {
     "url": "favicon.svg",
@@ -229,6 +229,15 @@ define(['./workbox-8d0d8005'], (function (workbox) { 'use strict';
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 10,
       maxAgeSeconds: 31536000
+    })]
+  }), 'GET');
+  workbox.registerRoute(/\/fonts\/NotoSansTC.*\.ttf$/i, new workbox.CacheFirst({
+    "cacheName": "cjk-font-cache",
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 2,
+      maxAgeSeconds: 31536000
+    }), new workbox.CacheableResponsePlugin({
+      statuses: [0, 200]
     })]
   }), 'GET');
 
