@@ -617,7 +617,9 @@ export const api = {
     const { data: tripId, error: verifyError } = await supabase
       .rpc('get_trip_id_by_share_code', { p_share_code: shareCode, p_password: sharePassword });
 
-    if (verifyError || !tripId) return err('Invalid share code or password');
+    console.log('[joinTrip] RPC result:', { tripId, verifyError, shareCode });
+    if (verifyError) return err(`RPC error: ${verifyError.message} (code: ${verifyError.code})`);
+    if (!tripId) return err('分享碼或密碼不正確，請重新確認');
 
     // Check if user is already the trip owner (prevent duplicate entry)
     const { data: ownerCheck } = await supabase
@@ -1595,4 +1597,3 @@ export function normalizeDateStr(d: string | null | undefined): string {
   if (d.includes('T')) return d.slice(0, 10);
   return d;
 }
-

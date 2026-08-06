@@ -126,7 +126,7 @@ export default function HomePage() {
         await fetchTrips();
         navigate(`/trip/${result.data.Trip_ID}`);
       } else {
-        setJoinError('分享碼或密碼不正確，請重新確認');
+        setJoinError(result.error || '分享碼或密碼不正確，請重新確認');
       }
     } catch (e: unknown) {
       setJoinError(e instanceof Error ? e.message : '加入失敗');
