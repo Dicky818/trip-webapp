@@ -117,7 +117,7 @@ export default function HomePage() {
     setJoining(true);
     setJoinError('');
     try {
-      const result = await api.joinTripByCode(joinCode.trim().toUpperCase(), joinPassword.trim().toUpperCase());
+      const result = await api.joinTripByCode(joinCode.trim().toUpperCase(), joinPassword.trim());
       if (result.success) {
         showToast('已成功加入行程！');
         setShowJoin(false);
@@ -352,8 +352,8 @@ export default function HomePage() {
           </div>
           <Input label="分享碼" required placeholder="例如：ABC123" value={joinCode}
             onChange={e => setJoinCode(e.target.value.toUpperCase())} />
-          <Input label="密碼" required placeholder="例如：XYZ789" value={joinPassword}
-            onChange={e => setJoinPassword(e.target.value.toUpperCase())} />
+          <Input label="密碼" required placeholder="輸入密碼" value={joinPassword}
+            onChange={e => setJoinPassword(e.target.value)} />
           {joinError && <p className="text-sm text-red-500">{joinError}</p>}
         </div>
       </Modal>
