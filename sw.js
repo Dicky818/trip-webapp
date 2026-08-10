@@ -173,7 +173,7 @@ define(['./workbox-8d0d8005'], (function (workbox) { 'use strict';
     "url": "assets/chevron-right-mXPgoOve.js",
     "revision": null
   }, {
-    "url": "assets/TripDetailPage-CMHw40c4.js",
+    "url": "assets/TripDetailPage-e0xEmTnI.js",
     "revision": null
   }, {
     "url": "assets/SettingsPage-CModH1cx.js",
@@ -194,7 +194,7 @@ define(['./workbox-8d0d8005'], (function (workbox) { 'use strict';
     "url": "assets/HomePage-W1Lww63Q.js",
     "revision": null
   }, {
-    "url": "assets/ExpensesTab-DG_YOHhg.js",
+    "url": "assets/ExpensesTab-Bs2nShZE.js",
     "revision": null
   }, {
     "url": "assets/AITab-Lw2Qc0Pq.js",
