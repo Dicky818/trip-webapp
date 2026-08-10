@@ -328,7 +328,8 @@ export default function ExpensesTab({ trip }: Props) {
         Is_Booking: expenseForm.Is_Booking,
       };
       if (editExpense) {
-        await api.updateExpense(editExpense.Expense_ID, payload);
+        const updateRes = await api.updateExpense(editExpense.Expense_ID, payload);
+        if (!updateRes.success) throw new Error(updateRes.error);
       } else {
         if (!navigator.onLine) {
           // Offline mode: queue for later sync
@@ -342,7 +343,8 @@ export default function ExpensesTab({ trip }: Props) {
           setSavingExpense(false);
           return;
         }
-        await api.createExpense(payload);
+        const createRes = await api.createExpense(payload);
+        if (!createRes.success) throw new Error(createRes.error);
       }
       showToast(editExpense ? '支出已更新' : '支出已新增');
       setShowExpenseModal(false);
