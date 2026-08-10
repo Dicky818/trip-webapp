@@ -283,6 +283,7 @@ export default function ExpensesTab({ trip }: Props) {
       showToast('請輸入有效金額', 'error'); return;
     }
     if (!expenseForm.Payer) { showToast('請選擇付款人', 'error'); return; }
+    console.log('[SaveExpense] Payer:', JSON.stringify(expenseForm.Payer), 'Payer_ID:', tripMembers.find(m => m.Member_Name === expenseForm.Payer)?.Member_ID);
     setSavingExpense(true);
     try {
       const isFlightCategory = expenseForm.Main_Category === '機票' || expenseForm.Sub_Category === '機票';
@@ -675,7 +676,7 @@ export default function ExpensesTab({ trip }: Props) {
             </div>
           </div>
           <Select label="付款人" required value={expenseForm.Payer || ''}
-            onChange={e => setExpenseForm(f => ({ ...f, Payer: e.target.value }))}
+            onChange={e => { console.log('[Payer Select] changed to:', JSON.stringify(e.target.value)); setExpenseForm(f => ({ ...f, Payer: e.target.value })); }}
             options={[{ value: '', label: '（選擇付款人）' }, ...tripMembers.map(m => ({ value: m.Member_Name, label: m.Member_Name }))]} />
           <div className="col-span-2">
             <label className="text-sm font-medium text-slate-700 block mb-2">分帳成員</label>
