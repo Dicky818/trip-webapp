@@ -675,9 +675,21 @@ export default function ExpensesTab({ trip }: Props) {
               {parseFloat(baseAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <Select label="付款人" required value={expenseForm.Payer || ''}
-            onChange={e => { console.log('[Payer Select] changed to:', JSON.stringify(e.target.value)); setExpenseForm(f => ({ ...f, Payer: e.target.value })); }}
-            options={[{ value: '', label: '（選擇付款人）' }, ...tripMembers.map(m => ({ value: m.Member_Name, label: m.Member_Name }))]} />
+          <div className="col-span-2">
+            <label className="text-sm font-medium text-slate-700 block mb-2">付款人 <span className="text-red-500">*</span></label>
+            <div className="flex flex-wrap gap-2">
+              {tripMembers.map(m => (
+                <button key={m.Member_ID} type="button"
+                  onClick={() => { console.log('[Payer btn] selected:', m.Member_Name); setExpenseForm(f => ({ ...f, Payer: m.Member_Name })); }}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
+                    ${expenseForm.Payer === m.Member_Name
+                      ? 'bg-green-600 text-white border-green-600'
+                      : 'bg-white text-slate-600 border-slate-300 hover:border-green-400'}`}>
+                  {m.Member_Name}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="col-span-2">
             <label className="text-sm font-medium text-slate-700 block mb-2">分帳成員</label>
             <div className="flex flex-wrap gap-2">
