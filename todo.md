@@ -10,3 +10,18 @@
 - [x] Preserve global category reads while limiting category writes to users who belong to at least one trip.
 - [x] Populate `categories.name` from the selected category values and report API failures to the UI.
 - [x] Validate creation and soft-deletion for a non-owner collaborator scenario.
+- [x] Audit RLS enablement, grants, policies, and helper functions for trips, trip_members, expenses, and expense_details.
+- [x] Test owner, collaborator, non-member, and anonymous access paths without persisting audit test data.
+- [x] Identify cross-trip access risks, unauthorized membership changes, and over-restrictive write rules.
+- [x] Apply only approved, low-risk RLS corrections and verify that existing sharing and expense flows remain protected.
+- [x] Confirm that collaborators can create expenses only in trips they belong to, while anonymous users cannot read membership data.
+- [x] Confirm the direct-insert share-join bypass: any authenticated user who knows a shared trip ID can add themselves without the share password.
+- [x] Confirm the owner-membership creation failure: the current `tm_self_insert` policy rejects the owner role after a new trip is created.
+- [x] Replace client-side membership creation with an atomic password-verifying join RPC, then disable direct collaborator inserts.
+- [x] Permit the creator’s owner membership only during trip creation through a hardened database-side path.
+- [x] Restrict privileged helper-RPC execution and set immutable search paths where required.
+- [x] Create a transaction-safe trigger that adds the authenticated trip creator as the owner member.
+- [x] Create a password-validating join RPC that inserts the authenticated collaborator only after credential verification.
+- [x] Remove the direct `trip_members` insert policy that allows membership creation from a disclosed trip ID.
+- [x] Update the frontend to use the secure join RPC and remove its redundant owner-membership insert.
+- [x] Verify that unauthorised direct joins fail, while valid password joins and newly created owner memberships succeed.

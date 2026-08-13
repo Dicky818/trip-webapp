@@ -543,23 +543,8 @@ export const api = {
       .single();
     if (error) return err(error.message);
 
-    // Add owner to trip_members table
-    if (user?.id) {
-      // Get owner's display name from user_profiles
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('display_name')
-        .eq('id', user.id)
-        .single();
-      const displayName = profile?.display_name || user.email?.split('@')[0] || '擁有者';
-      await supabase.from('trip_members').insert({
-        trip_id: data.id,
-        user_id: user.id,
-        role: 'owner',
-        display_name: displayName,
-      });
-    }
-
+    // The database trigger atomically adds the trip creator as the owner
+    // membership row. Avoid client-side membership inserts entirely.
     return ok(rowToTrip(data));
   },
 
@@ -612,56 +597,17 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return err('User not logged in');
 
-    // Verify password AND get trip_id in one atomic SECURITY DEFINER RPC call
-    // This avoids needing a permissive SELECT policy on trips table
+    // The SECURITY DEFINER RPC validates both credentials and creates the
+    // collaborator membership atomically. A disclosed trip UUID is therefore
+    // never enough to join a shared trip.
     const { data: tripId, error: verifyError } = await supabase
-      .rpc('get_trip_id_by_share_code', { p_share_code: shareCode, p_password: sharePassword });
-
-    console.log('[joinTrip] RPC result:', { tripId, verifyError, shareCode });
-    if (verifyError) return err(`RPC error: ${verifyError.message} (code: ${verifyError.code})`);
-    if (!tripId) return err('分享碼或密碼不正確，請重新確認');
-
-    // Check if user is already the trip owner (prevent duplicate entry)
-    const { data: ownerCheck } = await supabase
-      .from('trips')
-      .select('id')
-      .eq('id', tripId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (ownerCheck) return ok({ Trip_ID: tripId }); // Already the owner, skip adding as collaborator
-
-    // Check if already a member (collaborator) in trip_members
-    const { data: existing } = await supabase
-      .from('trip_members')
-      .select('id')
-      .eq('trip_id', tripId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (existing) return ok({ Trip_ID: tripId });
-
-    // Get user's display name from user_profiles
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('display_name')
-      .eq('id', user.id)
-      .single();
-    const displayName = profile?.display_name || user.email?.split('@')[0] || '協作者';
-
-    // Add as collaborator in trip_members
-    // RLS policy tm_self_insert now validates: user_id = auth.uid(), role = 'collaborator',
-    // AND trip has share_code enabled (via verify_trip_join_allowed)
-    const { error: joinError } = await supabase
-      .from('trip_members')
-      .insert({
-        trip_id: tripId,
-        user_id: user.id,
-        role: 'collaborator',
-        display_name: displayName,
+      .rpc('join_trip_with_share_credentials', {
+        p_share_code: shareCode.trim(),
+        p_password: sharePassword.trim(),
       });
 
-    if (joinError) return err(joinError.message);
+    if (verifyError) return err(`RPC error: ${verifyError.message} (code: ${verifyError.code})`);
+    if (!tripId) return err('分享碼或密碼不正確，請重新確認');
     return ok({ Trip_ID: tripId });
   },
 
