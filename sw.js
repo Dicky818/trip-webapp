@@ -87,7 +87,7 @@ define(['./workbox-8d0d8005'], (function (workbox) { 'use strict';
     "revision": "db6f82a4f109cd29d90bec86b7932f90"
   }, {
     "url": "index.html",
-    "revision": "b724a19cf958f1d512a519139a2f3ead"
+    "revision": "8b4feb612963dae737213d36241ca8a2"
   }, {
     "url": "icons.svg",
     "revision": "3b4fcfcf393eca4d264dca4a4663bc37"
@@ -101,103 +101,103 @@ define(['./workbox-8d0d8005'], (function (workbox) { 'use strict';
     "url": "404.html",
     "revision": "921f0c88b4dd6f4a0399dbe6b70d82ac"
   }, {
-    "url": "assets/users-3VYJtY6-.js",
+    "url": "assets/users-BbBP8H76.js",
     "revision": null
   }, {
-    "url": "assets/ui-D3lc5R_b.js",
+    "url": "assets/ui-CvC-V2eE.js",
     "revision": null
   }, {
     "url": "assets/typeof-CFYxgWuE.js",
     "revision": null
   }, {
-    "url": "assets/trash-2-DgHGQWKT.js",
+    "url": "assets/trash-2-DtjGGgGP.js",
     "revision": null
   }, {
-    "url": "assets/tag-TAm_ZUaX.js",
+    "url": "assets/tag-BFGPT03r.js",
     "revision": null
   }, {
-    "url": "assets/square-DA9SxJWe.js",
+    "url": "assets/square-CStCAgX4.js",
     "revision": null
   }, {
-    "url": "assets/sparkles-C8Ktqogz.js",
+    "url": "assets/sparkles-mfIt00T0.js",
     "revision": null
   }, {
-    "url": "assets/sortable.esm-BnGltr46.js",
+    "url": "assets/sortable.esm-BmnVcIlX.js",
     "revision": null
   }, {
     "url": "assets/purify.es-TR0vuwzy.js",
     "revision": null
   }, {
-    "url": "assets/plus-B6S0QoWF.js",
+    "url": "assets/plus-_oS_6hmO.js",
     "revision": null
   }, {
-    "url": "assets/pen-6-ZNBGg_.js",
+    "url": "assets/pen-pZ1oeoTS.js",
     "revision": null
   }, {
-    "url": "assets/pdfExport-Bw_TKRjd.js",
+    "url": "assets/pdfExport-C53vBUfL.js",
     "revision": null
   }, {
-    "url": "assets/package-BI3pMh_3.js",
+    "url": "assets/package-DbYMQYgQ.js",
     "revision": null
   }, {
-    "url": "assets/map-pin-CUgjPE0w.js",
+    "url": "assets/map-pin-CjNLeJWB.js",
     "revision": null
   }, {
-    "url": "assets/index.es-BaGtP96G.js",
+    "url": "assets/index.es-CHb4IC7m.js",
     "revision": null
   }, {
-    "url": "assets/index-CZkhAU_Z.js",
+    "url": "assets/index-LvsO9Aqu.js",
     "revision": null
   }, {
     "url": "assets/index-Ap3Lp0M6.css",
     "revision": null
   }, {
-    "url": "assets/html2canvas-DAoK2PPQ.js",
+    "url": "assets/html2canvas-I-3iQVLE.js",
     "revision": null
   }, {
-    "url": "assets/hotel-DNJQqEEr.js",
+    "url": "assets/hotel-CTPI2KvA.js",
     "revision": null
   }, {
-    "url": "assets/dollar-sign-BCLJqA-S.js",
+    "url": "assets/dollar-sign-BfCMHVeV.js",
     "revision": null
   }, {
     "url": "assets/defineProperty-wDFYsgMD.js",
     "revision": null
   }, {
-    "url": "assets/copy-BAUBGN0r.js",
+    "url": "assets/copy-CZKShSMp.js",
     "revision": null
   }, {
-    "url": "assets/circle-alert-BXa6pV3u.js",
+    "url": "assets/circle-alert-Cbbc5fb2.js",
     "revision": null
   }, {
-    "url": "assets/chevron-right-DBw8zbhv.js",
+    "url": "assets/chevron-right-BAOw9b4D.js",
     "revision": null
   }, {
-    "url": "assets/TripDetailPage-4oFOP-Nb.js",
+    "url": "assets/TripDetailPage-D2HhhlhE.js",
     "revision": null
   }, {
-    "url": "assets/SettingsPage-DEzuYJY9.js",
+    "url": "assets/SettingsPage-DPdQdKSb.js",
     "revision": null
   }, {
-    "url": "assets/PackingListTab-DpcFLYmm.js",
+    "url": "assets/PackingListTab-Dii5XJ1y.js",
     "revision": null
   }, {
-    "url": "assets/LoginPage-CP26oK5K.js",
+    "url": "assets/LoginPage-Btvz7aOj.js",
     "revision": null
   }, {
-    "url": "assets/ItineraryTab-CGAvas7l.js",
+    "url": "assets/ItineraryTab-C9N6VfPH.js",
     "revision": null
   }, {
-    "url": "assets/InfoTab-BQSv6-Qp.js",
+    "url": "assets/InfoTab-zaILQL1v.js",
     "revision": null
   }, {
-    "url": "assets/HomePage-d4nqXrle.js",
+    "url": "assets/HomePage-8ehX5HK8.js",
     "revision": null
   }, {
-    "url": "assets/ExpensesTab-DTx-at8B.js",
+    "url": "assets/ExpensesTab-V_PWD6Cq.js",
     "revision": null
   }, {
-    "url": "assets/AITab-BWi33S8J.js",
+    "url": "assets/AITab-DbDoHvDT.js",
     "revision": null
   }, {
     "url": "favicon.svg",
