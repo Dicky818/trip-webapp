@@ -878,7 +878,8 @@ export default function ExpensesTab({ trip }: Props) {
               }
               setAddingCat(true);
               try {
-                await api.createCategory(newCat);
+                const createRes = await api.createCategory(newCat);
+                if (!createRes.success) throw new Error(createRes.error);
                 showToast('分類已新增');
                 setShowAddCategory(false);
                 setNewCat({ Main_Category: '', Sub_Category: '' });
@@ -905,7 +906,8 @@ export default function ExpensesTab({ trip }: Props) {
         if (!deleteCategory) return;
         setDeletingCat(true);
         try {
-          await api.deactivateCategory(deleteCategory.Category_ID);
+          const deactivateRes = await api.deactivateCategory(deleteCategory.Category_ID);
+          if (!deactivateRes.success) throw new Error(deactivateRes.error);
           showToast('分類已停用');
           setDeleteCategory(null);
           await fetchCategories();

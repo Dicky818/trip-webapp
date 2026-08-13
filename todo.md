@@ -1,0 +1,12 @@
+- [x] Inventory all active foreign-key constraints in the `trip_planner` schema and identify their referenced tables.
+- [x] Review NOT NULL, CHECK, and uniqueness constraints that affect trip members, expenses, splitters, bookings, and sharing.
+- [x] Review triggers and row-level security policies for operations that can block valid application writes.
+- [x] Compare each constraint with the app's support for manually added trip members who may not have user profiles.
+- [ ] Decide the ownership model for globally shared categories before enabling category write policies.
+- [ ] Correct the category API/UI so it supplies the required `name` column and surfaces result errors.
+- [ ] Apply only low-risk corrections that preserve trip ownership and access-control safeguards.
+- [ ] Verify affected write flows and report findings, changes, and safeguards that remain in force.
+- [ ] Add authenticated-collaborator policies for category create, update, and soft-delete operations.
+- [ ] Preserve global category reads while limiting category writes to users who belong to at least one trip.
+- [ ] Populate `categories.name` from the selected category values and report API failures to the UI.
+- [ ] Validate creation and soft-deletion for a non-owner collaborator scenario.

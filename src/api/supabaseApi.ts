@@ -1361,11 +1361,18 @@ export const api = {
   },
 
   createCategory: async (body: Partial<Category>) => {
+    const mainCategory = (body.Main_Category || '').trim();
+    const subCategory = (body.Sub_Category || '').trim();
+    if (!mainCategory || !subCategory) return err('請填寫主分類和子分類');
+
     const { data, error } = await supabase
       .from('categories')
       .insert({
-        main_category: body.Main_Category || '',
-        sub_category: body.Sub_Category || '',
+        // `name` is a legacy-required display column. Keep it synchronized
+        // with the subcategory name used throughout the current UI.
+        name: subCategory,
+        main_category: mainCategory,
+        sub_category: subCategory,
         is_active: true,
       })
       .select()
@@ -1376,8 +1383,12 @@ export const api = {
 
   updateCategory: async (categoryId: string, body: Partial<Category>) => {
     const updates: Record<string, unknown> = {};
-    if (body.Main_Category !== undefined) updates.main_category = body.Main_Category;
-    if (body.Sub_Category !== undefined) updates.sub_category = body.Sub_Category;
+    if (body.Main_Category !== undefined) updates.main_category = body.Main_Category.trim();
+    if (body.Sub_Category !== undefined) {
+      const subCategory = body.Sub_Category.trim();
+      updates.sub_category = subCategory;
+      updates.name = subCategory;
+    }
     const { error } = await supabase.from('categories').update(updates).eq('id', categoryId);
     if (error) return err(error.message);
     return ok(null);
