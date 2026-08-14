@@ -456,15 +456,25 @@ function calcSettlement(expenses: Expense[], members: string[], memberIdToName?:
 }
 
 // ── Exchange Rate ──────────────────────────────────────────
-async function fetchExchangeRate(from: string, to: string): Promise<number> {
+async function fetchLiveExchangeRate(from: string, to: string): Promise<number | null> {
   if (from === to) return 1;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4500);
   try {
-    const res = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`);
+    const res = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`, { signal: controller.signal });
+    if (!res.ok) return null;
     const data = await res.json();
-    return data.rates?.[to] || 1;
+    const rate = Number(data.rates?.[to]);
+    return Number.isFinite(rate) && rate > 0 ? rate : null;
   } catch {
-    return 1;
+    return null;
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+async function fetchExchangeRate(from: string, to: string): Promise<number> {
+  return (await fetchLiveExchangeRate(from, to)) ?? 1;
 }
 
 // ── API ────────────────────────────────────────────────────
@@ -1579,9 +1589,10 @@ export const api = {
   },
 
   // ── Exchange Rate ────────────────────────────────────────
-  getExchangeRate: async (from: string, to: string) => {
-    const rate = await fetchExchangeRate(from, to);
-    return { success: true as const, rate, from, to };
+  getExchangeRate: async (from: string, to: string): Promise<Result<{ rate: number; from: string; to: string }>> => {
+    const rate = await fetchLiveExchangeRate(from, to);
+    if (rate === null) return err('暫時無法取得匯率，請稍後重試或手動輸入');
+    return ok({ rate, from, to });
   },
 };
 

@@ -275,27 +275,28 @@ export default function ExpensesTab({ trip }: Props) {
       setReceiptAnalysis(analysis);
       const suggestedNote = [analysis.merchant, analysis.note].filter(Boolean).join(' — ');
       const suggestedCategory = getReceiptCategorySuggestion(analysis);
-      let suggestedRate: string | undefined;
-      let rateWarning = '';
-      if (analysis.currency && analysis.currency !== trip.Base_Currency) {
-        try {
-          const exchange = await api.getExchangeRate(analysis.currency, trip.Base_Currency);
-          suggestedRate = String(exchange.rate);
-        } catch {
-          rateWarning = '；請手動更新匯率';
-        }
-      }
       setExpenseForm(current => ({
         ...current,
         Date: analysis.date || current.Date,
         Currency: analysis.currency || current.Currency,
         Original_Amount: analysis.amount !== null ? String(analysis.amount) : current.Original_Amount,
-        Exchange_Rate: suggestedRate || (analysis.currency === trip.Base_Currency ? '1' : current.Exchange_Rate),
+        Exchange_Rate: analysis.currency === trip.Base_Currency ? '1' : current.Exchange_Rate,
         Main_Category: suggestedCategory?.Main_Category || current.Main_Category,
         Sub_Category: suggestedCategory?.Sub_Category || current.Sub_Category,
         Note: suggestedNote || current.Note,
       }));
-      showToast(analysis.amount !== null ? `已填入辨識結果，請確認後再儲存${rateWarning}` : '未能讀取總額，請手動確認欄位', analysis.amount !== null ? 'success' : 'info');
+      showToast(analysis.amount !== null ? '已填入辨識結果，請確認後再儲存' : '未能讀取總額，請手動確認欄位', analysis.amount !== null ? 'success' : 'info');
+
+      if (analysis.currency && analysis.currency !== trip.Base_Currency) {
+        setExchangeRateLoading(true);
+        void api.getExchangeRate(analysis.currency, trip.Base_Currency)
+          .then(exchange => {
+            if (!exchange.success) throw new Error(exchange.error);
+            setExpenseForm(current => ({ ...current, Exchange_Rate: String(exchange.data.rate) }));
+          })
+          .catch(() => showToast('暫時無法取得匯率，請手動更新', 'info'))
+          .finally(() => setExchangeRateLoading(false));
+      }
     } catch (error: unknown) {
       clearReceipt();
       showToast(error instanceof Error ? error.message : '收據辨識失敗，請手動輸入', 'error');
@@ -314,8 +315,9 @@ export default function ExpensesTab({ trip }: Props) {
     setExchangeRateLoading(true);
     try {
       const result = await api.getExchangeRate(expenseForm.Currency, trip.Base_Currency);
-      setExpenseForm(f => ({ ...f, Exchange_Rate: String(result.rate) }));
-      showToast(`匯率已更新：1 ${expenseForm.Currency} = ${result.rate} ${trip.Base_Currency}`);
+      if (!result.success) throw new Error(result.error);
+      setExpenseForm(f => ({ ...f, Exchange_Rate: String(result.data.rate) }));
+      showToast(`匯率已更新：1 ${expenseForm.Currency} = ${result.data.rate} ${trip.Base_Currency}`);
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : '取得匯率失敗', 'error');
     } finally {
