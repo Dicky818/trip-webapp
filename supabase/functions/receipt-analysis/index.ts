@@ -174,19 +174,25 @@ ${categories}
 If this is not a receipt, or the total is unreadable, return null for unknown fields and confidence low. Do not invent values.`;
 
   try {
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-goog-api-key': geminiKey },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [
-          { inline_data: { mime_type: mimeType, data: imageBase64 } },
-          { text: prompt },
-        ] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 1024 },
-      }),
+    const requestBody = JSON.stringify({
+      contents: [{ role: 'user', parts: [
+        { inline_data: { mime_type: mimeType, data: imageBase64 } },
+        { text: prompt },
+      ] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 1024 },
     });
-    if (!response.ok) {
-      console.error('Receipt analysis provider error:', response.status);
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-goog-api-key': geminiKey },
+        body: requestBody,
+      });
+      if (response.ok || (response.status !== 429 && response.status !== 503) || attempt === 2) break;
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+    if (!response || !response.ok) {
+      console.error('Receipt analysis provider error:', response?.status ?? 'network failure');
       return json({ error: '收據辨識服務暫時不可用，請稍後再試' }, 502, headers);
     }
     const data = await response.json();

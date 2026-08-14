@@ -208,6 +208,30 @@ export default function ExpensesTab({ trip }: Props) {
   const mainCategories = Object.keys(catMap);
   const subCategories = expenseForm.Main_Category ? (catMap[expenseForm.Main_Category] || []) : [];
 
+  const getReceiptCategorySuggestion = (analysis: ReceiptAnalysis) => {
+    const exactMatch = activeCategories.find(category =>
+      category.Main_Category === analysis.mainCategory && category.Sub_Category === analysis.subCategory
+    );
+    if (exactMatch) return exactMatch;
+
+    const receiptText = [analysis.merchant, analysis.note].filter(Boolean).join(' ').toLowerCase();
+    const preferredCategories: Array<{ pattern: RegExp; main: string; preferredSubcategories: string[] }> = [
+      { pattern: /ramen|restaurant|cafe|coffee|food|meal|sushi|拉麵|餐|食|飯|茶/, main: '餐飲', preferredSubcategories: ['午餐', '晚餐', '早餐', '下午茶', '其他小食或飲品'] },
+      { pattern: /train|rail|metro|station|bus|taxi|uber|transport|flight|airport|鐵路|地鐵|巴士|的士|機票|機場/, main: '交通', preferredSubcategories: ['鐵路', '巴士', '的士或Uber', '機票', '其他公共交通'] },
+      { pattern: /hotel|hostel|airbnb|accommodation|住宿|酒店|民宿/, main: '住宿', preferredSubcategories: ['酒店', '民宿/Airbnb'] },
+      { pattern: /museum|temple|ticket|admission|tour|景點|門票|旅遊團/, main: '景點', preferredSubcategories: ['門票', '旅遊團'] },
+      { pattern: /shop|store|market|shopping|購物|商店|超市/, main: '購物', preferredSubcategories: ['日用品'] },
+    ];
+    const preferred = preferredCategories.find(item => item.pattern.test(receiptText));
+    if (!preferred) return null;
+
+    return preferred.preferredSubcategories
+      .map(subcategory => activeCategories.find(category => category.Main_Category === preferred.main && category.Sub_Category === subcategory))
+      .find(Boolean)
+      || activeCategories.find(category => category.Main_Category === preferred.main)
+      || null;
+  };
+
   const clearReceipt = () => {
     setReceiptPreview(null);
     setReceiptFileName('');
@@ -250,16 +274,28 @@ export default function ExpensesTab({ trip }: Props) {
       const analysis = result.data;
       setReceiptAnalysis(analysis);
       const suggestedNote = [analysis.merchant, analysis.note].filter(Boolean).join(' — ');
+      const suggestedCategory = getReceiptCategorySuggestion(analysis);
+      let suggestedRate: string | undefined;
+      let rateWarning = '';
+      if (analysis.currency && analysis.currency !== trip.Base_Currency) {
+        try {
+          const exchange = await api.getExchangeRate(analysis.currency, trip.Base_Currency);
+          suggestedRate = String(exchange.rate);
+        } catch {
+          rateWarning = '；請手動更新匯率';
+        }
+      }
       setExpenseForm(current => ({
         ...current,
         Date: analysis.date || current.Date,
         Currency: analysis.currency || current.Currency,
         Original_Amount: analysis.amount !== null ? String(analysis.amount) : current.Original_Amount,
-        Main_Category: analysis.mainCategory || current.Main_Category,
-        Sub_Category: analysis.subCategory || current.Sub_Category,
+        Exchange_Rate: suggestedRate || (analysis.currency === trip.Base_Currency ? '1' : current.Exchange_Rate),
+        Main_Category: suggestedCategory?.Main_Category || current.Main_Category,
+        Sub_Category: suggestedCategory?.Sub_Category || current.Sub_Category,
         Note: suggestedNote || current.Note,
       }));
-      showToast(analysis.amount !== null ? '已填入辨識結果，請確認後再儲存' : '未能讀取總額，請手動確認欄位', analysis.amount !== null ? 'success' : 'info');
+      showToast(analysis.amount !== null ? `已填入辨識結果，請確認後再儲存${rateWarning}` : '未能讀取總額，請手動確認欄位', analysis.amount !== null ? 'success' : 'info');
     } catch (error: unknown) {
       clearReceipt();
       showToast(error instanceof Error ? error.message : '收據辨識失敗，請手動輸入', 'error');

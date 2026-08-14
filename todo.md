@@ -44,3 +44,6 @@
 - [ ] Implement authenticated server-side receipt extraction with structured merchant, date, currency, amount, and category-suggestion output.
 - [ ] Prefill the expense form only after presenting the extracted values for user confirmation and editing.
 - [ ] Validate mobile camera capture, upload errors, non-receipt handling, and normal manual expense creation.
+- [ ] Apply a deterministic category fallback when the AI cannot map a valid returned category option.
+- [ ] Fetch and prefill the exchange rate automatically when a receipt uses a non-base currency.
+- [ ] Retest the reviewed receipt form with a synthetic JPY receipt without saving a test expense.
