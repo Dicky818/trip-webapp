@@ -457,6 +457,10 @@ async function fetchExchangeRate(from: string, to: string): Promise<number> {
 }
 
 // ── API ────────────────────────────────────────────────────
+// Never request share_password_hash in browser-accessible trip queries.
+// The database also enforces this separation with column privileges.
+const TRIP_READ_FIELDS = 'id, user_id, trip_name, start_date, end_date, base_currency, share_code, owner_display_name, created_at, updated_at';
+
 export const api = {
 
   // ── Trips ────────────────────────────────────────────────
@@ -467,7 +471,7 @@ export const api = {
     // Get trips owned by user
     const { data: ownedTrips, error: ownedError } = await supabase
       .from('trips')
-      .select('*')
+      .select(TRIP_READ_FIELDS)
       .eq('user_id', user.id);
 
     if (ownedError) return err(ownedError.message);
@@ -486,7 +490,7 @@ export const api = {
       const tripIds = collabRecords.map(r => r.trip_id);
       const { data: sharedTrips, error: sharedError } = await supabase
         .from('trips')
-        .select('*')
+        .select(TRIP_READ_FIELDS)
         .in('id', tripIds);
         
       if (!sharedError && sharedTrips) {
@@ -518,7 +522,7 @@ export const api = {
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('trips')
-      .select('*')
+      .select(TRIP_READ_FIELDS)
       .eq('id', tripId)
       .single();
     if (error) return err(error.message);
@@ -539,7 +543,7 @@ export const api = {
         end_date: body.End_Date || null,
         base_currency: body.Base_Currency || 'HKD',
       })
-      .select()
+      .select(TRIP_READ_FIELDS)
       .single();
     if (error) return err(error.message);
 
