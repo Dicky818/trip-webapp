@@ -47,11 +47,11 @@
 - [x] Apply a deterministic category fallback when the AI cannot map a valid returned category option.
 - [x] Fetch and prefill the exchange rate automatically when a receipt uses a non-base currency.
 - [x] Retest the reviewed receipt form with a synthetic JPY receipt without saving a test expense.
-- [ ] Inspect receipt-preview state, object/base64 URL cleanup, file-input reset, and modal-unmount behavior.
-- [ ] Audit AI analysis, exchange-rate, retry, and cancellation paths for duplicate requests and stale state updates.
-- [ ] Review Edge Function image payload size, retry backoff, parsing, and rate-limit resource use.
-- [ ] Apply verified low-risk cleanup or request-control improvements and validate normal receipt scanning.
-- [ ] Add request cancellation and latest-request guards for receipt reading, AI extraction, and exchange-rate lookup.
-- [ ] Abort pending receipt and exchange work when the receipt is cleared, modal closes, trip changes, or component unmounts.
-- [ ] Add per-attempt Gemini timeout and client-disconnect cancellation to the receipt Edge Function.
-- [ ] Verify cancelled requests cannot overwrite a newer receipt form and that a normal scan still completes.
+- [x] Inspect receipt-preview state, object/base64 URL cleanup, file-input reset, and modal-unmount behavior.
+- [x] Audit AI analysis, exchange-rate, retry, and cancellation paths for duplicate requests and stale state updates.
+- [x] Review Edge Function image payload size, retry backoff, parsing, and rate-limit resource use.
+- [x] Apply verified low-risk cleanup or request-control improvements and validate normal receipt scanning.
+- [x] Add request cancellation and latest-request guards for receipt reading, AI extraction, and exchange-rate lookup.
+- [x] Abort pending receipt and exchange work when the receipt is cleared, modal closes, trip changes, or component unmounts.
+- [x] Add per-attempt Gemini timeout and client-disconnect cancellation to the receipt Edge Function.
+- [x] Verify cancelled requests cannot overwrite a newer receipt form and that a normal scan still completes.
