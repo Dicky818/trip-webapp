@@ -115,6 +115,9 @@ export default function ExpensesTab({ trip }: Props) {
   const [settlingExpenseId, setSettlingExpenseId] = useState<string | null>(null);
   // Receipt images stay only in component memory and are discarded on close/save.
   const receiptInputRef = useRef<HTMLInputElement>(null);
+  const receiptAbortRef = useRef<AbortController | null>(null);
+  const exchangeRateAbortRef = useRef<AbortController | null>(null);
+  const receiptRequestIdRef = useRef(0);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const [receiptFileName, setReceiptFileName] = useState('');
   const [receiptAnalysis, setReceiptAnalysis] = useState<ReceiptAnalysis | null>(null);
@@ -193,6 +196,11 @@ export default function ExpensesTab({ trip }: Props) {
     if (activeSubTab === 'settlement') fetchSettlement();
   }, [activeSubTab]);
 
+  useEffect(() => () => {
+    receiptAbortRef.current?.abort();
+    exchangeRateAbortRef.current?.abort();
+  }, []);
+
   const activeCategories = categories.filter(c => String(c.Is_Active).toUpperCase() === 'TRUE');
 
   // 主分類 → 子分類 映射
@@ -233,6 +241,13 @@ export default function ExpensesTab({ trip }: Props) {
   };
 
   const clearReceipt = () => {
+    receiptRequestIdRef.current += 1;
+    receiptAbortRef.current?.abort();
+    receiptAbortRef.current = null;
+    exchangeRateAbortRef.current?.abort();
+    exchangeRateAbortRef.current = null;
+    setAnalyzingReceipt(false);
+    setExchangeRateLoading(false);
     setReceiptPreview(null);
     setReceiptFileName('');
     setReceiptAnalysis(null);
@@ -254,22 +269,36 @@ export default function ExpensesTab({ trip }: Props) {
       showToast('收據圖片不可超過 6MB', 'error');
       return;
     }
+    receiptAbortRef.current?.abort();
+    exchangeRateAbortRef.current?.abort();
+    const controller = new AbortController();
+    receiptAbortRef.current = controller;
+    const requestId = receiptRequestIdRef.current + 1;
+    receiptRequestIdRef.current = requestId;
     setAnalyzingReceipt(true);
     setReceiptAnalysis(null);
     try {
       const imageDataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
+        const abortReader = () => {
+          reader.abort();
+          reject(new DOMException('Request aborted', 'AbortError'));
+        };
+        controller.signal.addEventListener('abort', abortReader, { once: true });
         reader.onerror = () => reject(new Error('無法讀取收據圖片'));
+        reader.onabort = () => reject(new DOMException('Request aborted', 'AbortError'));
         reader.onload = () => resolve(String(reader.result));
         reader.readAsDataURL(file);
       });
+      if (controller.signal.aborted || requestId !== receiptRequestIdRef.current) return;
       setReceiptPreview(imageDataUrl);
       setReceiptFileName(file.name || 'receipt');
       const categoryOptions = activeCategories.map(category => ({
         mainCategory: category.Main_Category,
         subCategory: category.Sub_Category,
       }));
-      const result = await api.analyzeReceipt(trip.Trip_ID, imageDataUrl, file.type, categoryOptions);
+      const result = await api.analyzeReceipt(trip.Trip_ID, imageDataUrl, file.type, categoryOptions, controller.signal);
+      if (controller.signal.aborted || requestId !== receiptRequestIdRef.current) return;
       if (!result.success) throw new Error(result.error);
       const analysis = result.data;
       setReceiptAnalysis(analysis);
@@ -288,20 +317,33 @@ export default function ExpensesTab({ trip }: Props) {
       showToast(analysis.amount !== null ? '已填入辨識結果，請確認後再儲存' : '未能讀取總額，請手動確認欄位', analysis.amount !== null ? 'success' : 'info');
 
       if (analysis.currency && analysis.currency !== trip.Base_Currency) {
+        exchangeRateAbortRef.current?.abort();
+        const exchangeController = new AbortController();
+        exchangeRateAbortRef.current = exchangeController;
         setExchangeRateLoading(true);
-        void api.getExchangeRate(analysis.currency, trip.Base_Currency)
+        void api.getExchangeRate(analysis.currency, trip.Base_Currency, exchangeController.signal)
           .then(exchange => {
             if (!exchange.success) throw new Error(exchange.error);
+            if (exchangeController.signal.aborted || requestId !== receiptRequestIdRef.current) return;
             setExpenseForm(current => ({ ...current, Exchange_Rate: String(exchange.data.rate) }));
           })
-          .catch(() => showToast('暫時無法取得匯率，請手動更新', 'info'))
-          .finally(() => setExchangeRateLoading(false));
+          .catch(error => {
+            if (!exchangeController.signal.aborted) showToast(error instanceof Error ? error.message : '暫時無法取得匯率，請手動更新', 'info');
+          })
+          .finally(() => {
+            if (exchangeRateAbortRef.current === exchangeController) setExchangeRateLoading(false);
+          });
       }
     } catch (error: unknown) {
-      clearReceipt();
-      showToast(error instanceof Error ? error.message : '收據辨識失敗，請手動輸入', 'error');
+      if (!controller.signal.aborted && requestId === receiptRequestIdRef.current) {
+        clearReceipt();
+        showToast(error instanceof Error ? error.message : '收據辨識失敗，請手動輸入', 'error');
+      }
     } finally {
-      setAnalyzingReceipt(false);
+      if (receiptAbortRef.current === controller) {
+        receiptAbortRef.current = null;
+        setAnalyzingReceipt(false);
+      }
       if (receiptInputRef.current) receiptInputRef.current.value = '';
     }
   };
@@ -312,16 +354,20 @@ export default function ExpensesTab({ trip }: Props) {
       setExpenseForm(f => ({ ...f, Exchange_Rate: '1' }));
       return;
     }
+    exchangeRateAbortRef.current?.abort();
+    const controller = new AbortController();
+    exchangeRateAbortRef.current = controller;
     setExchangeRateLoading(true);
     try {
-      const result = await api.getExchangeRate(expenseForm.Currency, trip.Base_Currency);
+      const result = await api.getExchangeRate(expenseForm.Currency, trip.Base_Currency, controller.signal);
+      if (controller.signal.aborted) return;
       if (!result.success) throw new Error(result.error);
       setExpenseForm(f => ({ ...f, Exchange_Rate: String(result.data.rate) }));
       showToast(`匯率已更新：1 ${expenseForm.Currency} = ${result.data.rate} ${trip.Base_Currency}`);
     } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : '取得匯率失敗', 'error');
+      if (!controller.signal.aborted) showToast(e instanceof Error ? e.message : '取得匯率失敗', 'error');
     } finally {
-      setExchangeRateLoading(false);
+      if (exchangeRateAbortRef.current === controller) setExchangeRateLoading(false);
     }
   };
 

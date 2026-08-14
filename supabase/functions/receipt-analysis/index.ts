@@ -38,6 +38,35 @@ function json(body: Record<string, unknown>, status: number, headers: Record<str
   return new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
 }
 
+async function waitWithAbort(milliseconds: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return false;
+  return await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(true);
+    }, milliseconds);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function fetchGeminiWithTimeout(url: string, init: RequestInit, requestSignal: AbortSignal): Promise<Response> {
+  const controller = new AbortController();
+  const abortFromClient = () => controller.abort();
+  if (requestSignal.aborted) throw new DOMException('Client disconnected', 'AbortError');
+  requestSignal.addEventListener('abort', abortFromClient, { once: true });
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+    requestSignal.removeEventListener('abort', abortFromClient);
+  }
+}
+
 function cleanText(value: unknown, maxLength: number): string | null {
   if (typeof value !== 'string') return null;
   const clean = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maxLength);
@@ -183,13 +212,25 @@ If this is not a receipt, or the total is unreadable, return null for unknown fi
     });
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-goog-api-key': geminiKey },
-        body: requestBody,
-      });
+      if (req.signal.aborted) return json({ error: '請求已取消' }, 499, headers);
+      try {
+        response = await fetchGeminiWithTimeout('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-goog-api-key': geminiKey },
+          body: requestBody,
+        }, req.signal);
+      } catch (error) {
+        if (req.signal.aborted) return json({ error: '請求已取消' }, 499, headers);
+        if (attempt === 2) {
+          console.error('Receipt analysis provider request failed:', error instanceof Error ? error.message : 'unknown error');
+          return json({ error: '收據辨識服務逾時，請稍後再試' }, 504, headers);
+        }
+        if (!await waitWithAbort(500 * (attempt + 1), req.signal)) return json({ error: '請求已取消' }, 499, headers);
+        continue;
+      }
       if (response.ok || (response.status !== 429 && response.status !== 503) || attempt === 2) break;
-      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+      await response.body?.cancel();
+      if (!await waitWithAbort(500 * (attempt + 1), req.signal)) return json({ error: '請求已取消' }, 499, headers);
     }
     if (!response || !response.ok) {
       console.error('Receipt analysis provider error:', response?.status ?? 'network failure');

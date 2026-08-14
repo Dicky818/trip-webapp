@@ -456,9 +456,12 @@ function calcSettlement(expenses: Expense[], members: string[], memberIdToName?:
 }
 
 // ── Exchange Rate ──────────────────────────────────────────
-async function fetchLiveExchangeRate(from: string, to: string): Promise<number | null> {
+async function fetchLiveExchangeRate(from: string, to: string, externalSignal?: AbortSignal): Promise<number | null> {
   if (from === to) return 1;
   const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  if (externalSignal?.aborted) return null;
+  externalSignal?.addEventListener('abort', abortFromCaller, { once: true });
   const timeout = setTimeout(() => controller.abort(), 4500);
   try {
     const res = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`, { signal: controller.signal });
@@ -470,11 +473,12 @@ async function fetchLiveExchangeRate(from: string, to: string): Promise<number |
     return null;
   } finally {
     clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', abortFromCaller);
   }
 }
 
-async function fetchExchangeRate(from: string, to: string): Promise<number> {
-  return (await fetchLiveExchangeRate(from, to)) ?? 1;
+async function fetchExchangeRate(from: string, to: string, signal?: AbortSignal): Promise<number> {
+  return (await fetchLiveExchangeRate(from, to, signal)) ?? 1;
 }
 
 // ── API ────────────────────────────────────────────────────
@@ -1554,11 +1558,14 @@ export const api = {
     imageDataUrl: string,
     mimeType: string,
     categoryOptions: Array<{ mainCategory: string; subCategory: string }>,
+    signal?: AbortSignal,
   ) => {
     try {
       if (!tripId || !imageDataUrl || !mimeType.startsWith('image/')) return err('請選擇有效的收據圖片');
       const { data, error } = await supabase.functions.invoke('receipt-analysis', {
         body: { tripId, imageDataUrl, mimeType, categoryOptions },
+        signal,
+        timeout: 30_000,
       });
       if (error) return err(error.message || '收據辨識服務暫時不可用');
       if (data?.error) return err(String(data.error));
@@ -1589,8 +1596,8 @@ export const api = {
   },
 
   // ── Exchange Rate ────────────────────────────────────────
-  getExchangeRate: async (from: string, to: string): Promise<Result<{ rate: number; from: string; to: string }>> => {
-    const rate = await fetchLiveExchangeRate(from, to);
+  getExchangeRate: async (from: string, to: string, signal?: AbortSignal): Promise<Result<{ rate: number; from: string; to: string }>> => {
+    const rate = await fetchLiveExchangeRate(from, to, signal);
     if (rate === null) return err('暫時無法取得匯率，請稍後重試或手動輸入');
     return ok({ rate, from, to });
   },
