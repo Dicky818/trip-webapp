@@ -32,10 +32,10 @@
 - [ ] Optionally revoke redundant anon grants on finance tables as defense in depth.
 - [ ] Decide whether shared collaborators should retain the current ability to edit and delete all finance records within their own trip.
 - [ ] Consider a future integrity trigger to ensure expense payer and splitter IDs belong to the same trip.
-- [ ] Inventory all remaining non-finance trip-planning tables, views, RLS policies, grants, triggers, and SECURITY DEFINER functions.
-- [ ] Test anonymous, non-member, collaborator, and owner access to membership, sharing, itinerary, profile, category, and packing-list data without persisting audit test data.
-- [ ] Validate significant RLS findings and distinguish intentional shared-collaboration access from actual cross-trip or anonymous bypasses.
-- [ ] Apply only explicitly approved, low-risk corrections and verify affected user flows.
+- [x] Inventory all remaining non-finance trip-planning tables, views, RLS policies, grants, triggers, and SECURITY DEFINER functions.
+- [x] Test anonymous, non-member, collaborator, and owner access to membership, sharing, itinerary, profile, category, and packing-list data without persisting audit test data.
+- [x] Validate significant RLS findings and distinguish intentional shared-collaboration access from actual cross-trip or anonymous bypasses.
+- [x] Apply only explicitly approved, low-risk corrections and verify affected user flows.
 - [x] Replace wildcard trip reads with explicit, non-sensitive column selections.
 - [x] Revoke authenticated and anonymous SELECT access to `trips.share_password_hash` while retaining service-role access.
 - [x] Verify that sharing code generation and password-verified joining remain functional after column protection.
