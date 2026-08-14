@@ -39,11 +39,11 @@
 - [x] Replace wildcard trip reads with explicit, non-sensitive column selections.
 - [x] Revoke authenticated and anonymous SELECT access to `trips.share_password_hash` while retaining service-role access.
 - [x] Verify that sharing code generation and password-verified joining remain functional after column protection.
-- [ ] Inspect the existing expense modal, Supabase storage configuration, and available secure image-analysis integration path.
-- [ ] Add a receipt capture/upload control with image preview and clear removal behavior.
-- [ ] Implement authenticated server-side receipt extraction with structured merchant, date, currency, amount, and category-suggestion output.
-- [ ] Prefill the expense form only after presenting the extracted values for user confirmation and editing.
-- [ ] Validate mobile camera capture, upload errors, non-receipt handling, and normal manual expense creation.
-- [ ] Apply a deterministic category fallback when the AI cannot map a valid returned category option.
-- [ ] Fetch and prefill the exchange rate automatically when a receipt uses a non-base currency.
-- [ ] Retest the reviewed receipt form with a synthetic JPY receipt without saving a test expense.
+- [x] Inspect the existing expense modal, Supabase storage configuration, and available secure image-analysis integration path.
+- [x] Add a receipt capture/upload control with image preview and clear removal behavior.
+- [x] Implement authenticated server-side receipt extraction with structured merchant, date, currency, amount, and category-suggestion output.
+- [x] Prefill the expense form only after presenting the extracted values for user confirmation and editing.
+- [x] Validate mobile camera capture, upload errors, non-receipt handling, and normal manual expense creation.
+- [x] Apply a deterministic category fallback when the AI cannot map a valid returned category option.
+- [x] Fetch and prefill the exchange rate automatically when a receipt uses a non-base currency.
+- [x] Retest the reviewed receipt form with a synthetic JPY receipt without saving a test expense.
