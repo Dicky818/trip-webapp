@@ -39,3 +39,8 @@
 - [x] Replace wildcard trip reads with explicit, non-sensitive column selections.
 - [x] Revoke authenticated and anonymous SELECT access to `trips.share_password_hash` while retaining service-role access.
 - [x] Verify that sharing code generation and password-verified joining remain functional after column protection.
+- [ ] Inspect the existing expense modal, Supabase storage configuration, and available secure image-analysis integration path.
+- [ ] Add a receipt capture/upload control with image preview and clear removal behavior.
+- [ ] Implement authenticated server-side receipt extraction with structured merchant, date, currency, amount, and category-suggestion output.
+- [ ] Prefill the expense form only after presenting the extracted values for user confirmation and editing.
+- [ ] Validate mobile camera capture, upload errors, non-receipt handling, and normal manual expense creation.

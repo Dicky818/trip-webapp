@@ -175,6 +175,17 @@ export interface Category {
   Updated_At: string;
 }
 
+export interface ReceiptAnalysis {
+  merchant: string | null;
+  date: string | null;
+  currency: string | null;
+  amount: number | null;
+  mainCategory: string | null;
+  subCategory: string | null;
+  note: string | null;
+  confidence: 'high' | 'medium' | 'low';
+}
+
 export interface Member {
   Member_ID: string;
   Member_Name: string;
@@ -1522,6 +1533,28 @@ export const api = {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'AI 服務暫時不可用';
       return err(msg);
+    }
+  },
+
+  // ── Receipt analysis ─────────────────────────────────────
+  // Image data is sent only to the authenticated Edge Function for one-time
+  // analysis. The client never receives or stores any AI-provider credential.
+  analyzeReceipt: async (
+    tripId: string,
+    imageDataUrl: string,
+    mimeType: string,
+    categoryOptions: Array<{ mainCategory: string; subCategory: string }>,
+  ) => {
+    try {
+      if (!tripId || !imageDataUrl || !mimeType.startsWith('image/')) return err('請選擇有效的收據圖片');
+      const { data, error } = await supabase.functions.invoke('receipt-analysis', {
+        body: { tripId, imageDataUrl, mimeType, categoryOptions },
+      });
+      if (error) return err(error.message || '收據辨識服務暫時不可用');
+      if (data?.error) return err(String(data.error));
+      return ok(data as ReceiptAnalysis);
+    } catch (e: unknown) {
+      return err(e instanceof Error ? e.message : '收據辨識服務暫時不可用');
     }
   },
 

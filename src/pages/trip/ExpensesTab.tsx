@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download, Tag, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download, Tag, X, Camera, ReceiptText } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -7,7 +7,7 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { api, Trip, Expense, TripMember, Settlement, Category } from '../../api/supabaseApi';
+import { api, Trip, Expense, TripMember, Settlement, Category, ReceiptAnalysis } from '../../api/supabaseApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -113,6 +113,12 @@ export default function ExpensesTab({ trip }: Props) {
   const [deletingExpense, setDeletingExpense] = useState(false);
   const [exchangeRateLoading, setExchangeRateLoading] = useState(false);
   const [settlingExpenseId, setSettlingExpenseId] = useState<string | null>(null);
+  // Receipt images stay only in component memory and are discarded on close/save.
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [receiptFileName, setReceiptFileName] = useState('');
+  const [receiptAnalysis, setReceiptAnalysis] = useState<ReceiptAnalysis | null>(null);
+  const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
 
   // Member name editing
   const [editingMember, setEditingMember] = useState<TripMember | null>(null);
@@ -202,6 +208,67 @@ export default function ExpensesTab({ trip }: Props) {
   const mainCategories = Object.keys(catMap);
   const subCategories = expenseForm.Main_Category ? (catMap[expenseForm.Main_Category] || []) : [];
 
+  const clearReceipt = () => {
+    setReceiptPreview(null);
+    setReceiptFileName('');
+    setReceiptAnalysis(null);
+    if (receiptInputRef.current) receiptInputRef.current.value = '';
+  };
+
+  const closeExpenseModal = () => {
+    clearReceipt();
+    setShowExpenseModal(false);
+  };
+
+  const handleReceiptFile = async (file?: File) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      showToast('請使用 JPG、PNG 或 WEBP 格式的收據圖片', 'error');
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      showToast('收據圖片不可超過 6MB', 'error');
+      return;
+    }
+    setAnalyzingReceipt(true);
+    setReceiptAnalysis(null);
+    try {
+      const imageDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('無法讀取收據圖片'));
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsDataURL(file);
+      });
+      setReceiptPreview(imageDataUrl);
+      setReceiptFileName(file.name || 'receipt');
+      const categoryOptions = activeCategories.map(category => ({
+        mainCategory: category.Main_Category,
+        subCategory: category.Sub_Category,
+      }));
+      const result = await api.analyzeReceipt(trip.Trip_ID, imageDataUrl, file.type, categoryOptions);
+      if (!result.success) throw new Error(result.error);
+      const analysis = result.data;
+      setReceiptAnalysis(analysis);
+      const suggestedNote = [analysis.merchant, analysis.note].filter(Boolean).join(' — ');
+      setExpenseForm(current => ({
+        ...current,
+        Date: analysis.date || current.Date,
+        Currency: analysis.currency || current.Currency,
+        Original_Amount: analysis.amount !== null ? String(analysis.amount) : current.Original_Amount,
+        Main_Category: analysis.mainCategory || current.Main_Category,
+        Sub_Category: analysis.subCategory || current.Sub_Category,
+        Note: suggestedNote || current.Note,
+      }));
+      showToast(analysis.amount !== null ? '已填入辨識結果，請確認後再儲存' : '未能讀取總額，請手動確認欄位', analysis.amount !== null ? 'success' : 'info');
+    } catch (error: unknown) {
+      clearReceipt();
+      showToast(error instanceof Error ? error.message : '收據辨識失敗，請手動輸入', 'error');
+    } finally {
+      setAnalyzingReceipt(false);
+      if (receiptInputRef.current) receiptInputRef.current.value = '';
+    }
+  };
+
   // 取得匯率
   const fetchExchangeRate = async () => {
     if (!expenseForm.Currency || expenseForm.Currency === trip.Base_Currency) {
@@ -228,6 +295,7 @@ export default function ExpensesTab({ trip }: Props) {
   }, [expenseForm.Original_Amount, expenseForm.Exchange_Rate]);
 
   const openExpenseModal = (expense?: Expense) => {
+    clearReceipt();
     setEditExpense(expense || null);
     if (expense) {
       const splitterIds = expense.Splitters ? expense.Splitters.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -339,7 +407,7 @@ export default function ExpensesTab({ trip }: Props) {
           }}));
           await addOfflineExpense(trip.Trip_ID, payload);
           showToast('已離線儲存，上線後自動同步', 'info');
-          setShowExpenseModal(false);
+          closeExpenseModal();
           setSavingExpense(false);
           return;
         }
@@ -347,7 +415,7 @@ export default function ExpensesTab({ trip }: Props) {
         if (!createRes.success) throw new Error(createRes.error);
       }
       showToast(editExpense ? '支出已更新' : '支出已新增');
-      setShowExpenseModal(false);
+      closeExpenseModal();
       await fetchAll();
     } catch (e: unknown) { showToast(e instanceof Error ? e.message : '儲存失敗', 'error'); }
     finally { setSavingExpense(false); }
@@ -636,16 +704,58 @@ export default function ExpensesTab({ trip }: Props) {
       </Modal>
 
       {/* ── 新增/編輯支出 Modal ── */}
-      <Modal open={showExpenseModal} onClose={() => setShowExpenseModal(false)}
+      <Modal open={showExpenseModal} onClose={closeExpenseModal}
         title={editExpense ? '編輯支出' : '新增支出'} size="xl"
         footer={
           <>
-            <Button variant="outline" onClick={() => setShowExpenseModal(false)}>取消</Button>
+            <Button variant="outline" onClick={closeExpenseModal}>取消</Button>
             <Button onClick={handleSaveExpense} loading={savingExpense}>儲存</Button>
           </>
         }
       >
         <div className="grid grid-cols-2 gap-4">
+          {!editExpense && (
+            <div className="col-span-2 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <ReceiptText size={17} className="text-blue-600" />
+                    掃描收據，自動填寫
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">拍攝或上傳收據後，系統會建議日期、幣別、總額和分類。圖片只作即時辨識，不會儲存。</p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700">
+                  {analyzingReceipt ? <Spinner /> : <Camera size={16} />}
+                  {analyzingReceipt ? '辨識中…' : '拍攝／上傳'}
+                  <input
+                    ref={receiptInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    className="sr-only"
+                    disabled={analyzingReceipt}
+                    onChange={event => handleReceiptFile(event.target.files?.[0])}
+                  />
+                </label>
+              </div>
+              {receiptPreview && (
+                <div className="mt-3 flex gap-3 rounded-lg border border-blue-100 bg-white p-2.5">
+                  <img src={receiptPreview} alt="收據預覽" className="h-20 w-16 rounded-md border border-slate-200 object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-slate-700">{receiptFileName}</p>
+                    {receiptAnalysis && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        信心：{receiptAnalysis.confidence === 'high' ? '高' : receiptAnalysis.confidence === 'medium' ? '中' : '低'}。請核對已填入的欄位與匯率。
+                      </p>
+                    )}
+                  </div>
+                  <button type="button" onClick={clearReceipt} aria-label="移除收據" className="self-start rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <Input label="日期" type="date" required value={expenseForm.Date || ''}
             onChange={e => setExpenseForm(f => ({ ...f, Date: e.target.value }))} />
           <Select label="主分類" value={expenseForm.Main_Category || ''}
