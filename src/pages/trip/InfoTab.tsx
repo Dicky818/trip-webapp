@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plane, Hotel, Ticket, Clock, MapPin, Users } from 'lucide-react';
+/*
+ * Design system: "旅途作戰桌" — overview answers: where are we, what is
+ * prepared, and which trip facts need attention before showing detail lists.
+ */
+import { Plane, Hotel, Ticket, Clock, MapPin, Users, CalendarDays, WalletCards } from 'lucide-react';
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
 
@@ -100,26 +104,40 @@ export default function InfoTab({ trip }: Props) {
     return Math.round((parseD(trip.End_Date).getTime() - parseD(trip.Start_Date).getTime()) / 86400000) + 1;
   })();
 
-  return (
-    <div className="p-5 space-y-6">
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const start = new Date(formatDateOnly(trip.Start_Date));
+  const end = new Date(formatDateOnly(trip.End_Date));
+  const daysToStart = Math.ceil((start.getTime() - now.getTime()) / 86400000);
+  const dayInTrip = Math.abs(daysToStart) + 1;
+  const isLive = daysToStart <= 0 && end >= now;
+  const journeyLabel = daysToStart > 0 ? `${daysToStart} 天後出發` : isLive ? `旅行中 · 第 ${dayInTrip}/${tripDuration} 天` : '此行程已完成';
 
-      {/* ── 行程總覽卡片 ── */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-100 text-center">
-          <p className="text-2xl font-bold text-blue-600">{tripDuration}</p>
-          <p className="text-xs text-slate-500 mt-0.5">旅行天數</p>
+  return (
+    <div className="p-4 sm:p-6 space-y-7">
+      <section className="relative overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white">
+        <div className="absolute inset-0 route-grid opacity-40" />
+        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-500/25 blur-3xl" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.15em] text-blue-200 uppercase">Journey status</p>
+            <h3 className="mt-2 text-xl font-bold">{journeyLabel}</h3>
+            <p className="mt-2 text-sm text-slate-300">{formatDateOnly(trip.Start_Date)} — {formatDateOnly(trip.End_Date)} · 共 {tripDuration} 天</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl bg-white/10 px-3 py-2"><p className="text-lg font-bold">{allMembers.length}</p><p className="text-[10px] text-slate-300">旅伴</p></div>
+            <div className="rounded-xl bg-white/10 px-3 py-2"><p className="text-lg font-bold">{bookingExpenses.length}</p><p className="text-[10px] text-slate-300">預訂</p></div>
+            <div className="rounded-xl bg-white/10 px-3 py-2"><p className="text-lg font-bold">{expenses.length}</p><p className="text-[10px] text-slate-300">支出</p></div>
+          </div>
         </div>
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-3 border border-emerald-100 text-center">
-          <p className="text-2xl font-bold text-emerald-600">{allMembers.length}</p>
-          <p className="text-xs text-slate-500 mt-0.5">行程成員</p>
-        </div>
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-3 border border-amber-100 text-center">
-          <p className="text-2xl font-bold text-amber-600">{expenses.length}</p>
-          <p className="text-xs text-slate-500 mt-0.5">支出筆數</p>
-        </div>
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 border border-purple-100 text-center">
-          <p className="text-lg font-bold text-purple-600">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-          <p className="text-xs text-slate-500 mt-0.5">總支出</p>
+      </section>
+
+      <section>
+        <div className="flex items-end justify-between gap-4 mb-3"><div><p className="text-[11px] font-bold tracking-[0.14em] text-blue-600 uppercase">Trip snapshot</p><h3 className="mt-1 font-bold text-slate-950">目前準備狀態</h3></div><span className="text-xs text-slate-400">所有金額以 {trip.Base_Currency} 計</span></div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><CalendarDays size={18} className="text-blue-600" /><p className="mt-5 text-2xl font-bold text-slate-950">{tripDuration}</p><p className="text-xs text-slate-500 mt-0.5">旅行天數</p></div>
+          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><Users size={18} className="text-emerald-600" /><p className="mt-5 text-2xl font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500 mt-0.5">行程成員</p></div>
+          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><Ticket size={18} className="text-amber-600" /><p className="mt-5 text-2xl font-bold text-slate-950">{bookingExpenses.length}</p><p className="text-xs text-slate-500 mt-0.5">已記錄預訂</p></div>
+          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><WalletCards size={18} className="text-violet-600" /><p className="mt-5 text-lg font-bold text-slate-950 truncate">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-slate-500 mt-0.5">目前總支出</p></div>
         </div>
       </section>
 
@@ -127,7 +145,7 @@ export default function InfoTab({ trip }: Props) {
       <section>
         <div className="flex items-center gap-2 mb-3">
           <Users size={18} className="text-blue-600" />
-          <h3 className="font-semibold text-slate-900">行程成員</h3>
+          <h3 className="font-bold text-slate-950">一起出發的人</h3>
           <span className="text-xs text-slate-400">({allMembers.length})</span>
         </div>
         {allMembers.length === 0 ? (
@@ -136,7 +154,7 @@ export default function InfoTab({ trip }: Props) {
           <div className="flex flex-wrap gap-2">
             {allMembers.map(member => (
               <div key={member.Trip_Member_ID}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0
                   ${member.Is_Owner ? 'bg-blue-500' : member.Member_ID === '' ? 'bg-emerald-400' : 'bg-slate-400'}`}>
                   {(member.Member_Name || '?').charAt(0).toUpperCase()}

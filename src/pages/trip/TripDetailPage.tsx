@@ -1,9 +1,13 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock, FileDown } from 'lucide-react';
+/*
+ * Design system: "旅途作戰桌" — trip work is grouped by a journey sequence,
+ * with persistent orientation and a contextual next action in every section.
+ */
+import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock, FileDown, ArrowRight, CirclePlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api, Trip } from '../../api/supabaseApi';
-import { Button, TabBar, Spinner, Input, Select } from '../../components/ui';
+import { Button, Spinner, Input, Select } from '../../components/ui';
 
 // Lazy-loaded tab components for code splitting
 const InfoTab = React.lazy(() => import('./InfoTab'));
@@ -15,11 +19,11 @@ const PackingListTab = React.lazy(() => import('./PackingListTab'));
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
 const TABS = [
-  { id: 'info', label: '資訊總結', icon: <Plane size={15} /> },
-  { id: 'itinerary', label: '行程總表', icon: <Map size={15} /> },
-  { id: 'expenses', label: '支出總表', icon: <DollarSign size={15} /> },
-  { id: 'packing', label: '行李清單', icon: <Package size={15} /> },
-  { id: 'ai', label: 'AI 注意事項', icon: <Sparkles size={15} /> },
+  { id: 'info', label: '概覽', shortLabel: '概覽', description: '先掌握今天與下一站', icon: <Plane size={17} /> },
+  { id: 'itinerary', label: '規劃路線', shortLabel: '路線', description: '安排每天的時間與地點', icon: <Map size={17} /> },
+  { id: 'expenses', label: '記錄支出', shortLabel: '支出', description: '收據、分帳與總覽都在這裡', icon: <DollarSign size={17} /> },
+  { id: 'packing', label: '打包清單', shortLabel: '打包', description: '把出發前的必需品劃掉', icon: <Package size={17} /> },
+  { id: 'ai', label: '旅程助手', shortLabel: '助手', description: '根據現有資料整理注意事項', icon: <Sparkles size={17} /> },
 ];
 
 function TabSpinner() {
@@ -104,148 +108,113 @@ export default function TripDetailPage() {
     );
   }
 
-  return (
-    <div>
-      {/* 頂部行程資訊 */}
-      <div className="mb-4">
-        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3 transition-colors">
-          <ArrowLeft size={16} /> 返回行程列表
-        </button>
+  const parseD = (d: string) => { const s = d.includes('T') ? d.slice(0, 10) : d; const [y, m, day] = s.split('-').map(Number); return new Date(y, m - 1, day); };
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const startDate = parseD(trip.Start_Date);
+  const endDate = parseD(trip.End_Date);
+  const diffStart = Math.ceil((startDate.getTime() - now.getTime()) / 86400000);
+  const diffEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86400000);
+  const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+  const tripStatus = diffStart > 0
+    ? { label: `還有 ${diffStart} 天出發`, className: 'text-blue-100 bg-blue-500/20 border-blue-300/20' }
+    : diffEnd >= 0
+      ? { label: `旅行中 · 第 ${Math.abs(diffStart) + 1}/${totalDays} 天`, className: 'text-emerald-100 bg-emerald-500/20 border-emerald-300/20' }
+      : { label: '行程已結束', className: 'text-slate-300 bg-white/10 border-white/15' };
+  const activeSection = TABS.find(tab => tab.id === activeTab) || TABS[0];
+  const nextAction = activeTab === 'info'
+    ? { target: 'itinerary', label: '安排每日路線' }
+    : activeTab === 'itinerary'
+      ? { target: 'expenses', label: '記錄一筆支出' }
+      : activeTab === 'expenses'
+        ? { target: 'packing', label: '檢查打包清單' }
+        : activeTab === 'packing'
+          ? { target: 'ai', label: '查看旅程注意事項' }
+          : { target: 'itinerary', label: '回到路線規劃' };
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+  const exportBooklet = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const [expRes, itiRes, fliRes, accRes, memRes] = await Promise.all([
+        api.getExpenses(trip.Trip_ID), api.getItinerary(trip.Trip_ID), api.getFlights(trip.Trip_ID), api.getAccommodations(trip.Trip_ID), api.getTripMembers(trip.Trip_ID),
+      ]);
+      const settlement = await api.getSettlement(trip.Trip_ID);
+      const { generateTravelBooklet } = await import('../../lib/pdfExport');
+      await generateTravelBooklet({ trip, expenses: expRes.success ? expRes.data : [], itinerary: itiRes.success ? itiRes.data : [], flights: fliRes.success ? fliRes.data : [], accommodations: accRes.success ? accRes.data : [], members: memRes.success ? memRes.data : [], settlement: settlement.success ? settlement.data : null });
+      showToast('PDF 旅行小冊子已下載');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '匯出失敗', 'error');
+    } finally { setExporting(false); }
+  };
+
+  return (
+    <div className="space-y-5 sm:space-y-6">
+      <section className="relative overflow-hidden rounded-[1.75rem] bg-slate-950 text-white px-5 py-5 sm:px-8 sm:py-7 shadow-[0_18px_45px_rgba(15,23,42,0.18)] route-enter">
+        <div className="absolute inset-0 route-grid opacity-40" />
+        <div className="absolute -right-16 -bottom-20 h-56 w-56 rounded-full bg-blue-500/25 blur-3xl" />
+        <div className="relative">
+          <button onClick={() => navigate('/')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+            <ArrowLeft size={15} /> 所有行程
+          </button>
+
           {editingName ? (
-            <div className="flex flex-col gap-3">
-              <Input label="行程名稱" value={editName} onChange={e => setEditName(e.target.value)} required />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="出發日期" type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
-                <Input label="結束日期" type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
-              </div>
-              <Select label="基礎貨幣" value={editCurrency} onChange={e => setEditCurrency(e.target.value)}
-                options={CURRENCIES.map(c => ({ value: c, label: c }))} />
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" size="sm" onClick={() => setEditingName(false)}><X size={14} /> 取消</Button>
-                <Button size="sm" onClick={handleSaveName} loading={savingName}><Check size={14} /> 儲存</Button>
+            <div className="mt-5 max-w-2xl rounded-2xl bg-white p-4 sm:p-5 text-slate-900">
+              <div className="flex flex-col gap-3">
+                <Input label="行程名稱" value={editName} onChange={e => setEditName(e.target.value)} required />
+                <div className="grid grid-cols-2 gap-3"><Input label="出發日期" type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} /><Input label="結束日期" type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} /></div>
+                <Select label="基礎貨幣" value={editCurrency} onChange={e => setEditCurrency(e.target.value)} options={CURRENCIES.map(c => ({ value: c, label: c }))} />
+                <div className="flex gap-2 justify-end"><Button variant="outline" size="sm" onClick={() => setEditingName(false)}><X size={14} /> 取消</Button><Button size="sm" onClick={handleSaveName} loading={savingName}><Check size={14} /> 儲存變更</Button></div>
               </div>
             </div>
           ) : (
-            <div className="flex items-start justify-between">
+            <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h1 className="text-xl font-bold text-slate-900 mb-1">{trip.Trip_Name}</h1>
-                <p className="text-sm text-slate-500">
-                  {formatDate(trip.Start_Date)} — {formatDate(trip.End_Date)}
-                  <span className="mx-2">·</span>
-                  <span className="font-medium text-blue-600">{trip.Base_Currency}</span>
-                </p>
-                {/* Countdown Badge */}
-                {(() => {
-                  const parseD = (d: string) => { const s = d.includes('T') ? d.slice(0, 10) : d; const [y, m, day] = s.split('-').map(Number); return new Date(y, m - 1, day); };
-                  const now = new Date(); now.setHours(0, 0, 0, 0);
-                  const startDate = parseD(trip.Start_Date);
-                  const endDate = parseD(trip.End_Date);
-                  const diffStart = Math.ceil((startDate.getTime() - now.getTime()) / 86400000);
-                  const diffEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86400000);
-                  const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
-                  if (diffStart > 0) {
-                    return (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Clock size={14} className="text-blue-500" />
-                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                          距離出發還有 {diffStart} 天
-                        </span>
-                      </div>
-                    );
-                  } else if (diffEnd >= 0) {
-                    const dayNum = Math.abs(diffStart) + 1;
-                    return (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Clock size={14} className="text-emerald-500" />
-                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                          旅行中 · 第 {dayNum}/{totalDays} 天
-                        </span>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Clock size={14} className="text-slate-400" />
-                        <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full">
-                          行程已結束
-                        </span>
-                      </div>
-                    );
-                  }
-                })()}
+                <p className="text-xs font-bold tracking-[0.16em] text-blue-200 uppercase">Trip workspace</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3"><h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{trip.Trip_Name}</h1><span className={`border rounded-full px-2.5 py-1 text-xs font-bold ${tripStatus.className}`}>{tripStatus.label}</span></div>
+                <p className="mt-2 text-sm text-slate-300">{formatDate(trip.Start_Date)} — {formatDate(trip.End_Date)} <span className="mx-2 text-slate-500">/</span><span className="font-semibold text-blue-200">{trip.Base_Currency}</span></p>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={async () => {
-                    if (exporting) return;
-                    setExporting(true);
-                    try {
-                      const [expRes, itiRes, fliRes, accRes, memRes] = await Promise.all([
-                        api.getExpenses(trip.Trip_ID),
-                        api.getItinerary(trip.Trip_ID),
-                        api.getFlights(trip.Trip_ID),
-                        api.getAccommodations(trip.Trip_ID),
-                        api.getTripMembers(trip.Trip_ID),
-                      ]);
-                      const settlement = await api.getSettlement(trip.Trip_ID);
-                      const { generateTravelBooklet } = await import('../../lib/pdfExport');
-                      await generateTravelBooklet({
-                        trip,
-                        expenses: expRes.success ? expRes.data : [],
-                        itinerary: itiRes.success ? itiRes.data : [],
-                        flights: fliRes.success ? fliRes.data : [],
-                        accommodations: accRes.success ? accRes.data : [],
-                        members: memRes.success ? memRes.data : [],
-                        settlement: settlement.success ? settlement.data : null,
-                      });
-                      showToast('PDF 旅行小冊子已下載');
-                    } catch (e: unknown) {
-                      showToast(e instanceof Error ? e.message : '匯出失敗', 'error');
-                    } finally {
-                      setExporting(false);
-                    }
-                  }}
-                  disabled={exporting}
-                  className="p-2 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 transition-colors disabled:opacity-50"
-                  title="匯出旅行小冊子 PDF"
-                >
-                  <FileDown size={16} className={exporting ? 'animate-pulse' : ''} />
-                </button>
-                <button
-                  onClick={() => {
-                    setEditName(trip.Trip_Name);
-                    setEditStartDate(trip.Start_Date);
-                    setEditEndDate(trip.End_Date);
-                    setEditCurrency(trip.Base_Currency);
-                    setEditingName(true);
-                  }}
-                  className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-                >
-                  <Edit2 size={16} />
-                </button>
+              <div className="flex items-center gap-2">
+                <button onClick={exportBooklet} disabled={exporting} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/15 text-xs font-semibold text-slate-200 hover:bg-white/10 transition-colors disabled:opacity-50"><FileDown size={15} className={exporting ? 'animate-pulse' : ''} /> 小冊子</button>
+                <button onClick={() => { setEditName(trip.Trip_Name); setEditStartDate(trip.Start_Date); setEditEndDate(trip.End_Date); setEditCurrency(trip.Base_Currency); setEditingName(true); }} className="p-2 rounded-xl border border-white/15 text-slate-200 hover:bg-white/10 transition-colors" aria-label="編輯行程"><Edit2 size={16} /></button>
               </div>
             </div>
           )}
         </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[224px_minmax(0,1fr)] route-enter-delay">
+        <aside className="hidden xl:block">
+          <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            <p className="px-3 py-2 text-[11px] font-bold tracking-[0.14em] text-slate-400 uppercase">旅程工作區</p>
+            <nav className="space-y-1">
+              {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full text-left rounded-xl px-3 py-3 transition-colors ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}><span className="flex items-center gap-2.5 text-sm font-bold">{tab.icon}{tab.label}</span><span className={`mt-1 ml-7 block text-xs leading-4 ${activeTab === tab.id ? 'text-blue-100' : 'text-slate-400'}`}>{tab.description}</span></button>)}
+            </nav>
+          </div>
+        </aside>
+
+        <div className="min-w-0">
+          <div className="mb-4 flex items-center justify-between gap-4 rounded-2xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
+            <div><p className="text-[11px] font-bold tracking-[0.14em] text-blue-600 uppercase">現在位置</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{activeSection.label}</h2><p className="mt-0.5 text-xs text-slate-500">{activeSection.description}</p></div>
+            <button onClick={() => setActiveTab(nextAction.target)} className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors"><CirclePlus size={15} /> {nextAction.label}<ArrowRight size={14} /></button>
+          </div>
+
+          <div className="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm min-h-[32rem] overflow-hidden">
+            <Suspense fallback={<TabSpinner />}>
+              {activeTab === 'info' && <InfoTab trip={trip} />}
+              {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
+              {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
+              {activeTab === 'packing' && <PackingListTab trip={trip} />}
+              {activeTab === 'ai' && <AITab trip={trip} />}
+            </Suspense>
+          </div>
+        </div>
       </div>
 
-      {/* Tab 導航 */}
-      <div className="bg-white rounded-t-2xl border border-slate-200 border-b-0 overflow-hidden">
-        <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
-      </div>
-
-      {/* Tab 內容 - lazy loaded */}
-      <div className="bg-white rounded-b-2xl border border-slate-200 border-t-0 shadow-sm min-h-96">
-        <Suspense fallback={<TabSpinner />}>
-          {activeTab === 'info' && <InfoTab trip={trip} />}
-          {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
-          {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
-          {activeTab === 'packing' && <PackingListTab trip={trip} />}
-          {activeTab === 'ai' && <AITab trip={trip} />}
-        </Suspense>
-      </div>
+      <nav className="xl:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-xl px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]" aria-label="行程工作區">
+        <div className="grid grid-cols-5">
+          {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold transition-colors ${activeTab === tab.id ? 'text-blue-700 bg-blue-50' : 'text-slate-400'}`}>{tab.icon}<span>{tab.shortLabel}</span></button>)}
+        </div>
+      </nav>
     </div>
   );
 }

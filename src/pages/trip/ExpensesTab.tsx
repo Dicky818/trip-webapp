@@ -869,18 +869,18 @@ export default function ExpensesTab({ trip }: Props) {
           </>
         }
       >
-        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-6">
           {!editExpense && (
-            <div className="col-span-2 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-3 sm:p-4">
+            <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/50 p-4 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                     <ReceiptText size={17} className="text-blue-600" />
-                    掃描收據，自動填寫
+                    想快一點？先拍下收據
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">拍攝或上傳收據後，系統會建議日期、幣別、總額和分類。圖片只作即時辨識，不會儲存。</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">我們會先建議日期、幣別、總額和分類；你確認後才會儲存。圖片只作即時辨識。</p>
                 </div>
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700">
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 active:scale-[0.98]">
                   {analyzingReceipt ? <Spinner /> : <Camera size={16} />}
                   {analyzingReceipt ? '辨識中…' : '拍攝／上傳'}
                   <input
@@ -912,70 +912,33 @@ export default function ExpensesTab({ trip }: Props) {
               )}
             </div>
           )}
-          <Input label="日期" type="date" required value={expenseForm.Date || ''}
-            onChange={e => setExpenseForm(f => ({ ...f, Date: e.target.value }))} />
-          <Select label="主分類" value={expenseForm.Main_Category || ''}
-            onChange={e => setExpenseForm(f => ({ ...f, Main_Category: e.target.value, Sub_Category: '' }))}
-            options={[{ value: '', label: '（選擇主分類）' }, ...mainCategories.map(c => ({ value: c, label: c }))]} />
-          <Select label="子分類" value={expenseForm.Sub_Category || ''}
-            onChange={e => setExpenseForm(f => ({ ...f, Sub_Category: e.target.value }))}
-            options={[{ value: '', label: '（選擇子分類）' }, ...subCategories.map(c => ({ value: c, label: c }))]} />
-          <Input label="備注" placeholder="可選" value={expenseForm.Note || ''}
-            onChange={e => setExpenseForm(f => ({ ...f, Note: e.target.value }))} />
-          <Select label="貨幣" value={expenseForm.Currency || trip.Base_Currency}
-            onChange={e => setExpenseForm(f => ({ ...f, Currency: e.target.value }))}
-            options={CURRENCIES.map(c => ({ value: c, label: c }))} />
-          <Input label="金額" type="number" required placeholder="0.00" step="0.01" min="0"
-            value={String(expenseForm.Original_Amount || '')}
-            onChange={e => setExpenseForm(f => ({ ...f, Original_Amount: e.target.value }))} />
-          <div className="flex gap-2 items-end">
-            <Input label={`匯率 (→ ${trip.Base_Currency})`} type="text" inputMode="decimal"
-              value={String(expenseForm.Exchange_Rate ?? '1')}
-              onChange={e => setExpenseForm(f => ({ ...f, Exchange_Rate: e.target.value }))}
-              className="flex-1" />
-            <Button size="sm" variant="outline" onClick={fetchExchangeRate} loading={exchangeRateLoading} className="mb-0.5">
-              <RefreshCw size={13} />
-            </Button>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700">基礎金額 ({trip.Base_Currency})</label>
-            <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-900">
-              {parseFloat(baseAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <section>
+            <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span><div><p className="text-sm font-bold text-slate-950">這筆是什麼？</p><p className="text-xs text-slate-500">日期、分類和簡短說明即可開始。</p></div></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label="日期" type="date" required value={expenseForm.Date || ''} onChange={e => setExpenseForm(f => ({ ...f, Date: e.target.value }))} />
+              <Select label="主分類" value={expenseForm.Main_Category || ''} onChange={e => setExpenseForm(f => ({ ...f, Main_Category: e.target.value, Sub_Category: '' }))} options={[{ value: '', label: '（選擇主分類）' }, ...mainCategories.map(c => ({ value: c, label: c }))]} />
+              <Select label="子分類" value={expenseForm.Sub_Category || ''} onChange={e => setExpenseForm(f => ({ ...f, Sub_Category: e.target.value }))} options={[{ value: '', label: '（選擇子分類）' }, ...subCategories.map(c => ({ value: c, label: c }))]} />
+              <Input label="備注" placeholder="例如：LAWSON 早餐（可選）" value={expenseForm.Note || ''} onChange={e => setExpenseForm(f => ({ ...f, Note: e.target.value }))} />
             </div>
-          </div>
-          <div className="col-span-2">
-            <label className="text-sm font-medium text-slate-700 block mb-2">付款人 <span className="text-red-500">*</span></label>
-            <div className="flex flex-wrap gap-2">
-              {tripMembers.map(m => (
-                <button key={m.Member_ID} type="button"
-                  onClick={() => { console.log('[Payer btn] selected:', m.Member_Name); setExpenseForm(f => ({ ...f, Payer: m.Member_Name })); }}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
-                    ${expenseForm.Payer === m.Member_Name
-                      ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-white text-slate-600 border-slate-300 hover:border-green-400'}`}>
-                  {m.Member_Name}
-                </button>
-              ))}
+          </section>
+
+          <section className="border-t border-slate-100 pt-5">
+            <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span><div><p className="text-sm font-bold text-slate-950">金額由誰先付？</p><p className="text-xs text-slate-500">選擇金額、貨幣和付款人。</p></div></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Select label="貨幣" value={expenseForm.Currency || trip.Base_Currency} onChange={e => setExpenseForm(f => ({ ...f, Currency: e.target.value }))} options={CURRENCIES.map(c => ({ value: c, label: c }))} />
+              <Input label="金額" type="number" required placeholder="0.00" step="0.01" min="0" value={String(expenseForm.Original_Amount || '')} onChange={e => setExpenseForm(f => ({ ...f, Original_Amount: e.target.value }))} />
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between"><div><p className="text-xs text-slate-500">換算後基礎金額</p><p className="mt-0.5 text-lg font-bold text-slate-950">{trip.Base_Currency} {parseFloat(baseAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div><p className="text-xs text-slate-500">匯率 {String(expenseForm.Exchange_Rate ?? '1')}</p></div>
+              <div className="sm:col-span-2"><label className="text-sm font-bold text-slate-800 block mb-2">付款人 <span className="text-red-500">*</span></label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => setExpenseForm(f => ({ ...f, Payer: m.Member_Name }))} className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-colors ${expenseForm.Payer === m.Member_Name ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-400'}`}>{m.Member_Name}</button>)}</div></div>
             </div>
-          </div>
-          <div className="col-span-2">
-            <label className="text-sm font-medium text-slate-700 block mb-2">分帳成員</label>
-            <div className="flex flex-wrap gap-2">
-              {tripMembers.map(m => (
-                <button key={m.Member_ID}
-                  onClick={() => toggleSplitter(m.Member_Name)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
-                    ${expenseForm.splitterIds?.includes(m.Member_Name)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>
-                  {m.Member_Name}
-                </button>
-              ))}
-              {tripMembers.length === 0 && (
-                <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>
-              )}
+          </section>
+
+          <details className="group rounded-xl border border-slate-200 bg-slate-50/60">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-700 flex items-center justify-between">需要分帳、調整匯率或標記預訂嗎？<span className="text-slate-400 transition-transform group-open:rotate-45">+</span></summary>
+            <div className="border-t border-slate-200 p-4 space-y-4">
+              <div className="flex gap-2 items-end"><Input label={`匯率 (→ ${trip.Base_Currency})`} type="text" inputMode="decimal" value={String(expenseForm.Exchange_Rate ?? '1')} onChange={e => setExpenseForm(f => ({ ...f, Exchange_Rate: e.target.value }))} className="flex-1" /><Button size="sm" variant="outline" onClick={fetchExchangeRate} loading={exchangeRateLoading} className="mb-0.5"><RefreshCw size={13} /> 更新</Button></div>
+              <div><label className="text-sm font-semibold text-slate-700 block mb-2">分帳成員</label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => toggleSplitter(m.Member_Name)} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${expenseForm.splitterIds?.includes(m.Member_Name) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>{m.Member_Name}</button>)}{tripMembers.length === 0 && <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>}</div></div>
             </div>
-          </div>
+          </details>
 
           {/* 機票額外欄位 */}
           {(expenseForm.Main_Category === '機票' || expenseForm.Sub_Category === '機票') && (
