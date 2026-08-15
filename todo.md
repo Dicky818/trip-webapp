@@ -55,14 +55,14 @@
 - [x] Abort pending receipt and exchange work when the receipt is cleared, modal closes, trip changes, or component unmounts.
 - [x] Add per-attempt Gemini timeout and client-disconnect cancellation to the receipt Edge Function.
 - [x] Verify cancelled requests cannot overwrite a newer receipt form and that a normal scan still completes.
-- [ ] Inventory every non-receipt AI planning, advisory, and text-generation frontend call and Edge Function.
-- [ ] Audit request cancellation, latest-result guards, timeout, retry, and unmount cleanup behavior for each AI workflow.
-- [ ] Apply only approved low-risk protections and validate normal AI planning and advisory responses.
-- [ ] Inspect receipt-analysis logs and payload handling for the reported mobile non-2xx failure.
-- [ ] Repair the discovered receipt error path and validate the LAWSON receipt without persisting an expense.
-- [ ] Add approved cancellation, latest-result, timeout, and retry safeguards to the AI travel-advice workflow.
-- [ ] Rebuild, deploy, and verify both receipt scanning and AI advisory flows.
-- [ ] Preserve images at or below 6MB and compress only oversized receipt files locally before analysis.
-- [ ] Add a bounded JPEG resize loop that targets a safe payload size without uploading the original image.
-- [ ] Surface Edge Function response messages instead of generic non-2xx errors.
-- [ ] Validate the 17MB LAWSON receipt extracts correctly after conditional local compression.
+- [x] Inventory every non-receipt AI planning, advisory, and text-generation frontend call and Edge Function.
+- [x] Audit request cancellation, latest-result guards, timeout, retry, and unmount cleanup behavior for each AI workflow.
+- [x] Apply approved low-risk protections and validate cancellation behavior; provider success validation is blocked only by Gemini quota.
+- [x] Inspect receipt-analysis logs and payload handling for the reported mobile non-2xx failure.
+- [x] Repair the discovered receipt error path and validate that oversized images are compressed before analysis without persisting an expense.
+- [x] Add approved cancellation, latest-result, timeout, and retry safeguards to the AI travel-advice workflow.
+- [x] Rebuild and deploy both receipt scanning and AI advisory repairs.
+- [x] Preserve images at or below 6MB and compress only oversized receipt files locally before analysis.
+- [x] Add a bounded JPEG resize loop that targets a safe payload size without uploading the original image.
+- [x] Surface Edge Function response messages instead of generic non-2xx errors.
+- [ ] Repeat real LAWSON receipt extraction after the Gemini provider quota replenishes; no expense should be saved during validation.

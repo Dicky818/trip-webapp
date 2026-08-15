@@ -67,6 +67,19 @@ async function fetchGeminiWithTimeout(url: string, init: RequestInit, requestSig
   }
 }
 
+function providerRetryDelayMs(response: Response, body: string, fallbackMs: number): number {
+  const headerSeconds = Number(response.headers.get('retry-after'));
+  if (Number.isFinite(headerSeconds) && headerSeconds > 0) {
+    return Math.min(20_000, Math.max(500, Math.round(headerSeconds * 1000)));
+  }
+  const retryMatch = body.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/)
+    || body.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+  const bodySeconds = retryMatch ? Number(retryMatch[1]) : NaN;
+  return Number.isFinite(bodySeconds) && bodySeconds > 0
+    ? Math.min(20_000, Math.max(500, Math.round(bodySeconds * 1000)))
+    : fallbackMs;
+}
+
 function cleanText(value: unknown, maxLength: number): string | null {
   if (typeof value !== 'string') return null;
   const clean = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maxLength);
@@ -211,6 +224,8 @@ If this is not a receipt, or the total is unreadable, return null for unknown fi
       generationConfig: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 1024 },
     });
     let response: Response | null = null;
+    let providerBody = '';
+    let retryDelayMs = 0;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if (req.signal.aborted) return json({ error: '請求已取消' }, 499, headers);
       try {
@@ -228,12 +243,19 @@ If this is not a receipt, or the total is unreadable, return null for unknown fi
         if (!await waitWithAbort(500 * (attempt + 1), req.signal)) return json({ error: '請求已取消' }, 499, headers);
         continue;
       }
-      if (response.ok || (response.status !== 429 && response.status !== 503) || attempt === 2) break;
-      await response.body?.cancel();
-      if (!await waitWithAbort(500 * (attempt + 1), req.signal)) return json({ error: '請求已取消' }, 499, headers);
+      if (response.ok) break;
+      providerBody = await response.text();
+      const retryable = response.status === 429 || response.status === 503;
+      retryDelayMs = providerRetryDelayMs(response, providerBody, 500 * (attempt + 1));
+      if (!retryable || attempt === 2) break;
+      if (!await waitWithAbort(retryDelayMs, req.signal)) return json({ error: '請求已取消' }, 499, headers);
     }
     if (!response || !response.ok) {
-      console.error('Receipt analysis provider error:', response?.status ?? 'network failure');
+      console.error('Receipt analysis provider error:', response?.status ?? 'network failure', providerBody);
+      if (response?.status === 429) {
+        const retrySeconds = Math.max(1, Math.ceil(retryDelayMs / 1000));
+        return json({ error: `收據辨識服務暫時達到使用額度，請約 ${retrySeconds} 秒後再試` }, 429, headers);
+      }
       return json({ error: '收據辨識服務暫時不可用，請稍後再試' }, 502, headers);
     }
     const data = await response.json();
