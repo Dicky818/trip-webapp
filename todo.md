@@ -66,8 +66,8 @@
 - [x] Add a bounded JPEG resize loop that targets a safe payload size without uploading the original image.
 - [x] Surface Edge Function response messages instead of generic non-2xx errors.
 - [ ] Repeat real LAWSON receipt extraction after the Gemini provider quota replenishes; no expense should be saved during validation.
-- [ ] Map the first-time-user journeys for registration, trip creation, joining, itinerary entry, expense entry, and collaboration.
-- [ ] Identify current mobile and desktop navigation, hierarchy, terminology, and form-complexity barriers.
-- [ ] Document a coherent redesigned information architecture, design system, and guided onboarding direction.
-- [ ] Rebuild the highest-friction screens and responsive navigation without changing data models or security flows.
+- [x] Map the first-time-user journeys for registration, trip creation, joining, itinerary entry, expense entry, and collaboration.
+- [x] Identify current mobile and desktop navigation, hierarchy, terminology, and form-complexity barriers.
+- [x] Document a coherent redesigned information architecture, design system, and guided onboarding direction.
+- [x] Rebuild the highest-friction screens and responsive navigation without changing data models or security flows.
 - [ ] Validate core user journeys on mobile and desktop before publishing the redesign.
