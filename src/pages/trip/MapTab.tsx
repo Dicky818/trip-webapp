@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { MapPin, AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { ItineraryItem, Trip } from '../../api/supabaseApi';
 import { supabase } from '../../lib/supabase';
+import { GOOGLE_MAPS_API_KEY } from '../../lib/googleMaps';
 
 // Decode Google encoded polyline to lat/lng array
 function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
@@ -60,8 +61,6 @@ async function fetchCachedPolylines(
   }
   return result;
 }
-
-const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
 declare global { interface Window { google: any; } }
 

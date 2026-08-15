@@ -72,3 +72,6 @@
 - [x] Rebuild the highest-friction screens and responsive navigation without changing data models or security flows.
 - [ ] Validate core user journeys on mobile and desktop before publishing the redesign.
 - [x] Fix the mobile browser/PWA stale-cache path so the redesigned production bundle replaces the old interface reliably.
+- [ ] Diagnose and fix the Google Maps authorization error on the deployed itinerary map without relaxing API-key restrictions.
+- [ ] Verify that the API key configured in Google Cloud matches the key embedded in the deployed Google Maps bundle before final validation.
+- [ ] Supply the browser-restricted Google Maps key to the production bundle, which currently contains an empty map-key value.

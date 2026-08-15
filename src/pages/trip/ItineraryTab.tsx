@@ -13,9 +13,7 @@ import { useApp } from '../../context/AppContext';
 import MapTab from './MapTab';
 import TimetableTab from './TimetableTab';
 import TransportCard from './TransportCard';
-
-// Google Maps API key
-const GOOGLE_MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
+import { GOOGLE_MAPS_API_KEY } from '../../lib/googleMaps';
 
 // Load Google Maps script once
 let googleMapsLoaded = false;
