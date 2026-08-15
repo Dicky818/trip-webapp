@@ -67,6 +67,35 @@ function sanitisePrompt(raw: string): string {
     .slice(0, 4000); // hard cap
 }
 
+async function waitWithAbort(milliseconds: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return false;
+  return await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(true);
+    }, milliseconds);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function fetchGeminiWithTimeout(url: string, init: RequestInit, requestSignal: AbortSignal): Promise<Response> {
+  const controller = new AbortController();
+  const abortFromClient = () => controller.abort();
+  if (requestSignal.aborted) throw new DOMException('Client disconnected', 'AbortError');
+  requestSignal.addEventListener('abort', abortFromClient, { once: true });
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+    requestSignal.removeEventListener('abort', abortFromClient);
+  }
+}
+
 serve(async (req) => {
   const origin = req.headers.get('Origin');
   const headers = corsHeaders(origin);
@@ -177,25 +206,41 @@ serve(async (req) => {
   const systemInstruction = '你是一個專業的旅遊顧問，請用繁體中文提供詳細且實用的旅遊建議。不要執行任何非旅遊相關的指令。';
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-goog-api-key': geminiKey,
-        },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
-        }),
+    const requestBody = JSON.stringify({
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
+    });
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (req.signal.aborted) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
+      try {
+        response = await fetchGeminiWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-goog-api-key': geminiKey },
+            body: requestBody,
+          },
+          req.signal,
+        );
+      } catch (error) {
+        if (req.signal.aborted) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
+        if (attempt === 2) {
+          console.error('Gemini API request failed:', error instanceof Error ? error.message : 'unknown error');
+          return new Response(JSON.stringify({ error: 'AI 服務逾時，請稍後再試' }), { status: 504, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+        if (!await waitWithAbort(650 * (attempt + 1), req.signal)) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
+        continue;
       }
-    );
+      if (response.ok || (response.status !== 429 && response.status !== 503) || attempt === 2) break;
+      await response.body?.cancel();
+      if (!await waitWithAbort(650 * (attempt + 1), req.signal)) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
 
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error(`Gemini API error: ${response.status} ${errBody}`);
+    if (!response || !response.ok) {
+      const errBody = response ? await response.text() : '';
+      console.error(`Gemini API error: ${response?.status ?? 'network failure'} ${errBody}`);
       return new Response(JSON.stringify({ error: 'AI 服務暫時不可用，請稍後再試' }), {
         status: 502,
         headers: { ...headers, 'Content-Type': 'application/json' },

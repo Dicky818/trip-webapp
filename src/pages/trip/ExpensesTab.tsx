@@ -18,6 +18,79 @@ import SettlementTab from './SettlementTab';
 interface Props { trip: Trip; }
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
+const MAX_RECEIPT_BYTES = 6 * 1024 * 1024;
+const RECEIPT_COMPRESSION_TARGET_BYTES = 5 * 1024 * 1024;
+const MAX_RECEIPT_DIMENSION = 1920;
+
+type PreparedReceiptImage = {
+  blob: Blob;
+  mimeType: string;
+  fileName: string;
+  compressed: boolean;
+};
+
+function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('無法壓縮收據圖片')), 'image/jpeg', quality);
+  });
+}
+
+async function loadReceiptImage(file: File): Promise<{ image: CanvasImageSource; width: number; height: number; release: () => void }> {
+  if ('createImageBitmap' in window) {
+    const bitmap = await createImageBitmap(file);
+    return { image: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() };
+  }
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error('無法讀取收據圖片'));
+      element.src = objectUrl;
+    });
+    return { image, width: image.naturalWidth, height: image.naturalHeight, release: () => URL.revokeObjectURL(objectUrl) };
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
+async function prepareReceiptImage(file: File, signal: AbortSignal): Promise<PreparedReceiptImage> {
+  if (file.size <= MAX_RECEIPT_BYTES) {
+    return { blob: file, mimeType: file.type, fileName: file.name || 'receipt', compressed: false };
+  }
+
+  const source = await loadReceiptImage(file);
+  try {
+    if (signal.aborted) throw new DOMException('Request aborted', 'AbortError');
+    const scale = Math.min(1, MAX_RECEIPT_DIMENSION / Math.max(source.width, source.height));
+    let width = Math.max(1, Math.round(source.width * scale));
+    let height = Math.max(1, Math.round(source.height * scale));
+    const qualities = [0.84, 0.74, 0.64, 0.54];
+
+    for (let resizeAttempt = 0; resizeAttempt < 3; resizeAttempt += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d', { alpha: false });
+      if (!context) throw new Error('無法建立圖片壓縮器');
+      context.drawImage(source.image, 0, 0, width, height);
+
+      for (const quality of qualities) {
+        if (signal.aborted) throw new DOMException('Request aborted', 'AbortError');
+        const blob = await canvasToJpeg(canvas, quality);
+        if (blob.size <= RECEIPT_COMPRESSION_TARGET_BYTES) {
+          return { blob, mimeType: 'image/jpeg', fileName: `${file.name || 'receipt'}（已壓縮）`, compressed: true };
+        }
+      }
+      width = Math.max(1, Math.round(width * 0.75));
+      height = Math.max(1, Math.round(height * 0.75));
+    }
+    throw new Error('圖片壓縮後仍超過安全上限，請裁剪收據範圍後再試');
+  } finally {
+    source.release();
+  }
+}
 
 // Sortable expense item component
 function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, onToggleSettled, onEdit, onDelete }: {
@@ -265,10 +338,6 @@ export default function ExpensesTab({ trip }: Props) {
       showToast('請使用 JPG、PNG 或 WEBP 格式的收據圖片', 'error');
       return;
     }
-    if (file.size > 6 * 1024 * 1024) {
-      showToast('收據圖片不可超過 6MB', 'error');
-      return;
-    }
     receiptAbortRef.current?.abort();
     exchangeRateAbortRef.current?.abort();
     const controller = new AbortController();
@@ -278,6 +347,9 @@ export default function ExpensesTab({ trip }: Props) {
     setAnalyzingReceipt(true);
     setReceiptAnalysis(null);
     try {
+      const preparedImage = await prepareReceiptImage(file, controller.signal);
+      if (controller.signal.aborted || requestId !== receiptRequestIdRef.current) return;
+      if (preparedImage.compressed) showToast('圖片較大，已在此裝置壓縮後辨識', 'info');
       const imageDataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         const abortReader = () => {
@@ -288,16 +360,16 @@ export default function ExpensesTab({ trip }: Props) {
         reader.onerror = () => reject(new Error('無法讀取收據圖片'));
         reader.onabort = () => reject(new DOMException('Request aborted', 'AbortError'));
         reader.onload = () => resolve(String(reader.result));
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(preparedImage.blob);
       });
       if (controller.signal.aborted || requestId !== receiptRequestIdRef.current) return;
       setReceiptPreview(imageDataUrl);
-      setReceiptFileName(file.name || 'receipt');
+      setReceiptFileName(preparedImage.fileName);
       const categoryOptions = activeCategories.map(category => ({
         mainCategory: category.Main_Category,
         subCategory: category.Sub_Category,
       }));
-      const result = await api.analyzeReceipt(trip.Trip_ID, imageDataUrl, file.type, categoryOptions, controller.signal);
+      const result = await api.analyzeReceipt(trip.Trip_ID, imageDataUrl, preparedImage.mimeType, categoryOptions, controller.signal);
       if (controller.signal.aborted || requestId !== receiptRequestIdRef.current) return;
       if (!result.success) throw new Error(result.error);
       const analysis = result.data;

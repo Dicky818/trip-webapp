@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { api, Trip } from '../../api/supabaseApi';
@@ -14,26 +14,49 @@ export default function AITab({ trip }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [generated, setGenerated] = useState(false);
+  const adviceAbortRef = useRef<AbortController | null>(null);
+  const adviceRequestIdRef = useRef(0);
+
+  useEffect(() => () => {
+    adviceAbortRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    adviceAbortRef.current?.abort();
+    adviceAbortRef.current = null;
+    adviceRequestIdRef.current += 1;
+    setLoading(false);
+  }, [trip.Trip_ID]);
 
   const handleGenerate = async () => {
+    adviceAbortRef.current?.abort();
+    const controller = new AbortController();
+    adviceAbortRef.current = controller;
+    const requestId = adviceRequestIdRef.current + 1;
+    adviceRequestIdRef.current = requestId;
     setLoading(true);
     setError('');
     try {
-      const result = await api.generateAIAdvice(trip.Trip_ID);
+      const result = await api.generateAIAdvice(trip.Trip_ID, controller.signal);
+      if (controller.signal.aborted || requestId !== adviceRequestIdRef.current) return;
       if (result.success && result.data) {
         setAdvice(result.data);
         setModel((result as any).model || '');
         setGenerated(true);
         showToast('AI 注意事項已生成');
       } else {
-        throw new Error('回應格式異常');
+        throw new Error(result.error || '回應格式異常');
       }
     } catch (e: unknown) {
+      if (controller.signal.aborted || requestId !== adviceRequestIdRef.current) return;
       const msg = e instanceof Error ? e.message : 'AI 生成失敗';
       setError(msg);
       showToast(msg, 'error');
     } finally {
-      setLoading(false);
+      if (adviceAbortRef.current === controller) {
+        adviceAbortRef.current = null;
+        setLoading(false);
+      }
     }
   };
 

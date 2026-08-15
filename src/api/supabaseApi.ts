@@ -1485,13 +1485,15 @@ export const api = {
   removeTripMember: async (_id: string) => err('Members are now account-based'),
 
   // ── AI ───────────────────────────────────────────────────
-  generateAIAdvice: async (tripId: string) => {
+  generateAIAdvice: async (tripId: string, signal?: AbortSignal) => {
+    if (signal?.aborted) return err('請求已取消');
     // Fetch trip data for AI context
     const [tripRes, itinRes, expRes] = await Promise.all([
       api.getTripById(tripId),
       api.getItinerary(tripId),
       api.getExpenses(tripId),
     ]);
+    if (signal?.aborted) return err('請求已取消');
     const trip = tripRes.success ? (tripRes as { success: true; data: Trip }).data : null;
     const itinerary = itinRes.success ? (itinRes as { success: true; data: ItineraryItem[] }).data : [];
     const expenses = expRes.success ? (expRes as { success: true; data: Expense[] }).data : [];
@@ -1521,6 +1523,10 @@ export const api = {
 7. 行李打包建議
 8. 其他重要提示`;
 
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort();
+    signal?.addEventListener('abort', abortFromCaller, { once: true });
+    const timeout = setTimeout(() => controller.abort(), 45_000);
     try {
       // Call Supabase Edge Function as secure proxy
       const { data: sessionData } = await supabase.auth.getSession();
@@ -1535,6 +1541,7 @@ export const api = {
           'apikey': anonKey,
         },
         body: JSON.stringify({ prompt }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const errText = await res.text();
@@ -1545,8 +1552,13 @@ export const api = {
       const result = { ...ok(data.text as string), model: data.model };
       return result;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'AI 服務暫時不可用';
+      const msg = controller.signal.aborted
+        ? (signal?.aborted ? '請求已取消' : 'AI 生成逾時，請稍後再試')
+        : (e instanceof Error ? e.message : 'AI 服務暫時不可用');
       return err(msg);
+    } finally {
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', abortFromCaller);
     }
   },
 
@@ -1567,7 +1579,21 @@ export const api = {
         signal,
         timeout: 30_000,
       });
-      if (error) return err(error.message || '收據辨識服務暫時不可用');
+      if (error) {
+        // FunctionsHttpError normally contains the Edge Function's JSON response
+        // in `context`; prefer that safe, actionable message over Supabase's
+        // generic "non-2xx" wrapper.
+        const context = (error as unknown as { context?: Response }).context;
+        if (context) {
+          try {
+            const payload = await context.clone().json() as { error?: unknown };
+            if (typeof payload.error === 'string' && payload.error.trim()) return err(payload.error);
+          } catch {
+            // The response was not JSON; use the generic transport error below.
+          }
+        }
+        return err(error.message || '收據辨識服務暫時不可用');
+      }
       if (data?.error) return err(String(data.error));
       return ok(data as ReceiptAnalysis);
     } catch (e: unknown) {
