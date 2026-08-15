@@ -9,6 +9,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // The app registers the worker explicitly in src/main.tsx so it can
+      // bypass stale HTTP caches and refresh when a mobile PWA regains focus.
+      injectRegister: false,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
