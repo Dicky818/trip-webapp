@@ -25,3 +25,9 @@ Opening the new-expense form in production confirmed that the receipt action, ca
 ## Mobile Cache Follow-up
 
 An iPhone screenshot showed the pre-redesign layout even though the current production service worker precaches the redesigned `index-B4MMNiaS.js` bundle. A clean review session registered the active production worker with no waiting worker and verified that its precache manifest contains that redesigned bundle. The discrepancy is therefore isolated to an existing iOS Safari/PWA cache on the affected device rather than a failed GitHub Pages deployment. A safe remediation should preserve current offline caching while making post-deployment update checks more explicit for future releases; the affected installation still needs a one-time local website-data or Home Screen app reset.
+
+The post-remedy deployment publishes a new main bundle and retains the previous worker until an existing client performs its one-time update transition. A review session deliberately controlled by the immediately preceding worker continued to serve the preceding bundle, confirming that users who are already pinned to an old iOS worker still need the one-time local reset described above. Once the updated client is installed, foreground and focus events perform an update check with `updateViaCache: 'none'` for future releases.
+
+After unregistering the previous worker and clearing its two browser caches in a controlled review session, the production route loaded the redesigned home shell again. This verifies that the deployment is reachable after a one-time reset; the initial data request naturally begins with the empty-state shell before the authenticated trip list resolves.
+
+The clean production session subsequently resolved both authenticated trips and ran `index-Bk4Vvk-k.js`, the bundle that contains the foreground service-worker update check. The new service worker is active and controls the current `/trip-webapp/` scope.

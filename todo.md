@@ -71,4 +71,4 @@
 - [x] Document a coherent redesigned information architecture, design system, and guided onboarding direction.
 - [x] Rebuild the highest-friction screens and responsive navigation without changing data models or security flows.
 - [ ] Validate core user journeys on mobile and desktop before publishing the redesign.
-- [ ] Fix the mobile browser/PWA stale-cache path so the redesigned production bundle replaces the old interface reliably.
+- [x] Fix the mobile browser/PWA stale-cache path so the redesigned production bundle replaces the old interface reliably.
