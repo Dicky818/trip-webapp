@@ -96,6 +96,19 @@ async function fetchGeminiWithTimeout(url: string, init: RequestInit, requestSig
   }
 }
 
+function providerRetryDelayMs(response: Response, body: string, fallbackMs: number): number {
+  const headerSeconds = Number(response.headers.get('retry-after'));
+  if (Number.isFinite(headerSeconds) && headerSeconds > 0) {
+    return Math.min(20_000, Math.max(650, Math.round(headerSeconds * 1000)));
+  }
+  const retryMatch = body.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/)
+    || body.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+  const bodySeconds = retryMatch ? Number(retryMatch[1]) : NaN;
+  return Number.isFinite(bodySeconds) && bodySeconds > 0
+    ? Math.min(20_000, Math.max(650, Math.round(bodySeconds * 1000)))
+    : fallbackMs;
+}
+
 serve(async (req) => {
   const origin = req.headers.get('Origin');
   const headers = corsHeaders(origin);
@@ -212,6 +225,8 @@ serve(async (req) => {
       generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
     });
     let response: Response | null = null;
+    let providerBody = '';
+    let retryDelayMs = 0;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if (req.signal.aborted) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
       try {
@@ -233,14 +248,23 @@ serve(async (req) => {
         if (!await waitWithAbort(650 * (attempt + 1), req.signal)) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
         continue;
       }
-      if (response.ok || (response.status !== 429 && response.status !== 503) || attempt === 2) break;
-      await response.body?.cancel();
-      if (!await waitWithAbort(650 * (attempt + 1), req.signal)) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
+      if (response.ok) break;
+      providerBody = await response.text();
+      const retryable = response.status === 429 || response.status === 503;
+      retryDelayMs = providerRetryDelayMs(response, providerBody, 650 * (attempt + 1));
+      if (!retryable || attempt === 2) break;
+      if (!await waitWithAbort(retryDelayMs, req.signal)) return new Response(JSON.stringify({ error: '請求已取消' }), { status: 499, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
 
     if (!response || !response.ok) {
-      const errBody = response ? await response.text() : '';
-      console.error(`Gemini API error: ${response?.status ?? 'network failure'} ${errBody}`);
+      console.error(`Gemini API error: ${response?.status ?? 'network failure'} ${providerBody}`);
+      if (response?.status === 429) {
+        const retrySeconds = Math.max(1, Math.ceil(retryDelayMs / 1000));
+        return new Response(JSON.stringify({ error: `AI 服務暫時達到使用額度，請約 ${retrySeconds} 秒後再試` }), {
+          status: 429,
+          headers: { ...headers, 'Content-Type': 'application/json', 'Retry-After': String(retrySeconds) },
+        });
+      }
       return new Response(JSON.stringify({ error: 'AI 服務暫時不可用，請稍後再試' }), {
         status: 502,
         headers: { ...headers, 'Content-Type': 'application/json' },

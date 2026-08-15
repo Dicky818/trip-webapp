@@ -1544,8 +1544,14 @@ export const api = {
         signal: controller.signal,
       });
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Edge Function error: ${res.status} ${errText}`);
+        let message = '';
+        try {
+          const payload = await res.json() as { error?: unknown };
+          message = typeof payload.error === 'string' ? payload.error : '';
+        } catch {
+          // Keep the concise fallback below when a proxy returns non-JSON text.
+        }
+        throw new Error(message || `AI 服務暫時不可用（${res.status}）`);
       }
       const data = await res.json();
       if (data.error) throw new Error(data.error);

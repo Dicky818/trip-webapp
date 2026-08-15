@@ -55,3 +55,14 @@
 - [x] Abort pending receipt and exchange work when the receipt is cleared, modal closes, trip changes, or component unmounts.
 - [x] Add per-attempt Gemini timeout and client-disconnect cancellation to the receipt Edge Function.
 - [x] Verify cancelled requests cannot overwrite a newer receipt form and that a normal scan still completes.
+- [ ] Inventory every non-receipt AI planning, advisory, and text-generation frontend call and Edge Function.
+- [ ] Audit request cancellation, latest-result guards, timeout, retry, and unmount cleanup behavior for each AI workflow.
+- [ ] Apply only approved low-risk protections and validate normal AI planning and advisory responses.
+- [ ] Inspect receipt-analysis logs and payload handling for the reported mobile non-2xx failure.
+- [ ] Repair the discovered receipt error path and validate the LAWSON receipt without persisting an expense.
+- [ ] Add approved cancellation, latest-result, timeout, and retry safeguards to the AI travel-advice workflow.
+- [ ] Rebuild, deploy, and verify both receipt scanning and AI advisory flows.
+- [ ] Preserve images at or below 6MB and compress only oversized receipt files locally before analysis.
+- [ ] Add a bounded JPEG resize loop that targets a safe payload size without uploading the original image.
+- [ ] Surface Edge Function response messages instead of generic non-2xx errors.
+- [ ] Validate the 17MB LAWSON receipt extracts correctly after conditional local compression.
