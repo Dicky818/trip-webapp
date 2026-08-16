@@ -76,6 +76,6 @@
 - [x] Verify that the API key configured in Google Cloud matches the key embedded in the deployed Google Maps bundle before final validation.
 - [x] Supply the browser-restricted Google Maps key to the production bundle, which currently contains an empty map-key value.
 - [x] Replace the non-matching wildcard referrer rule with Google’s documented exact GitHub Pages origin restriction and revalidate the Maps loader.
-- [ ] Audit the current offline queue, expense-submit flow, section navigation, and reusable feedback components for the first interaction-improvement release.
-- [ ] Implement clear synchronization feedback, saved-expense recovery, and actionable overview-summary navigation.
+- [x] Audit the current offline queue, expense-submit flow, section navigation, and reusable feedback components for the first interaction-improvement release.
+- [x] Implement clear synchronization feedback, saved-expense recovery, and actionable overview-summary navigation.
 - [ ] Validate the interaction release on responsive desktop and mobile layouts before publishing.
