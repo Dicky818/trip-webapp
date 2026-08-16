@@ -850,7 +850,6 @@ export default function ItineraryTab({ trip }: Props) {
                           ) : null;
                         })()}
                         <span className="text-xs text-slate-400">{dayItems.length} 項活動</span>
-                        {dayItems.length > 1 && <span className="text-[11px] text-blue-500 sm:hidden">↔ 滑動</span>}
                       </div>
                     </div>
 
@@ -881,6 +880,8 @@ export default function ItineraryTab({ trip }: Props) {
                             ))}
                           </select>
                         </div>
+
+                        {dayItems.length > 1 && <p className="px-1 text-[11px] font-medium text-blue-500 sm:hidden">← 左右滑動查看下一站 →</p>}
 
                         {/* Main itinerary items */}
                         {dayItems.length === 0 ? (
