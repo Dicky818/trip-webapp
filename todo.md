@@ -85,5 +85,5 @@
 - [x] Audit the active workspace for redundant controls, unclear primary actions, and first-time-user interaction friction.
 - [x] Redesign high-frequency screens around one primary action, contextual secondary actions, and restrained emoji cues with text labels.
 - [ ] Validate the simplified interface on desktop and mobile layouts before publication.
-- [ ] Capture iOS Safari-sized previews of the active workspace and identify safe-area, touch-target, and narrow-layout issues.
-- [ ] Apply and validate targeted iOS Safari layout refinements without changing trip data or the minimalist interaction model.
+- [x] Capture iOS Safari-sized previews of the active workspace and identify safe-area, touch-target, and narrow-layout issues.
+- [x] Apply and validate targeted iOS Safari layout refinements without changing trip data or the minimalist interaction model.
