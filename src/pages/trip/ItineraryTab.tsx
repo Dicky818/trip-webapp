@@ -849,7 +849,7 @@ export default function ItineraryTab({ trip }: Props) {
                             <span className="text-xs text-slate-400 hidden sm:inline">{timeRange}</span>
                           ) : null;
                         })()}
-                        <span className="text-xs text-slate-400">{dayItems.length} 項活動</span>
+                        <span className="flex-none whitespace-nowrap text-[11px] text-slate-400">{dayItems.length} 項活動</span>
                       </div>
                     </div>
 
