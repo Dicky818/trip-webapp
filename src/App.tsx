@@ -1,3 +1,7 @@
+/*
+ * Design system: "旅途作戰桌" — global recovery feedback belongs inside the
+ * authenticated workspace so it shares one clear, accessible notification channel.
+ */
 import React, { Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
@@ -53,6 +57,7 @@ function ProtectedRoutes() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <OfflineIndicator />
     </AppProvider>
   );
 }
@@ -62,7 +67,6 @@ export default function App() {
     <AuthProvider>
       <HashRouter>
         <ProtectedRoutes />
-        <OfflineIndicator />
         <InstallPrompt />
       </HashRouter>
     </AuthProvider>
