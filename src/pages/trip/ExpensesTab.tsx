@@ -8,7 +8,7 @@ import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, horizontalListSortingStrategy, useSortable, arrayMove,
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { api, Trip, Expense, TripMember, Settlement, Category, ReceiptAnalysis } from '../../api/supabaseApi';
@@ -111,7 +111,7 @@ function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, isRecent
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
     <div ref={setNodeRef} id={`expense-${exp.Expense_ID}`} style={style}
-      className={`flex w-[min(78vw,19rem)] flex-none snap-start items-start gap-2 rounded-xl border p-3 scroll-mt-28 transition-[border-color,background-color,box-shadow,transform] duration-200 ${
+      className={`flex items-start gap-2 rounded-xl border p-3 scroll-mt-28 transition-[border-color,background-color,box-shadow,transform] duration-200 ${
         isRecentlySaved ? 'bg-blue-50/70 border-blue-400 ring-4 ring-blue-100 shadow-sm' : isSettled ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-200'
       }`}>
       {/* Drag handle */}
@@ -802,7 +802,10 @@ export default function ExpensesTab({ trip }: Props) {
                   groups[d].push(exp);
                 });
                 const sortedDates = Object.keys(groups).sort();
-                return sortedDates.map(date => {
+                return <>
+                  {sortedDates.length > 1 && <p className="px-1 text-[11px] font-medium text-blue-500 sm:hidden">← 左右滑動切換日期 →</p>}
+                  <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-5 pb-2 scrollbar-hide touch-pan-x">
+                  {sortedDates.map(date => {
                   const isCollapsed = collapsedDates.has(date);
                   // Apply local drag order if exists
                   const order = expenseOrder[date];
@@ -819,7 +822,7 @@ export default function ExpensesTab({ trip }: Props) {
                     : rawExpenses;
                   const dateTotal = dateExpenses.reduce((s, e) => s + (parseFloat(String(e.Base_Amount)) || 0), 0);
                   return (
-                    <div key={date} className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div key={date} className="w-[min(88vw,34rem)] flex-none snap-start overflow-hidden rounded-xl border border-slate-200 bg-white">
                       {/* Date header - clickable to collapse */}
                       <div
                         className="flex items-center justify-between px-3 py-2.5 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
@@ -842,8 +845,8 @@ export default function ExpensesTab({ trip }: Props) {
                         <div className="p-2">
                           <DndContext sensors={sensors} collisionDetection={closestCenter}
                             onDragEnd={e => handleExpenseDragEnd(e, date, dateExpenses)}>
-                            <SortableContext items={dateExpenses.map(e => e.Expense_ID)} strategy={horizontalListSortingStrategy}>
-                              <div className="-mx-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-2 pb-2 scrollbar-hide touch-pan-x">
+                            <SortableContext items={dateExpenses.map(e => e.Expense_ID)} strategy={verticalListSortingStrategy}>
+                              <div className="space-y-1.5">
                                 {dateExpenses.map(exp => (
                                   <SortableExpenseItem
                                     key={exp.Expense_ID}
@@ -863,8 +866,10 @@ export default function ExpensesTab({ trip }: Props) {
                         </div>
                       )}
                     </div>
-                  );
-                });
+                    );
+                  })}
+                  </div>
+                </>;
               })()}
             </div>
           )}

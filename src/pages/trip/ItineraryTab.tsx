@@ -8,7 +8,7 @@ import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, horizontalListSortingStrategy, useSortable, arrayMove,
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { api, Trip, ItineraryItem, Accommodation, DayAccommodation, Expense, ItineraryAlternative } from '../../api/supabaseApi';
@@ -138,7 +138,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
 
   return (
     <div ref={setNodeRef} style={style}
-      className={`flex w-[min(78vw,19rem)] flex-none snap-start items-start gap-2 rounded-xl border bg-white p-3 transition-colors group ${
+      className={`flex items-start gap-2 rounded-lg border bg-white p-3 transition-colors group ${
         isSelected ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-200'
       }`}>
       {selectMode ? (
@@ -788,7 +788,9 @@ export default function ItineraryTab({ trip }: Props) {
           {tripDays.length === 0 ? (
             <EmptyState title="無法計算行程天數" description="請確認行程的出發和結束日期已正確設定" />
           ) : (
-            <div className="space-y-3">
+            <div>
+              {tripDays.length > 1 && <p className="mb-2 px-1 text-[11px] font-medium text-blue-500 sm:hidden">← 左右滑動切換日期 →</p>}
+              <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-5 pb-2 scrollbar-hide touch-pan-x">
               {tripDays.map(({ day, date }) => {
                 const dayItems = items
                   .filter(i => Number(i.Day_Number) === day)
@@ -808,7 +810,7 @@ export default function ItineraryTab({ trip }: Props) {
                 const weatherInfo = weather ? getWeatherInfo(weather.code) : null;
 
                 return (
-                  <div key={day} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div key={day} className="w-[min(88vw,34rem)] flex-none snap-start overflow-hidden rounded-xl border border-slate-200 bg-white">
                     {/* Day Header */}
                     <div
                       className="flex items-center justify-between px-4 py-3 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
@@ -881,16 +883,14 @@ export default function ItineraryTab({ trip }: Props) {
                           </select>
                         </div>
 
-                        {dayItems.length > 1 && <p className="px-1 text-[11px] font-medium text-blue-500 sm:hidden">← 左右滑動查看下一站 →</p>}
-
                         {/* Main itinerary items */}
                         {dayItems.length === 0 ? (
                           <p className="text-xs text-slate-400 text-center py-3">尚無行程，點擊 + 新增</p>
                         ) : (
                           <DndContext sensors={sensors} collisionDetection={closestCenter}
                             onDragEnd={e => handleDragEnd(e, dayItems)}>
-                            <SortableContext items={dayItems.map(i => i.Itinerary_ID)} strategy={horizontalListSortingStrategy}>
-                              <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 scrollbar-hide touch-pan-x">
+                            <SortableContext items={dayItems.map(i => i.Itinerary_ID)} strategy={verticalListSortingStrategy}>
+                              <div className="space-y-0">
                                 {dayItems.map((item, idx) => (
                                   <React.Fragment key={item.Itinerary_ID}>
                                     <div className="mb-1.5">
@@ -911,14 +911,12 @@ export default function ItineraryTab({ trip }: Props) {
                                       !isNaN(parseFloat(String(item.Lng || ''))) &&
                                       !isNaN(parseFloat(String(dayItems[idx + 1].Lat || ''))) &&
                                       !isNaN(parseFloat(String(dayItems[idx + 1].Lng || ''))) && (
-                                      <div className="w-48 flex-none self-center snap-start">
-                                        <TransportCard
-                                          key={`transport-${item.Itinerary_ID}-${dayItems[idx + 1].Itinerary_ID}`}
-                                          from={item}
-                                          to={dayItems[idx + 1]}
-                                          dayColor={getDayColor(day)}
-                                        />
-                                      </div>
+                                      <TransportCard
+                                        key={`transport-${item.Itinerary_ID}-${dayItems[idx + 1].Itinerary_ID}`}
+                                        from={item}
+                                        to={dayItems[idx + 1]}
+                                        dayColor={getDayColor(day)}
+                                      />
                                     )}
                                   </React.Fragment>
                                 ))}
@@ -1008,6 +1006,7 @@ export default function ItineraryTab({ trip }: Props) {
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
 
