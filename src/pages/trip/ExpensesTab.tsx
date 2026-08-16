@@ -3,7 +3,7 @@
  * visible sync state, one clear save outcome, and a safe short recovery path.
  */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download, Tag, X, Camera, ReceiptText } from 'lucide-react';
+import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download, Tag, X, Camera, ReceiptText, MoreHorizontal } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -150,14 +150,13 @@ function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, isRecent
             <p className="text-xs text-slate-400">{exp.Currency} {parseFloat(String(exp.Original_Amount || 0)).toLocaleString()}</p>
           )}
         </div>
-        <button onClick={() => onEdit(exp)}
-          className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
-          <Edit2 size={14} />
-        </button>
-        <button onClick={() => onDelete(exp)}
-          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-          <Trash2 size={14} />
-        </button>
+        <details className="relative">
+          <summary className="list-none cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><MoreHorizontal size={15} /><span className="sr-only">更多支出操作</span></summary>
+          <div className="absolute right-0 top-[calc(100%+0.25rem)] z-20 min-w-28 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+            <button onClick={() => onEdit(exp)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700"><Edit2 size={14} /> 編輯</button>
+            <button onClick={() => onDelete(exp)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50"><Trash2 size={14} /> 刪除</button>
+          </div>
+        </details>
       </div>
     </div>
   );
@@ -771,14 +770,15 @@ export default function ExpensesTab({ trip }: Props) {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowCategoryModal(true)} title="管理分類">
-                <Tag size={14} /> 分類
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleDownloadCSV} title="下載 CSV">
-                <Download size={14} /> CSV
-              </Button>
+              <details className="relative">
+                <summary className="list-none inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"><MoreHorizontal size={16} /><span className="sr-only">更多支出工具</span></summary>
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-32 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                  <button onClick={() => setShowCategoryModal(true)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"><Tag size={14} /> 管理分類</button>
+                  <button onClick={handleDownloadCSV} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"><Download size={14} /> 下載 CSV</button>
+                </div>
+              </details>
               <Button size="sm" onClick={() => openExpenseModal()}>
-                <Plus size={14} /> 新增支出
+                <Plus size={14} /> 💳 新增支出
               </Button>
             </div>
           </div>

@@ -82,3 +82,6 @@
 - [ ] Perform browser-based no-write validation of production overview navigation, connectivity feedback, and the expense recovery interface.
 - [x] Create and immediately undo one approved zero-value test expense to verify saved-item focus, highlight, and recovery without leaving test data.
 - [x] Align the amount validator with the existing zero-permitting number input while continuing to reject missing and negative expense values.
+- [ ] Audit the active workspace for redundant controls, unclear primary actions, and first-time-user interaction friction.
+- [ ] Redesign high-frequency screens around one primary action, contextual secondary actions, and restrained emoji cues with text labels.
+- [ ] Validate the simplified interface on desktop and mobile layouts before publication.

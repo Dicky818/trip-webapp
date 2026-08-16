@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Calendar } from 'lucide-react';
+import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Calendar, MoreHorizontal } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
@@ -716,20 +716,19 @@ export default function ItineraryTab({ trip }: Props) {
       {activeSubTab === 'list' && (
         <div className="px-5 pb-5">
           <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-            <h3 className="font-semibold text-slate-900">每日行程</h3>
+            <div><h3 className="font-semibold text-slate-900">每日行程</h3><p className="mt-0.5 text-xs text-slate-500">選擇一天，再安排下一站</p></div>
             <div className="flex items-center gap-2">
               {selectMode && selectedItems.size > 0 && (
                 <Button size="sm" variant="primary" onClick={() => setShowMoveModal(true)}>
                   <ArrowRightCircle size={14} /> 移動 ({selectedItems.size})
                 </Button>
               )}
-              <Button size="sm" variant={selectMode ? 'primary' : 'outline'} onClick={toggleSelectMode}>
-                <Shuffle size={14} /> {selectMode ? '取消選取' : '跨日移動'}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowCopyModal(true)}>
-                <Copy size={14} /> 複製行程
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => {
+              <details className="relative">
+                <summary className="list-none inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"><MoreHorizontal size={16} /><span className="sr-only">更多行程工具</span></summary>
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-36 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                  <button onClick={toggleSelectMode} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"><Shuffle size={14} /> {selectMode ? '結束選取' : '跨日移動'}</button>
+                  <button onClick={() => setShowCopyModal(true)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"><Copy size={14} /> 複製行程</button>
+                  <button onClick={() => {
                 // Generate .ics calendar export
                 const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TripWebApp//TW//EN', 'CALSCALE:GREGORIAN'];
                 tripDays.forEach(({ day, date }) => {
@@ -766,8 +765,11 @@ export default function ItineraryTab({ trip }: Props) {
                 a.click();
                 URL.revokeObjectURL(url);
                 showToast('行程已匯出為 .ics 檔案');
-              }}>
-                <Calendar size={14} /> 匯出日曆
+                  }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"><Calendar size={14} /> 匯出日曆</button>
+                </div>
+              </details>
+              <Button size="sm" onClick={() => openItemModal(selectedDay)}>
+                <Plus size={14} /> 📍 加一站
               </Button>
             </div>
           </div>

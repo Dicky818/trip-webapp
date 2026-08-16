@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
  * Design system: "旅途作戰桌" — overview answers: where are we, what is
  * prepared, and which trip facts need attention before showing detail lists.
  */
-import { Plane, Hotel, Ticket, Clock, MapPin, Users, CalendarDays, WalletCards, ArrowUpRight } from 'lucide-react';
+import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
 
@@ -114,34 +114,29 @@ export default function InfoTab({ trip, onNavigate }: Props) {
   const dayInTrip = Math.abs(daysToStart) + 1;
   const isLive = daysToStart <= 0 && end >= now;
   const journeyLabel = daysToStart > 0 ? `${daysToStart} 天後出發` : isLive ? `旅行中 · 第 ${dayInTrip}/${tripDuration} 天` : '此行程已完成';
+  const nextStep = isLive
+    ? { label: '📍 查看今天路線', detail: '先確認下一站與今天安排', target: 'itinerary' as const }
+    : { label: '🗺️ 開始規劃路線', detail: '先加入第一個行程地點', target: 'itinerary' as const };
 
   return (
-    <div className="p-4 sm:p-6 space-y-7">
+    <div className="p-4 sm:p-6 space-y-6">
       <section className="relative overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white">
         <div className="absolute inset-0 route-grid opacity-40" />
         <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-500/25 blur-3xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-bold tracking-[0.15em] text-blue-200 uppercase">Journey status</p>
+            <p className="text-[11px] font-bold tracking-[0.15em] text-blue-200 uppercase">現在</p>
             <h3 className="mt-2 text-xl font-bold">{journeyLabel}</h3>
-            <p className="mt-2 text-sm text-slate-300">{formatDateOnly(trip.Start_Date)} — {formatDateOnly(trip.End_Date)} · 共 {tripDuration} 天</p>
+            <p className="mt-2 text-sm text-slate-300">{nextStep.detail}</p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-white/10 px-3 py-2"><p className="text-lg font-bold">{allMembers.length}</p><p className="text-[10px] text-slate-300">旅伴</p></div>
-            <div className="rounded-xl bg-white/10 px-3 py-2"><p className="text-lg font-bold">{bookingExpenses.length}</p><p className="text-[10px] text-slate-300">預訂</p></div>
-            <div className="rounded-xl bg-white/10 px-3 py-2"><p className="text-lg font-bold">{expenses.length}</p><p className="text-[10px] text-slate-300">支出</p></div>
-          </div>
+          <button type="button" onClick={() => onNavigate(nextStep.target)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-bold text-white shadow-sm transition-all duration-150 hover:bg-blue-400 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">{nextStep.label}<ArrowRight size={15} /></button>
         </div>
       </section>
 
-      <section>
-        <div className="flex items-end justify-between gap-4 mb-3"><div><p className="text-[11px] font-bold tracking-[0.14em] text-blue-600 uppercase">Trip snapshot</p><h3 className="mt-1 font-bold text-slate-950">目前準備狀態</h3></div><span className="text-xs text-slate-400">所有金額以 {trip.Base_Currency} 計</span></div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <button type="button" onClick={() => onNavigate('itinerary')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><CalendarDays size={18} className="text-blue-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-blue-600" /></div><p className="mt-5 text-2xl font-bold text-slate-950">{tripDuration}</p><p className="text-xs text-slate-500 mt-0.5">旅行天數</p><p className="mt-2 text-[11px] font-semibold text-blue-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看路線</p></button>
-          <button type="button" onClick={() => onNavigate('expenses')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><Users size={18} className="text-emerald-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-emerald-600" /></div><p className="mt-5 text-2xl font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500 mt-0.5">行程成員</p><p className="mt-2 text-[11px] font-semibold text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看分帳</p></button>
-          <button type="button" onClick={() => onNavigate('expenses')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><Ticket size={18} className="text-amber-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-amber-600" /></div><p className="mt-5 text-2xl font-bold text-slate-950">{bookingExpenses.length}</p><p className="text-xs text-slate-500 mt-0.5">已記錄預訂</p><p className="mt-2 text-[11px] font-semibold text-amber-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看支出</p></button>
-          <button type="button" onClick={() => onNavigate('expenses')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><WalletCards size={18} className="text-violet-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-violet-600" /></div><p className="mt-5 text-lg font-bold text-slate-950 truncate">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-slate-500 mt-0.5">目前總支出</p><p className="mt-2 text-[11px] font-semibold text-violet-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看明細</p></button>
-        </div>
+      <section className="grid grid-cols-3 divide-x divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500">👥 旅伴</p></div>
+        <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{bookingExpenses.length}</p><p className="text-xs text-slate-500">🎟️ 預訂</p></div>
+        <button type="button" onClick={() => onNavigate('expenses')} className="px-4 py-3 text-left transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"><p className="text-lg font-bold text-slate-950">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-blue-700">💳 總支出</p></button>
       </section>
 
       {/* ── 行程成員（第一個區塊） ── */}
