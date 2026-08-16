@@ -1,3 +1,7 @@
+/**
+ * Design system: "旅途作戰桌" — mobile install guidance stays compact,
+ * contextual, and above the thumb navigation rather than obscuring trip data.
+ */
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
 
@@ -49,39 +53,31 @@ export function InstallPrompt() {
   if (!showPrompt || dismissed || !deferredPrompt) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 md:left-auto md:right-4 md:w-96
-      bg-white rounded-xl shadow-xl border border-blue-100 p-4 
+    <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 md:left-auto md:right-4 md:w-96
+      bg-white rounded-2xl shadow-xl border border-blue-100 p-3
       animate-in slide-in-from-bottom-4 duration-300">
-      <button 
+      <button
         onClick={handleDismiss}
-        className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 transition-colors"
+        aria-label="關閉安裝提示"
+        title="稍後再說"
+        className="absolute right-2 top-2 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
       >
-        <X size={16} />
+        <X size={15} />
       </button>
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-          <Download size={20} className="text-blue-600" />
+      <div className="flex items-center gap-2.5 pr-6">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50">
+          <Download size={18} className="text-blue-600" />
         </div>
-        <div className="flex-1">
-          <h3 className="text-sm font-semibold text-slate-900">安裝旅遊規劃 App</h3>
-          <p className="text-xs text-slate-500 mt-0.5 mb-3">
-            安裝到主畫面，離線也能使用，體驗更流暢
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={handleInstall}
-              className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              安裝
-            </button>
-            <button
-              onClick={handleDismiss}
-              className="px-3 py-1.5 text-slate-500 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              稍後再說
-            </button>
-          </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold text-slate-900">離線也能使用</h3>
+          <p className="mt-0.5 hidden text-xs text-slate-500 sm:block">安裝到主畫面，旅途中更快開啟</p>
         </div>
+        <button
+          onClick={handleInstall}
+          className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98]"
+        >
+          安裝
+        </button>
       </div>
     </div>
   );

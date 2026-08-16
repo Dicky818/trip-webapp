@@ -846,9 +846,6 @@ export default function ItineraryTab({ trip }: Props) {
                           ) : null;
                         })()}
                         <span className="text-xs text-slate-400">{dayItems.length} 項活動</span>
-                        <Button size="sm" variant="ghost" onClick={() => openItemModal(day)}>
-                          <Plus size={14} />
-                        </Button>
                       </div>
                     </div>
 
