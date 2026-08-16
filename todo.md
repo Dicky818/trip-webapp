@@ -79,3 +79,4 @@
 - [x] Audit the current offline queue, expense-submit flow, section navigation, and reusable feedback components for the first interaction-improvement release.
 - [x] Implement clear synchronization feedback, saved-expense recovery, and actionable overview-summary navigation.
 - [ ] Validate the interaction release on responsive desktop and mobile layouts before publishing.
+- [ ] Perform browser-based no-write validation of production overview navigation, connectivity feedback, and the expense recovery interface.
