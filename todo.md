@@ -90,4 +90,4 @@
 - [x] Audit the current daily-itinerary cards, expense rows, and new-expense split initialization for the requested mobile behavior.
 - [x] Present daily itinerary items and expense records in horizontal touch-scrollable card lanes with clear continuation affordances.
 - [x] Default a new expense’s split participant to the signed-in user while preserving the ability to add or remove collaborators.
-- [ ] Correct the horizontal-scrolling hierarchy so days and expense dates move horizontally while each card’s contents remain vertical.
+- [x] Correct the horizontal-scrolling hierarchy so days and expense dates move horizontally while each card’s contents remain vertical.

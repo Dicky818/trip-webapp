@@ -133,3 +133,7 @@ Daily itinerary stops and date-grouped expense records now render as snap-aligne
 The initial 393×852 mobile capture confirmed that expense cards occupy an appropriate touch width and the horizontal lane is available. It also found that the itinerary header’s inline swipe cue can wrap alongside a two-line activity count. The cue will be moved to its own small line immediately above the itinerary lane so the day header remains visually stable.
 
 The final 393×852 production capture confirms the corrected treatment: “7 項活動” now remains on a single compact line in the day header, while the dedicated “← 左右滑動查看下一站 →” cue remains legible beneath the accommodation selector. The expense and itinerary lanes expose the intended snap-enabled horizontal scrolling without horizontal page overflow or clipped primary controls.
+
+## Corrected horizontal hierarchy
+
+The intended hierarchy was clarified after review: it is the day and date containers—not individual activities or expenses—that should move horizontally. The implementation now presents each date-grouped expense list as one horizontally swipeable date card with its expense rows stacked vertically, and each daily itinerary as one horizontally swipeable day card with accommodation, stops, and transport connectors stacked vertically. Fresh 393×852 previews confirm the structure: the expense view shows a clear “← 左右滑動切換日期 →” cue above a vertically ordered date card, while the itinerary view shows the same cue above a vertically ordered day card. The signed-in-user split default remains unchanged.
