@@ -521,8 +521,9 @@ export default function ExpensesTab({ trip }: Props) {
   };
 
   const handleSaveExpense = async () => {
-    if (!expenseForm.Original_Amount || parseFloat(String(expenseForm.Original_Amount)) <= 0) {
-      showToast('請輸入有效金額', 'error'); return;
+    const parsedAmount = Number(expenseForm.Original_Amount);
+    if (String(expenseForm.Original_Amount ?? '').trim() === '' || !Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      showToast('請輸入 0 或以上的有效金額', 'error'); return;
     }
     if (!expenseForm.Payer) { showToast('請選擇付款人', 'error'); return; }
     console.log('[SaveExpense] Payer:', JSON.stringify(expenseForm.Payer), 'Payer_ID:', tripMembers.find(m => m.Member_Name === expenseForm.Payer)?.Member_ID);

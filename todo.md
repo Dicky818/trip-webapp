@@ -80,3 +80,5 @@
 - [x] Implement clear synchronization feedback, saved-expense recovery, and actionable overview-summary navigation.
 - [ ] Validate the interaction release on responsive desktop and mobile layouts before publishing.
 - [ ] Perform browser-based no-write validation of production overview navigation, connectivity feedback, and the expense recovery interface.
+- [ ] Create and immediately undo one approved zero-value test expense to verify saved-item focus, highlight, and recovery without leaving test data.
+- [ ] Align the amount validator with the existing zero-permitting number input while continuing to reject missing and negative expense values.
