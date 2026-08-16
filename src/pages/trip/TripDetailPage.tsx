@@ -200,7 +200,7 @@ export default function TripDetailPage() {
 
           <div className="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm min-h-[32rem] overflow-hidden">
             <Suspense fallback={<TabSpinner />}>
-              {activeTab === 'info' && <InfoTab trip={trip} />}
+              {activeTab === 'info' && <InfoTab trip={trip} onNavigate={setActiveTab} />}
               {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
               {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
               {activeTab === 'packing' && <PackingListTab trip={trip} />}

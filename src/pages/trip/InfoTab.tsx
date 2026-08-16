@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
  * Design system: "旅途作戰桌" — overview answers: where are we, what is
  * prepared, and which trip facts need attention before showing detail lists.
  */
-import { Plane, Hotel, Ticket, Clock, MapPin, Users, CalendarDays, WalletCards } from 'lucide-react';
+import { Plane, Hotel, Ticket, Clock, MapPin, Users, CalendarDays, WalletCards, ArrowUpRight } from 'lucide-react';
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
 
@@ -37,9 +37,12 @@ function isAccommodationExpense(exp: Expense): boolean {
 }
 
 
-interface Props { trip: Trip; }
+interface Props {
+  trip: Trip;
+  onNavigate: (target: 'itinerary' | 'expenses') => void;
+}
 
-export default function InfoTab({ trip }: Props) {
+export default function InfoTab({ trip, onNavigate }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,10 +137,10 @@ export default function InfoTab({ trip }: Props) {
       <section>
         <div className="flex items-end justify-between gap-4 mb-3"><div><p className="text-[11px] font-bold tracking-[0.14em] text-blue-600 uppercase">Trip snapshot</p><h3 className="mt-1 font-bold text-slate-950">目前準備狀態</h3></div><span className="text-xs text-slate-400">所有金額以 {trip.Base_Currency} 計</span></div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><CalendarDays size={18} className="text-blue-600" /><p className="mt-5 text-2xl font-bold text-slate-950">{tripDuration}</p><p className="text-xs text-slate-500 mt-0.5">旅行天數</p></div>
-          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><Users size={18} className="text-emerald-600" /><p className="mt-5 text-2xl font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500 mt-0.5">行程成員</p></div>
-          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><Ticket size={18} className="text-amber-600" /><p className="mt-5 text-2xl font-bold text-slate-950">{bookingExpenses.length}</p><p className="text-xs text-slate-500 mt-0.5">已記錄預訂</p></div>
-          <div className="rounded-2xl p-4 border border-slate-200 bg-white"><WalletCards size={18} className="text-violet-600" /><p className="mt-5 text-lg font-bold text-slate-950 truncate">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-slate-500 mt-0.5">目前總支出</p></div>
+          <button type="button" onClick={() => onNavigate('itinerary')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><CalendarDays size={18} className="text-blue-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-blue-600" /></div><p className="mt-5 text-2xl font-bold text-slate-950">{tripDuration}</p><p className="text-xs text-slate-500 mt-0.5">旅行天數</p><p className="mt-2 text-[11px] font-semibold text-blue-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看路線</p></button>
+          <button type="button" onClick={() => onNavigate('expenses')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><Users size={18} className="text-emerald-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-emerald-600" /></div><p className="mt-5 text-2xl font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500 mt-0.5">行程成員</p><p className="mt-2 text-[11px] font-semibold text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看分帳</p></button>
+          <button type="button" onClick={() => onNavigate('expenses')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><Ticket size={18} className="text-amber-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-amber-600" /></div><p className="mt-5 text-2xl font-bold text-slate-950">{bookingExpenses.length}</p><p className="text-xs text-slate-500 mt-0.5">已記錄預訂</p><p className="mt-2 text-[11px] font-semibold text-amber-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看支出</p></button>
+          <button type="button" onClick={() => onNavigate('expenses')} className="group rounded-2xl p-4 border border-slate-200 bg-white text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><div className="flex items-start justify-between"><WalletCards size={18} className="text-violet-600" /><ArrowUpRight size={15} className="text-slate-300 transition-colors group-hover:text-violet-600" /></div><p className="mt-5 text-lg font-bold text-slate-950 truncate">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-slate-500 mt-0.5">目前總支出</p><p className="mt-2 text-[11px] font-semibold text-violet-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">查看明細</p></button>
         </div>
       </section>
 

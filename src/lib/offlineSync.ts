@@ -15,9 +15,17 @@ export interface PendingExpense {
 }
 
 const QUEUE_PREFIX = 'offline_expense_';
+export const OFFLINE_QUEUE_UPDATED_EVENT = 'trip-webapp:offline-queue-updated';
+
+function notifyQueueUpdated() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(OFFLINE_QUEUE_UPDATED_EVENT));
+  }
+}
 
 export async function addToQueue(item: PendingExpense): Promise<void> {
   await set(QUEUE_PREFIX + item.id, item);
+  notifyQueueUpdated();
 }
 
 export async function getQueue(): Promise<PendingExpense[]> {
@@ -35,6 +43,7 @@ export async function getQueue(): Promise<PendingExpense[]> {
 
 export async function removeFromQueue(id: string): Promise<void> {
   await del(QUEUE_PREFIX + id);
+  notifyQueueUpdated();
 }
 
 export async function getQueueCount(): Promise<number> {

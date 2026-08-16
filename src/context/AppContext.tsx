@@ -1,5 +1,12 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+/*
+ * Design system: "旅途作戰桌" — feedback confirms an action and, where safe,
+ * gives the traveller a short, direct path to recover from it.
+ */
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { api, Trip, Category, UserProfile } from '../api/supabaseApi';
+
+type ToastAction = { label: string; onClick: () => void };
+type ToastState = { message: string; type: 'success' | 'error' | 'info'; action?: ToastAction };
 
 interface AppContextType {
   // Trips
@@ -18,8 +25,8 @@ interface AppContextType {
   fetchCategories: () => Promise<void>;
 
   // Toast notifications
-  toast: { message: string; type: 'success' | 'error' | 'info' } | null;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  toast: ToastState | null;
+  showToast: (message: string, type?: 'success' | 'error' | 'info', action?: ToastAction) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -31,7 +38,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchTrips = useCallback(async () => {
     setTripsLoading(true);
@@ -75,9 +83,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success', action?: ToastAction) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type, action });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), action ? 7000 : 3500);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
   }, []);
 
   return (
@@ -89,9 +102,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }}>
       {children}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all
-          ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'}`}>
-          {toast.message}
+        <div role={toast.type === 'error' ? 'alert' : 'status'} aria-live={toast.type === 'error' ? 'assertive' : 'polite'} className={`fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 flex items-center gap-3 rounded-2xl px-4 py-3 shadow-[0_14px_30px_rgba(15,23,42,0.24)] text-white text-sm font-medium transition-[transform,opacity] duration-200 ease-out
+          ${toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'}`}>
+          <span className="min-w-0 flex-1">{toast.message}</span>
+          {toast.action && (
+            <button onClick={() => { toast.action?.onClick(); setToast(null); }} className="rounded-lg border border-white/30 px-2.5 py-1 text-xs font-bold transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98]">
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
     </AppContext.Provider>

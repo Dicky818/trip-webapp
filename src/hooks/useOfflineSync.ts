@@ -1,5 +1,9 @@
+/*
+ * Design system: "旅途作戰桌" — connectivity is a visible trip state, not a
+ * background technical detail. Keep queued work recoverable and understandable.
+ */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { addToQueue, getQueue, removeFromQueue, getQueueCount, isOnline, registerSyncListener, PendingExpense } from '../lib/offlineSync';
+import { addToQueue, getQueue, removeFromQueue, getQueueCount, isOnline, registerSyncListener, PendingExpense, OFFLINE_QUEUE_UPDATED_EVENT } from '../lib/offlineSync';
 import { api, Expense } from '../api/supabaseApi';
 
 interface UseOfflineSyncReturn {
@@ -16,42 +20,8 @@ export function useOfflineSync(): UseOfflineSyncReturn {
   const [isSyncing, setIsSyncing] = useState(false);
   const syncingRef = useRef(false);
 
-  // Update online status
-  useEffect(() => {
-    const handleOnline = () => setOnline(true);
-    const handleOffline = () => setOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Load pending count on mount
-  useEffect(() => {
-    getQueueCount().then(setPendingCount);
-  }, []);
-
-  // Auto-sync when coming back online
-  useEffect(() => {
-    const cleanup = registerSyncListener(async () => {
-      if (syncingRef.current) return;
-      await syncNow();
-    });
-    return cleanup;
-  }, []);
-
-  const addOfflineExpense = useCallback(async (tripId: string, expense: Partial<Expense>) => {
-    const item: PendingExpense = {
-      id: crypto.randomUUID(),
-      tripId,
-      expense,
-      action: 'create',
-      createdAt: new Date().toISOString(),
-    };
-    await addToQueue(item);
-    setPendingCount(prev => prev + 1);
+  const refreshPendingCount = useCallback(async () => {
+    setPendingCount(await getQueueCount());
   }, []);
 
   const syncNow = useCallback(async () => {
@@ -66,27 +36,69 @@ export function useOfflineSync(): UseOfflineSyncReturn {
       const queue = await getQueue();
       for (const item of queue) {
         try {
+          let result;
           if (item.action === 'create') {
-            await api.createExpense({ ...item.expense, Trip_ID: item.tripId });
+            result = await api.createExpense({ ...item.expense, Trip_ID: item.tripId });
           } else if (item.action === 'update' && item.expense.Expense_ID) {
-            await api.updateExpense(item.expense.Expense_ID, item.expense);
+            result = await api.updateExpense(item.expense.Expense_ID, item.expense);
           } else if (item.action === 'delete' && item.expense.Expense_ID) {
-            await api.deleteExpense(item.expense.Expense_ID);
+            result = await api.deleteExpense(item.expense.Expense_ID);
           }
+          if (!result?.success) throw new Error(result?.error || '同步失敗');
           await removeFromQueue(item.id);
           synced++;
         } catch {
           failed++;
         }
       }
-      setPendingCount(await getQueueCount());
+      await refreshPendingCount();
     } finally {
       syncingRef.current = false;
       setIsSyncing(false);
     }
 
     return { synced, failed };
+  }, [refreshPendingCount]);
+
+  // Update online status
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
+
+  // Load and keep the queue count fresh whenever a local save changes it.
+  useEffect(() => {
+    void refreshPendingCount();
+    window.addEventListener(OFFLINE_QUEUE_UPDATED_EVENT, refreshPendingCount);
+    return () => window.removeEventListener(OFFLINE_QUEUE_UPDATED_EVENT, refreshPendingCount);
+  }, [refreshPendingCount]);
+
+  // Auto-sync when coming back online
+  useEffect(() => {
+    const cleanup = registerSyncListener(async () => {
+      if (syncingRef.current) return;
+      await syncNow();
+    });
+    return cleanup;
+  }, [syncNow]);
+
+  const addOfflineExpense = useCallback(async (tripId: string, expense: Partial<Expense>) => {
+    const item: PendingExpense = {
+      id: crypto.randomUUID(),
+      tripId,
+      expense,
+      action: 'create',
+      createdAt: new Date().toISOString(),
+    };
+    await addToQueue(item);
+    await refreshPendingCount();
+  }, [refreshPendingCount]);
 
   return { online, pendingCount, addOfflineExpense, syncNow, isSyncing };
 }

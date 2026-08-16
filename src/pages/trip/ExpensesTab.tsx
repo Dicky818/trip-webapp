@@ -1,3 +1,7 @@
+/*
+ * Design system: "旅途作戰桌" — expense entry is a confirmed journey action:
+ * visible sync state, one clear save outcome, and a safe short recovery path.
+ */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Plus, Trash2, Edit2, DollarSign, BarChart2, RefreshCw, ArrowRight, Table2, CheckCircle2, Circle, UserCog, ChevronDown, ChevronRight, GripVertical, Download, Tag, X, Camera, ReceiptText } from 'lucide-react';
 import {
@@ -93,11 +97,12 @@ async function prepareReceiptImage(file: File, signal: AbortSignal): Promise<Pre
 }
 
 // Sortable expense item component
-function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, onToggleSettled, onEdit, onDelete }: {
+function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, isRecentlySaved, onToggleSettled, onEdit, onDelete }: {
   exp: Expense;
   trip: Trip;
   isSettled: boolean;
   settlingExpenseId: string | null;
+  isRecentlySaved: boolean;
   onToggleSettled: (exp: Expense) => void;
   onEdit: (exp: Expense) => void;
   onDelete: (exp: Expense) => void;
@@ -105,9 +110,9 @@ function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, onToggle
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: exp.Expense_ID });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
-    <div ref={setNodeRef} style={style}
-      className={`flex items-start gap-2 p-3 rounded-xl border transition-all ${
-        isSettled ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-200'
+    <div ref={setNodeRef} id={`expense-${exp.Expense_ID}`} style={style}
+      className={`flex items-start gap-2 p-3 rounded-xl border scroll-mt-28 transition-[border-color,background-color,box-shadow,transform] duration-200 ${
+        isRecentlySaved ? 'bg-blue-50/70 border-blue-400 ring-4 ring-blue-100 shadow-sm' : isSettled ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-200'
       }`}>
       {/* Drag handle */}
       <button {...attributes} {...listeners}
@@ -186,6 +191,7 @@ export default function ExpensesTab({ trip }: Props) {
   const [deletingExpense, setDeletingExpense] = useState(false);
   const [exchangeRateLoading, setExchangeRateLoading] = useState(false);
   const [settlingExpenseId, setSettlingExpenseId] = useState<string | null>(null);
+  const [recentSavedExpenseId, setRecentSavedExpenseId] = useState<string | null>(null);
   // Receipt images stay only in component memory and are discarded on close/save.
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const receiptAbortRef = useRef<AbortController | null>(null);
@@ -250,6 +256,18 @@ export default function ExpensesTab({ trip }: Props) {
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    if (!recentSavedExpenseId || activeSubTab !== 'list') return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`expense-${recentSavedExpenseId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    const timeout = window.setTimeout(() => setRecentSavedExpenseId(null), 4200);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [activeSubTab, recentSavedExpenseId]);
 
   const fetchSettlement = async () => {
     setSettlementLoading(true);
@@ -551,6 +569,8 @@ export default function ExpensesTab({ trip }: Props) {
         Rail_Platform: expenseForm.Rail_Platform || undefined,
         Is_Booking: expenseForm.Is_Booking,
       };
+      let createdExpenseId: string | null = null;
+      let createdExpenseDate = expenseForm.Date || '（未填日期）';
       if (editExpense) {
         const updateRes = await api.updateExpense(editExpense.Expense_ID, payload);
         if (!updateRes.success) throw new Error(updateRes.error);
@@ -569,10 +589,37 @@ export default function ExpensesTab({ trip }: Props) {
         }
         const createRes = await api.createExpense(payload);
         if (!createRes.success) throw new Error(createRes.error);
+        createdExpenseId = createRes.data.Expense_ID;
+        createdExpenseDate = createRes.data.Date || createdExpenseDate;
       }
-      showToast(editExpense ? '支出已更新' : '支出已新增');
       closeExpenseModal();
       await fetchAll();
+      if (createdExpenseId) {
+        setCollapsedDates(prev => {
+          const next = new Set(prev);
+          next.delete(createdExpenseDate);
+          return next;
+        });
+        setActiveSubTab('list');
+        setRecentSavedExpenseId(createdExpenseId);
+        showToast('支出已新增，已定位到列表', 'success', {
+          label: '復原',
+          onClick: () => {
+            void (async () => {
+              const result = await api.deleteExpense(createdExpenseId!);
+              if (!result.success) {
+                showToast(result.error || '無法復原這筆支出', 'error');
+                return;
+              }
+              setRecentSavedExpenseId(null);
+              await fetchAll();
+              showToast('已復原新增的支出');
+            })();
+          },
+        });
+      } else {
+        showToast('支出已更新');
+      }
     } catch (e: unknown) { showToast(e instanceof Error ? e.message : '儲存失敗', 'error'); }
     finally { setSavingExpense(false); }
   };
@@ -796,6 +843,7 @@ export default function ExpensesTab({ trip }: Props) {
                                     trip={trip}
                                     isSettled={isSettled(exp)}
                                     settlingExpenseId={settlingExpenseId}
+                                    isRecentlySaved={recentSavedExpenseId === exp.Expense_ID}
                                     onToggleSettled={handleToggleSettled}
                                     onEdit={openExpenseModal}
                                     onDelete={setDeleteExpense}
