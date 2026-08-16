@@ -87,3 +87,6 @@
 - [ ] Validate the simplified interface on desktop and mobile layouts before publication.
 - [x] Capture iOS Safari-sized previews of the active workspace and identify safe-area, touch-target, and narrow-layout issues.
 - [x] Apply and validate targeted iOS Safari layout refinements without changing trip data or the minimalist interaction model.
+- [x] Audit the current daily-itinerary cards, expense rows, and new-expense split initialization for the requested mobile behavior.
+- [x] Present daily itinerary items and expense records in horizontal touch-scrollable card lanes with clear continuation affordances.
+- [x] Default a new expense’s split participant to the signed-in user while preserving the ability to add or remove collaborators.

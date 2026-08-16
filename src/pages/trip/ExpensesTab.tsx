@@ -8,7 +8,7 @@ import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+  SortableContext, horizontalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { api, Trip, Expense, TripMember, Settlement, Category, ReceiptAnalysis } from '../../api/supabaseApi';
@@ -111,7 +111,7 @@ function SortableExpenseItem({ exp, trip, isSettled, settlingExpenseId, isRecent
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
     <div ref={setNodeRef} id={`expense-${exp.Expense_ID}`} style={style}
-      className={`flex items-start gap-2 p-3 rounded-xl border scroll-mt-28 transition-[border-color,background-color,box-shadow,transform] duration-200 ${
+      className={`flex w-[min(78vw,19rem)] flex-none snap-start items-start gap-2 rounded-xl border p-3 scroll-mt-28 transition-[border-color,background-color,box-shadow,transform] duration-200 ${
         isRecentlySaved ? 'bg-blue-50/70 border-blue-400 ring-4 ring-blue-100 shadow-sm' : isSettled ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-200'
       }`}>
       {/* Drag handle */}
@@ -305,6 +305,10 @@ export default function ExpensesTab({ trip }: Props) {
 
   const mainCategories = Object.keys(catMap);
   const subCategories = expenseForm.Main_Category ? (catMap[expenseForm.Main_Category] || []) : [];
+  const currentTripMember = useMemo(
+    () => tripMembers.find(member => member.Member_ID === currentUser?.id) || null,
+    [tripMembers, currentUser?.id],
+  );
 
   const getReceiptCategorySuggestion = (analysis: ReceiptAnalysis) => {
     const exactMatch = activeCategories.find(category =>
@@ -513,7 +517,9 @@ export default function ExpensesTab({ trip }: Props) {
         Currency: trip.Base_Currency,
         Exchange_Rate: '1',
         Payer: tripMembers[0]?.Member_Name || '',
-        splitterIds: tripMembers.map(m => m.Member_Name),
+        splitterIds: currentTripMember
+          ? [currentTripMember.Member_Name]
+          : tripMembers[0] ? [tripMembers[0].Member_Name] : [],
       });
     }
     setShowExpenseModal(true);
@@ -825,6 +831,7 @@ export default function ExpensesTab({ trip }: Props) {
                           </span>
                           <span className="text-xs font-semibold text-slate-700">{date}</span>
                           <span className="text-xs text-slate-400">{dateExpenses.length} 項</span>
+                          {dateExpenses.length > 1 && <span className="text-[11px] text-blue-500 sm:hidden">↔ 滑動</span>}
                         </div>
                         <span className="text-xs font-semibold text-slate-600">
                           {trip.Base_Currency} {dateTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -835,8 +842,8 @@ export default function ExpensesTab({ trip }: Props) {
                         <div className="p-2">
                           <DndContext sensors={sensors} collisionDetection={closestCenter}
                             onDragEnd={e => handleExpenseDragEnd(e, date, dateExpenses)}>
-                            <SortableContext items={dateExpenses.map(e => e.Expense_ID)} strategy={verticalListSortingStrategy}>
-                              <div className="space-y-1.5">
+                            <SortableContext items={dateExpenses.map(e => e.Expense_ID)} strategy={horizontalListSortingStrategy}>
+                              <div className="-mx-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-2 pb-2 scrollbar-hide touch-pan-x">
                                 {dateExpenses.map(exp => (
                                   <SortableExpenseItem
                                     key={exp.Expense_ID}
@@ -985,7 +992,7 @@ export default function ExpensesTab({ trip }: Props) {
             <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-700 flex items-center justify-between">需要分帳、調整匯率或標記預訂嗎？<span className="text-slate-400 transition-transform group-open:rotate-45">+</span></summary>
             <div className="border-t border-slate-200 p-4 space-y-4">
               <div className="flex gap-2 items-end"><Input label={`匯率 (→ ${trip.Base_Currency})`} type="text" inputMode="decimal" value={String(expenseForm.Exchange_Rate ?? '1')} onChange={e => setExpenseForm(f => ({ ...f, Exchange_Rate: e.target.value }))} className="flex-1" /><Button size="sm" variant="outline" onClick={fetchExchangeRate} loading={exchangeRateLoading} className="mb-0.5"><RefreshCw size={13} /> 更新</Button></div>
-              <div><label className="text-sm font-semibold text-slate-700 block mb-2">分帳成員</label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => toggleSplitter(m.Member_Name)} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${expenseForm.splitterIds?.includes(m.Member_Name) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>{m.Member_Name}</button>)}{tripMembers.length === 0 && <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>}</div></div>
+              <div><label className="mb-2 block text-sm font-semibold text-slate-700">分帳成員 {!editExpense && <span className="ml-1 text-xs font-normal text-slate-400">預設：你本人</span>}</label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => toggleSplitter(m.Member_Name)} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${expenseForm.splitterIds?.includes(m.Member_Name) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>{m.Member_Name}</button>)}{tripMembers.length === 0 && <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>}</div></div>
             </div>
           </details>
 

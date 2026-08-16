@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+/*
+ * Design system: "旅途作戰桌" — daily plans are touch-first horizontal lanes;
+ * each card is one stop, while creation stays as a single clear action.
+ */
 import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Calendar, MoreHorizontal } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+  SortableContext, horizontalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { api, Trip, ItineraryItem, Accommodation, DayAccommodation, Expense, ItineraryAlternative } from '../../api/supabaseApi';
@@ -134,7 +138,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
 
   return (
     <div ref={setNodeRef} style={style}
-      className={`flex items-start gap-2 p-3 bg-white rounded-lg border transition-colors group ${
+      className={`flex w-[min(78vw,19rem)] flex-none snap-start items-start gap-2 rounded-xl border bg-white p-3 transition-colors group ${
         isSelected ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-200'
       }`}>
       {selectMode ? (
@@ -143,7 +147,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
           {isSelected ? <CheckSquare size={16} /> : <Square size={16} className="text-slate-300" />}
         </button>
       ) : (
-        <button {...attributes} {...listeners} className="drag-handle p-1 text-slate-300 hover:text-slate-500 flex-shrink-0 mt-0.5 cursor-grab active:cursor-grabbing">
+        <button {...attributes} {...listeners} className="drag-handle mt-0.5 flex-shrink-0 cursor-grab touch-none p-1 text-slate-300 hover:text-slate-500 active:cursor-grabbing">
           <GripVertical size={16} />
         </button>
       )}
@@ -846,6 +850,7 @@ export default function ItineraryTab({ trip }: Props) {
                           ) : null;
                         })()}
                         <span className="text-xs text-slate-400">{dayItems.length} 項活動</span>
+                        {dayItems.length > 1 && <span className="text-[11px] text-blue-500 sm:hidden">↔ 滑動</span>}
                       </div>
                     </div>
 
@@ -883,8 +888,8 @@ export default function ItineraryTab({ trip }: Props) {
                         ) : (
                           <DndContext sensors={sensors} collisionDetection={closestCenter}
                             onDragEnd={e => handleDragEnd(e, dayItems)}>
-                            <SortableContext items={dayItems.map(i => i.Itinerary_ID)} strategy={verticalListSortingStrategy}>
-                              <div className="space-y-0">
+                            <SortableContext items={dayItems.map(i => i.Itinerary_ID)} strategy={horizontalListSortingStrategy}>
+                              <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 scrollbar-hide touch-pan-x">
                                 {dayItems.map((item, idx) => (
                                   <React.Fragment key={item.Itinerary_ID}>
                                     <div className="mb-1.5">
@@ -905,12 +910,14 @@ export default function ItineraryTab({ trip }: Props) {
                                       !isNaN(parseFloat(String(item.Lng || ''))) &&
                                       !isNaN(parseFloat(String(dayItems[idx + 1].Lat || ''))) &&
                                       !isNaN(parseFloat(String(dayItems[idx + 1].Lng || ''))) && (
-                                      <TransportCard
-                                        key={`transport-${item.Itinerary_ID}-${dayItems[idx + 1].Itinerary_ID}`}
-                                        from={item}
-                                        to={dayItems[idx + 1]}
-                                        dayColor={getDayColor(day)}
-                                      />
+                                      <div className="w-48 flex-none self-center snap-start">
+                                        <TransportCard
+                                          key={`transport-${item.Itinerary_ID}-${dayItems[idx + 1].Itinerary_ID}`}
+                                          from={item}
+                                          to={dayItems[idx + 1]}
+                                          dayColor={getDayColor(day)}
+                                        />
+                                      </div>
                                     )}
                                   </React.Fragment>
                                 ))}
