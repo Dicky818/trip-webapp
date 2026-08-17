@@ -96,8 +96,8 @@
 - [x] Rebuild the home and overview entry experience around a journey-pass card and five numbered trip-tool cards.
 - [x] Refine navigation and high-frequency workspace action hierarchy to match the approved portal system.
 - [x] Validate the approved portal redesign on desktop and iPhone-sized layouts before publication.
-- [ ] Analyze the specified Tabitime Check-in site and draft an approval-only adaptation proposal before changing the Trip-WebApp interface.
-- [ ] Finalize the approved six-card Trip Portal structure and map it to existing routes without changing travel data models.
-- [ ] Implement the approved Trip Pass, six numbered portal tools, Travel Support panel, and editorial visual system.
-- [ ] Apply the approved portal hierarchy to overview, itinerary, expenses, stay and flight, and journey-assistant entry points.
-- [ ] Validate the Tabitime-inspired Trip Portal redesign on desktop and iPhone-sized layouts before publication.
+- [x] Analyze the specified Tabitime Check-in site and draft an approval-only adaptation proposal before changing the Trip-WebApp interface.
+- [x] Finalize the approved six-card Trip Portal structure and map it to existing routes without changing travel data models.
+- [x] Implement the approved Trip Pass, six numbered portal tools, Travel Support panel, and editorial visual system.
+- [x] Apply the approved portal hierarchy to overview, itinerary, expenses, stay and flight, and journey-assistant entry points.
+- [x] Validate the Tabitime-inspired Trip Portal redesign on desktop and iPhone-sized layouts before publication.
