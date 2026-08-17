@@ -92,7 +92,7 @@
 - [x] Default a new expense’s split participant to the signed-in user while preserving the ability to add or remove collaborators.
 - [x] Correct the horizontal-scrolling hierarchy so days and expense dates move horizontally while each card’s contents remain vertical.
 - [x] Draft an approval-only detailed design specification translating the editorial guest-portal reference into the Trip-WebApp travel workspace.
-- [ ] Apply the approved editorial travel-portal visual system, including Journey Yellow primary actions and the Ink Black journey-pass card.
-- [ ] Rebuild the home and overview entry experience around a journey-pass card and five numbered trip-tool cards.
-- [ ] Refine navigation and high-frequency workspace action hierarchy to match the approved portal system.
-- [ ] Validate the approved portal redesign on desktop and iPhone-sized layouts before publication.
+- [x] Apply the approved editorial travel-portal visual system, including Journey Yellow primary actions and the Ink Black journey-pass card.
+- [x] Rebuild the home and overview entry experience around a journey-pass card and five numbered trip-tool cards.
+- [x] Refine navigation and high-frequency workspace action hierarchy to match the approved portal system.
+- [x] Validate the approved portal redesign on desktop and iPhone-sized layouts before publication.
