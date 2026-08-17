@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 /*
- * Design system: "編輯式旅程入口" — a compact Ink Black journey pass explains
- * status and one next step before Paper White facts and reference details.
+ * Design system: "Tabitime-inspired Trip Portal" — a compact Trip Pass
+ * gives one next action before calm, editorial reference sections.
  */
 import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
@@ -142,7 +142,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
       {/* ── 行程成員（第一個區塊） ── */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <Users size={18} className="text-blue-600" />
+          <Users size={18} className="text-[#9a7100]" />
           <h3 className="font-bold text-slate-950">一起出發的人</h3>
           <span className="text-xs text-slate-400">({allMembers.length})</span>
         </div>
@@ -154,12 +154,12 @@ export default function InfoTab({ trip, onNavigate }: Props) {
               <div key={member.Trip_Member_ID}
                 className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0
-                  ${member.Is_Owner ? 'bg-blue-500' : member.Member_ID === '' ? 'bg-emerald-400' : 'bg-slate-400'}`}>
+                  ${member.Is_Owner ? 'bg-[#111111]' : member.Member_ID === '' ? 'bg-[#9a7100]' : 'bg-slate-400'}`}>
                   {(member.Member_Name || '?').charAt(0).toUpperCase()}
                 </div>
                 <span className="text-sm font-medium text-slate-700">{member.Member_Name}</span>
                 {member.Is_Owner && (
-                  <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">擁有者</span>
+                  <span className="rounded-full bg-[#fff3c4] px-1.5 py-0.5 text-xs text-[#8a6500]">擁有者</span>
                 )}
               </div>
             ))}
@@ -171,7 +171,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Plane size={18} className="text-blue-600" />
+            <Plane size={18} className="text-[#9a7100]" />
             <h3 className="font-semibold text-slate-900">航班資訊</h3>
             <span className="text-xs text-slate-400">({flightExpenses.length})</span>
           </div>
@@ -189,13 +189,13 @@ export default function InfoTab({ trip, onNavigate }: Props) {
                 : exp.Flight_Status === 'pending' ? '待確認'
                 : exp.Flight_Status === 'cancelled' ? '已取消' : '';
               return (
-                <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
+                <div key={exp.Expense_ID} className="rounded-xl border border-[#ece7da] bg-[#f5f2e8] p-4 transition-colors hover:border-[#ffc91a]">
                   {/* Header row: Airline + Flight No + Status */}
                   <div className="flex items-center gap-2 flex-wrap mb-3">
                     {exp.Airline && (
                       <span className="text-sm font-semibold text-slate-700">{exp.Airline}</span>
                     )}
-                    <span className="font-bold text-blue-700 text-base tracking-wide">
+                      <span className="text-base font-bold tracking-wide text-[#8a6500]">
                       {exp.Flight_No || '—'}
                     </span>
                     {statusLabel && <Badge color={statusColor}>{statusLabel}</Badge>}
@@ -273,7 +273,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Hotel size={18} className="text-blue-600" />
+            <Hotel size={18} className="text-[#9a7100]" />
             <h3 className="font-semibold text-slate-900">住宿資訊</h3>
             <span className="text-xs text-slate-400">({accommodationExpenses.length})</span>
           </div>
@@ -285,7 +285,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
         ) : (
           <div className="space-y-2">
             {accommodationExpenses.map(exp => (
-              <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
+              <div key={exp.Expense_ID} className="rounded-xl border border-[#ece7da] bg-[#f5f2e8] p-4 transition-colors hover:border-[#ffc91a]">
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-900 mb-1">
                     {exp.Accommodation_Name || exp.Sub_Category || exp.Note || '（未填住宿名稱）'}
@@ -323,7 +323,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Ticket size={18} className="text-blue-600" />
+            <Ticket size={18} className="text-[#9a7100]" />
             <h3 className="font-semibold text-slate-900">預訂資訊</h3>
             <span className="text-xs text-slate-400">({bookingExpenses.length})</span>
           </div>
@@ -335,7 +335,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
         ) : (
           <div className="space-y-2">
             {bookingExpenses.map(exp => (
-              <div key={exp.Expense_ID} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
+              <div key={exp.Expense_ID} className="rounded-xl border border-[#ece7da] bg-[#f5f2e8] p-4 transition-colors hover:border-[#ffc91a]">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-slate-900">

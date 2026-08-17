@@ -1,4 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+/*
+ * Design system: "Tabitime-inspired Trip Portal" — AI guidance is the
+ * Journey Yellow support service, not an unrelated purple product surface.
+ */
 import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { api, Trip } from '../../api/supabaseApi';
@@ -64,14 +68,14 @@ export default function AITab({ trip }: Props) {
     <div className="p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Sparkles size={18} className="text-purple-600" />
-          <h3 className="font-semibold text-slate-900">AI 旅遊注意事項</h3>
+          <Sparkles size={18} className="text-[#9a7100]" />
+          <div><p className="portal-eyebrow text-[#9a7100]">07 / TRAVEL SUPPORT</p><h3 className="mt-0.5 font-extrabold text-[#111111]">旅程助手</h3></div>
         </div>
         <Button
           onClick={handleGenerate}
           loading={loading}
           variant={generated ? 'outline' : 'primary'}
-          className={!generated ? 'bg-purple-600 hover:bg-purple-700 border-0' : ''}
+          className={!generated ? 'bg-[#ffc91a] text-[#111111] hover:bg-[#f1b900] border-0' : ''}
         >
           {loading ? '生成中...' : generated ? <><RefreshCw size={14} /> 重新生成</> : <><Sparkles size={14} /> 生成注意事項</>}
         </Button>
@@ -79,18 +83,18 @@ export default function AITab({ trip }: Props) {
 
       {/* 說明卡片 */}
       {!generated && !loading && (
-        <Card className="p-5 mb-4 border-purple-100 bg-purple-50">
+        <Card className="mb-4 border-[#f3cf59] bg-[#fff3c4] p-5">
           <div className="flex gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Sparkles size={20} className="text-purple-600" />
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#111111]">
+              <Sparkles size={20} className="text-[#ffc91a]" />
             </div>
             <div>
-              <h4 className="font-semibold text-purple-900 mb-1">AI 智能旅遊助手</h4>
-              <p className="text-sm text-purple-700 leading-relaxed">
+              <h4 className="mb-1 font-extrabold text-[#111111]">AI 智能旅遊助手</h4>
+              <p className="text-sm leading-relaxed text-[#4d3900]">
                 系統將根據您的行程資訊（目的地、日期、航班、住宿、每日行程等），
                 使用 Google Gemini AI 自動生成個人化的旅遊注意事項，包括：
               </p>
-              <ul className="text-sm text-purple-700 mt-2 space-y-1 list-disc list-inside">
+              <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[#4d3900]">
                 <li>目的地入境要求（簽證、護照有效期）</li>
                 <li>當地天氣與穿著建議</li>
                 <li>交通與住宿注意事項</li>
@@ -107,9 +111,9 @@ export default function AITab({ trip }: Props) {
       {loading && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <div className="relative">
-            <div className="w-16 h-16 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin" />
+            <div className="h-16 w-16 animate-spin rounded-full border-4 border-[#fff3c4] border-t-[#111111]" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Sparkles size={20} className="text-purple-600" />
+              <Sparkles size={20} className="text-[#9a7100]" />
             </div>
           </div>
           <div className="text-center">
@@ -141,7 +145,7 @@ export default function AITab({ trip }: Props) {
           {model && (
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs text-slate-400">由</span>
-              <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">{model}</span>
+              <span className="rounded-full bg-[#fff3c4] px-2 py-0.5 text-xs font-medium text-[#8a6500]">{model}</span>
               <span className="text-xs text-slate-400">生成</span>
             </div>
           )}

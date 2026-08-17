@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 /*
- * Design system: "編輯式旅程入口" — an Ink Black journey pass establishes
- * trip identity before five numbered tool cards reveal the next useful task.
+ * Design system: "Tabitime-inspired Trip Portal" — an Ink Black Trip Pass,
+ * six numbered tool cards, and one Journey Yellow support surface reveal the
+ * next useful task without changing underlying trip workflows.
  */
-import { Plus, Plane, Calendar, Trash2, MapPin, Share2, Users, Link2, Copy, Check, LogIn, ArrowRight, Compass, CirclePlus } from 'lucide-react';
+import { Plus, Plane, Calendar, Trash2, MapPin, Share2, Users, Link2, Copy, Check, LogIn, ArrowRight, CirclePlus, MessageCircle, Wifi, WifiOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api, Trip } from '../api/supabaseApi';
 import { Button, Card, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner } from '../components/ui';
@@ -37,10 +38,21 @@ export default function HomePage() {
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [portalSummary, setPortalSummary] = useState({ members: 0, totalExpense: 0, nextStop: '' });
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
 
   useEffect(() => {
     fetchTrips();
   }, [fetchTrips]);
+
+  useEffect(() => {
+    const updateConnection = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateConnection);
+    window.addEventListener('offline', updateConnection);
+    return () => {
+      window.removeEventListener('online', updateConnection);
+      window.removeEventListener('offline', updateConnection);
+    };
+  }, []);
 
   const handleCreate = async () => {
     if (!form.Trip_Name.trim()) { setFormError('請輸入行程名稱'); return; }
@@ -187,11 +199,12 @@ export default function HomePage() {
   }, [liveTrip?.Trip_ID]);
 
   const portalTools = [
-    { number: '01', eyebrow: 'PLAN', emoji: '🗺️', title: '每日行程', description: '下一站、地圖與交通安排', tab: 'itinerary', featured: true },
-    { number: '02', eyebrow: 'SPEND', emoji: '💳', title: '記錄支出', description: '拍照收據、付款與分帳', tab: 'expenses', featured: false },
-    { number: '03', eyebrow: 'PACK', emoji: '🎒', title: '打包清單', description: '出發前的必要準備', tab: 'packing', featured: false },
-    { number: '04', eyebrow: 'STAY & FLIGHT', emoji: '✈️', title: '航班與住宿', description: '確認預訂與入住資料', tab: 'info', featured: false },
-    { number: '05', eyebrow: 'ASSIST', emoji: '✨', title: '旅程助手', description: '根據目前行程整理提醒', tab: 'ai', featured: false },
+    { number: '01', eyebrow: 'NOW', emoji: '📍', title: '今日路線', description: '下一站、時間與交通', tab: 'itinerary', featured: true },
+    { number: '02', eyebrow: 'PLAN', emoji: '🗺️', title: '規劃路線', description: '每一天的站點與備案', tab: 'itinerary', featured: false },
+    { number: '03', eyebrow: 'SPEND', emoji: '💳', title: '記錄支出', description: '收據、付款與分帳', tab: 'expenses', featured: false },
+    { number: '04', eyebrow: 'STAY', emoji: '✈️', title: '航班與住宿', description: '入住、航班與確認資料', tab: 'info', featured: false },
+    { number: '05', eyebrow: 'PACK', emoji: '🎒', title: '打包清單', description: '出發前的必要準備', tab: 'packing', featured: false },
+    { number: '06', eyebrow: 'GUIDE', emoji: '✨', title: '旅程助手', description: '依目前資料整理提醒', tab: 'ai', featured: false },
   ];
 
   return (
@@ -230,12 +243,12 @@ export default function HomePage() {
 
       {liveTrip && (
         <section className="route-enter-delay">
-          <div className="mb-4 flex items-end justify-between gap-4 px-1"><div><p className="portal-eyebrow text-[#9b907c]">SECTION / YOUR TRIP TOOLS</p><h2 className="mt-1 text-xl font-extrabold text-[#171717]">下一步，從這裡開始</h2></div><span className="text-2xl font-extrabold text-[#b7aa91]">05</span></div>
+          <div className="mb-4 flex items-end justify-between gap-4 px-1"><div><p className="portal-eyebrow text-[#9b907c]">SECTION / YOUR TRIP TOOLS</p><h2 className="mt-1 text-xl font-extrabold text-[#171717]">下一步，從這裡開始</h2></div><span className="text-2xl font-extrabold text-[#b7aa91]">06</span></div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
             {portalTools.map(tool => (
-              <button key={tool.number} onClick={() => navigate(`/trip/${liveTrip.Trip_ID}?tab=${tool.tab}`)} className={`min-h-40 rounded-[1.35rem] p-5 text-left transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 ${tool.featured ? 'bg-[#111111] text-white shadow-[0_14px_30px_rgba(17,17,17,0.16)] hover:-translate-y-0.5' : 'border border-[#e3ddcf] bg-white text-[#171717] shadow-[0_12px_28px_rgba(17,17,17,0.06)] hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(17,17,17,0.10)]'}`}>
+              <button key={tool.number} onClick={() => navigate(`/trip/${liveTrip.Trip_ID}?tab=${tool.tab}`)} className={`min-h-36 rounded-[1.35rem] p-5 text-left transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 ${tool.featured ? 'bg-[#111111] text-white shadow-[0_14px_30px_rgba(17,17,17,0.16)] hover:-translate-y-0.5' : 'border border-[#e3ddcf] bg-white text-[#171717] shadow-[0_12px_28px_rgba(17,17,17,0.06)] hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(17,17,17,0.10)]'}`}>
                 <p className={`portal-eyebrow ${tool.featured ? 'text-[#ffc91a]' : 'text-[#9b907c]'}`}>{tool.number} / {tool.eyebrow}</p>
-                <p className="mt-5 text-lg font-extrabold leading-tight">{tool.emoji} {tool.title}</p>
+                <p className="mt-4 text-lg font-extrabold leading-tight">{tool.emoji} {tool.title}</p>
                 <p className={`mt-2 text-xs leading-5 ${tool.featured ? 'text-white/65' : 'text-slate-500'}`}>{tool.description}</p>
               </button>
             ))}
@@ -247,12 +260,29 @@ export default function HomePage() {
         </section>
       )}
 
+      {liveTrip && (
+        <section className="relative overflow-hidden rounded-[1.75rem] bg-[#ffc91a] px-6 py-7 text-[#111111] shadow-[0_14px_30px_rgba(156,116,0,0.14)] sm:px-8">
+          <div className="absolute -bottom-16 -right-10 h-44 w-44 rounded-full border-[18px] border-white/20" />
+          <div className="relative">
+            <div className="flex items-start justify-between gap-4">
+              <div><p className="portal-eyebrow text-[#735700]">07 / TRAVEL SUPPORT</p><h2 className="mt-3 text-2xl font-extrabold tracking-tight">需要旅程支援？</h2></div>
+              <span className="rounded-full bg-[#111111] px-3 py-1 text-xs font-bold text-[#ffc91a]">24h</span>
+            </div>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[#4d3900]">{isOnline ? '旅程助手可根據你的行程整理提醒；離線支出會在恢復連線後自動同步。' : '你目前離線；新增的支出會安全保存在此裝置，恢復連線後自動同步。'}</p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button onClick={() => navigate(`/trip/${liveTrip.Trip_ID}?tab=ai`)} className="bg-[#111111] text-white hover:bg-[#292929] focus:ring-[#111111]"><MessageCircle size={16} /> 開啟旅程助手 <ArrowRight size={15} /></Button>
+              <span className="inline-flex items-center gap-2 text-xs font-bold text-[#735700]">{isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}{isOnline ? '已連線 · 可即時同步' : '離線儲存已開啟'}</span>
+            </div>
+          </div>
+        </section>
+      )}
+
       {tripsLoading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" /></div>
       ) : activeTrips.length === 0 ? (
-        <section className="bg-white border border-slate-200 rounded-[1.5rem] p-6 sm:p-8 route-enter-delay">
-          <p className="text-xs font-bold text-blue-600 tracking-[0.14em] uppercase">First trip</p>
-          <h2 className="mt-2 text-xl font-bold text-slate-950">從一個目的地和日期開始就夠了。</h2>
+        <section className="rounded-[1.5rem] border border-[#e3ddcf] bg-white p-6 shadow-[0_12px_28px_rgba(17,17,17,0.06)] sm:p-8 route-enter-delay">
+          <p className="portal-eyebrow text-[#9a7100]">01 / FIRST TRIP</p>
+          <h2 className="mt-2 text-xl font-extrabold text-[#111111]">從一個目的地和日期開始就夠了。</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">建立後，你可以再補航班、住宿、每日安排和支出；也可以隨時邀請旅伴一起完成。</p>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {[
@@ -260,8 +290,8 @@ export default function HomePage() {
               ['02', '安排下一站', '先新增最重要的一天或一筆預訂'],
               ['03', '邀請旅伴', '產生分享碼後一起更新'],
             ].map(([index, title, description]) => (
-              <div key={index} className="rounded-xl bg-slate-50 p-4 border border-slate-100">
-                <span className="text-xs font-bold text-blue-600">{index}</span>
+              <div key={index} className="rounded-xl border border-[#ece7da] bg-[#f5f2e8] p-4">
+                <span className="portal-eyebrow text-[#9a7100]">{index}</span>
                 <p className="mt-2 font-semibold text-slate-900">{title}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
               </div>

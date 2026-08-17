@@ -105,3 +105,7 @@
 - **Canvas Ivory 材質（已確認）：** 全域底色改為 `#F5F2E8`，Paper White 卡片配合柔和深灰陰影；Ink Black `#111111` 用於通行證、最優先卡片與已選取狀態。
 - **卡片與導航（已確認）：** 首頁工具卡固定五張，維持 `PLAN → SPEND → PACK → STAY & FLIGHT → ASSIST` 的優先序；手機底部五項主導航保留，但只做常駐捷徑，不與首頁入口卡競爭。
 - **編輯式標籤（已確認）：** Noto Sans TC + DM Sans 維持不變；只在 `01 / PLAN`、`TRIP / IN PROGRESS`、日期與狀態等短標使用字距較大的 DM Sans，不新增字型負擔。
+- **Tabitime Trip Portal 節奏（已確認）：** 首頁結構採用 `Trip Pass → 六張編號工具卡 → Travel Support → 行程列表`。通行證先回答目的地、日期、旅行日、下一站、旅伴與總支出；工具卡再引導到具體工作。
+- **六張工具卡（已確認）：** 固定使用 `01 / NOW`、`02 / PLAN`、`03 / SPEND`、`04 / STAY`、`05 / PACK`、`06 / GUIDE`。`NOW` 使用 Ink Black 強調；其餘卡使用 Paper White，不在首頁疊加舊的五卡系統。
+- **Travel Support（已確認）：** 以全寬 Journey Yellow 卡片呈現旅程助手、連線／離線同步狀態與重要提醒；不加入推銷、折扣、QR 推薦或商業廣告內容。
+- **版面密度（已確認）：** Home 採中心化、易閱讀的 portal 欄寬；行程與地圖等高密度工作區保留較寬畫布。手機底部五項導覽維持，作為常駐捷徑而非與工具卡競爭的第二首頁。
