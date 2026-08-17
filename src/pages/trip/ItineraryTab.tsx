@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 /*
- * Design system: "旅途作戰桌" — daily plans are touch-first horizontal lanes;
- * each card is one stop, while creation stays as a single clear action.
+ * Design system: "Tabitime-inspired Trip Portal" — daily plans stay touch-first,
+ * but selected controls use Ink Black and Journey Yellow rather than blue-on-white.
  */
 import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Calendar, MoreHorizontal } from 'lucide-react';
 import {
@@ -669,17 +669,17 @@ export default function ItineraryTab({ trip }: Props) {
   return (
     <div>
       {/* Sub-tab toggle */}
-      <div className="flex gap-1 mx-5 mt-5 mb-4 bg-slate-100 rounded-xl p-1">
+      <div className="mx-5 mt-5 mb-4 flex gap-1 rounded-xl border border-[#e3ddcf] bg-[#f5f2e8] p-1">
         <button onClick={() => setActiveSubTab('list')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${activeSubTab === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${activeSubTab === 'list' ? 'bg-[#111111] text-[#ffc91a] shadow-sm' : 'text-slate-500 hover:bg-white hover:text-[#111111]'}`}>
           <List size={14} /> 每日行程
         </button>
         <button onClick={() => setActiveSubTab('map')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${activeSubTab === 'map' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${activeSubTab === 'map' ? 'bg-[#111111] text-[#ffc91a] shadow-sm' : 'text-slate-500 hover:bg-white hover:text-[#111111]'}`}>
           <MapPin size={14} /> 地圖
         </button>
         <button onClick={() => setActiveSubTab('timetable')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${activeSubTab === 'timetable' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${activeSubTab === 'timetable' ? 'bg-[#111111] text-[#ffc91a] shadow-sm' : 'text-slate-500 hover:bg-white hover:text-[#111111]'}`}>
           <Calendar size={14} /> 時間表
         </button>
       </div>
@@ -789,7 +789,7 @@ export default function ItineraryTab({ trip }: Props) {
             <EmptyState title="無法計算行程天數" description="請確認行程的出發和結束日期已正確設定" />
           ) : (
             <div>
-              {tripDays.length > 1 && <p className="mb-2 px-1 text-[11px] font-medium text-blue-500 sm:hidden">← 左右滑動切換日期 →</p>}
+              {tripDays.length > 1 && <p className="mb-2 px-1 text-[11px] font-medium text-[#9a7100] sm:hidden">← 左右滑動切換日期 →</p>}
               <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-5 pb-2 scrollbar-hide touch-pan-x">
               {tripDays.map(({ day, date }) => {
                 const dayItems = items
@@ -823,7 +823,7 @@ export default function ItineraryTab({ trip }: Props) {
                         <div>
                           <span className="font-semibold text-slate-800">第 {day} 天</span>
                           <span className="text-xs text-slate-500 ml-2">{date}</span>
-                          <span className="text-xs text-blue-500 ml-1">({getDayOfWeek(date)})</span>
+                          <span className="ml-1 text-xs text-slate-500">({getDayOfWeek(date)})</span>
                         </div>
                         {weatherInfo && (
                           <span className={`flex items-center gap-1 text-xs font-medium ${weatherInfo.color} bg-white border border-slate-200 px-2 py-0.5 rounded-full`}>
