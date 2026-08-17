@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -11,6 +12,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function InstallPrompt() {
+  const location = useLocation();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -50,7 +52,7 @@ export function InstallPrompt() {
     sessionStorage.setItem('pwa-install-dismissed', 'true');
   };
 
-  if (!showPrompt || dismissed || !deferredPrompt) return null;
+  if (!showPrompt || dismissed || !deferredPrompt || location.pathname.startsWith('/trip/')) return null;
 
   return (
     <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 md:left-auto md:right-4 md:w-96
