@@ -1,6 +1,6 @@
 /**
- * Design system: "旅途作戰桌" — mobile install guidance stays compact,
- * contextual, and above the thumb navigation rather than obscuring trip data.
+ * Design system: "編輯式旅程入口" — mobile install guidance is a compact
+ * Paper White utility card with one Journey Yellow action above thumb navigation.
  */
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
@@ -54,7 +54,7 @@ export function InstallPrompt() {
 
   return (
     <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 md:left-auto md:right-4 md:w-96
-      bg-white rounded-2xl shadow-xl border border-blue-100 p-3
+      rounded-2xl border border-[#e3ddcf] bg-white p-3 shadow-xl
       animate-in slide-in-from-bottom-4 duration-300">
       <button
         onClick={handleDismiss}
@@ -65,8 +65,8 @@ export function InstallPrompt() {
         <X size={15} />
       </button>
       <div className="flex items-center gap-2.5 pr-6">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50">
-          <Download size={18} className="text-blue-600" />
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#fff3c4]">
+          <Download size={18} className="text-[#9a7100]" />
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold text-slate-900">離線也能使用</h3>
@@ -74,7 +74,7 @@ export function InstallPrompt() {
         </div>
         <button
           onClick={handleInstall}
-          className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98]"
+          className="rounded-xl bg-[#ffc91a] px-3 py-2 text-xs font-bold text-[#111111] shadow-sm transition-all hover:bg-[#f1b900] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2"
         >
           安裝
         </button>

@@ -941,7 +941,7 @@ export default function ExpensesTab({ trip }: Props) {
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-slate-500">我們會先建議日期、幣別、總額和分類；你確認後才會儲存。圖片只作即時辨識。</p>
                 </div>
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 active:scale-[0.98]">
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#ffc91a] px-4 py-2.5 text-sm font-bold text-[#111111] shadow-sm transition-colors hover:bg-[#f1b900] active:scale-[0.98] focus-within:ring-2 focus-within:ring-[#2563eb] focus-within:ring-offset-2">
                   {analyzingReceipt ? <Spinner /> : <Camera size={16} />}
                   {analyzingReceipt ? '辨識中…' : '拍攝／上傳'}
                   <input
@@ -974,7 +974,7 @@ export default function ExpensesTab({ trip }: Props) {
             </div>
           )}
           <section>
-            <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span><div><p className="text-sm font-bold text-slate-950">這筆是什麼？</p><p className="text-xs text-slate-500">日期、分類和簡短說明即可開始。</p></div></div>
+            <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#ffc91a] text-xs font-bold text-[#111111]">1</span><div><p className="text-sm font-bold text-slate-950">這筆是什麼？</p><p className="text-xs text-slate-500">日期、分類和簡短說明即可開始。</p></div></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="日期" type="date" required value={expenseForm.Date || ''} onChange={e => setExpenseForm(f => ({ ...f, Date: e.target.value }))} />
               <Select label="主分類" value={expenseForm.Main_Category || ''} onChange={e => setExpenseForm(f => ({ ...f, Main_Category: e.target.value, Sub_Category: '' }))} options={[{ value: '', label: '（選擇主分類）' }, ...mainCategories.map(c => ({ value: c, label: c }))]} />
@@ -983,8 +983,8 @@ export default function ExpensesTab({ trip }: Props) {
             </div>
           </section>
 
-          <section className="border-t border-slate-100 pt-5">
-            <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span><div><p className="text-sm font-bold text-slate-950">金額由誰先付？</p><p className="text-xs text-slate-500">選擇金額、貨幣和付款人。</p></div></div>
+          <section className="border-t border-[#ece7da] pt-5">
+            <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#ffc91a] text-xs font-bold text-[#111111]">2</span><div><p className="text-sm font-bold text-slate-950">金額由誰先付？</p><p className="text-xs text-slate-500">選擇金額、貨幣和付款人。</p></div></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select label="貨幣" value={expenseForm.Currency || trip.Base_Currency} onChange={e => setExpenseForm(f => ({ ...f, Currency: e.target.value }))} options={CURRENCIES.map(c => ({ value: c, label: c }))} />
               <Input label="金額" type="number" required placeholder="0.00" step="0.01" min="0" value={String(expenseForm.Original_Amount || '')} onChange={e => setExpenseForm(f => ({ ...f, Original_Amount: e.target.value }))} />
@@ -997,7 +997,7 @@ export default function ExpensesTab({ trip }: Props) {
             <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-700 flex items-center justify-between">需要分帳、調整匯率或標記預訂嗎？<span className="text-slate-400 transition-transform group-open:rotate-45">+</span></summary>
             <div className="border-t border-slate-200 p-4 space-y-4">
               <div className="flex gap-2 items-end"><Input label={`匯率 (→ ${trip.Base_Currency})`} type="text" inputMode="decimal" value={String(expenseForm.Exchange_Rate ?? '1')} onChange={e => setExpenseForm(f => ({ ...f, Exchange_Rate: e.target.value }))} className="flex-1" /><Button size="sm" variant="outline" onClick={fetchExchangeRate} loading={exchangeRateLoading} className="mb-0.5"><RefreshCw size={13} /> 更新</Button></div>
-              <div><label className="mb-2 block text-sm font-semibold text-slate-700">分帳成員 {!editExpense && <span className="ml-1 text-xs font-normal text-slate-400">預設：你本人</span>}</label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => toggleSplitter(m.Member_Name)} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${expenseForm.splitterIds?.includes(m.Member_Name) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>{m.Member_Name}</button>)}{tripMembers.length === 0 && <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>}</div></div>
+              <div><label className="mb-2 block text-sm font-semibold text-slate-700">分帳成員 {!editExpense && <span className="ml-1 text-xs font-normal text-slate-400">預設：你本人</span>}</label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => toggleSplitter(m.Member_Name)} className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${expenseForm.splitterIds?.includes(m.Member_Name) ? 'border-[#111111] bg-[#111111] text-[#ffc91a]' : 'border-[#c9c1af] bg-white text-slate-600 hover:border-[#111111]'}`}>{m.Member_Name}</button>)}{tripMembers.length === 0 && <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>}</div></div>
             </div>
           </details>
 
@@ -1083,7 +1083,7 @@ export default function ExpensesTab({ trip }: Props) {
             <label className="flex items-center gap-3 cursor-pointer select-none">
               <div
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  expenseForm.Is_Booking ? 'bg-blue-600' : 'bg-slate-200'
+                  expenseForm.Is_Booking ? 'bg-[#111111]' : 'bg-slate-200'
                 }`}
                 onClick={() => setExpenseForm(f => ({ ...f, Is_Booking: !f.Is_Booking }))}
               >

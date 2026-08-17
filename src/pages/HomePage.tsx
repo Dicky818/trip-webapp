@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 /*
- * Design system: "旅途作戰桌" — home is an action-oriented launchpad.
- * Prioritize an active trip and one clear next step over a flat card gallery.
+ * Design system: "編輯式旅程入口" — an Ink Black journey pass establishes
+ * trip identity before five numbered tool cards reveal the next useful task.
  */
 import { Plus, Plane, Calendar, Trash2, MapPin, Share2, Users, Link2, Copy, Check, LogIn, ArrowRight, Compass, CirclePlus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -36,6 +36,7 @@ export default function HomePage() {
   const [joinPassword, setJoinPassword] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [portalSummary, setPortalSummary] = useState({ members: 0, totalExpense: 0, nextStop: '' });
 
   useEffect(() => {
     fetchTrips();
@@ -158,53 +159,93 @@ export default function HomePage() {
   const sharedTrips = activeTrips.filter(t => t.Is_Owner === false);
   const liveTrip = activeTrips.find(t => getTripStatus(t.Start_Date, t.End_Date).label === '旅行中') || ownedTrips[0] || sharedTrips[0];
 
-  return (
-    <div className="space-y-7 sm:space-y-9 route-enter">
-      <section className="relative overflow-hidden rounded-[1.75rem] bg-slate-950 text-white px-6 py-7 sm:px-9 sm:py-9 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
-        <div className="absolute inset-0 route-grid opacity-40" />
-        <div className="absolute -right-12 -top-20 h-56 w-56 rounded-full bg-blue-500/25 blur-3xl" />
-        <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.16em] text-blue-200 uppercase">
-              <Compass size={15} /> Trip desk / {activeTrips.length} trips
-            </div>
-            <h1 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">
-              {liveTrip ? '你的旅程，都有下一步。' : '先建立一趟想出發的旅程。'}
-            </h1>
-            <p className="mt-3 max-w-xl text-sm sm:text-base leading-7 text-slate-300">
-              {liveTrip
-                ? `從「${liveTrip.Trip_Name}」繼續：規劃路線、記錄支出，或把最新進度分享給旅伴。`
-                : '建立自己的行程，或使用旅伴提供的分享碼加入協作；需要的資訊會一步一步出現。'}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setShowJoin(true)} className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white">
-              <LogIn size={16} /> 加入旅伴行程
-            </Button>
-            <Button onClick={() => setShowCreate(true)} className="bg-blue-500 hover:bg-blue-400 focus:ring-blue-300 shadow-none">
-              <CirclePlus size={17} /> 建立新行程
-            </Button>
-          </div>
-        </div>
+  useEffect(() => {
+    let cancelled = false;
+    if (!liveTrip) {
+      setPortalSummary({ members: 0, totalExpense: 0, nextStop: '' });
+      return () => { cancelled = true; };
+    }
+    void Promise.all([
+      api.getTripMembers(liveTrip.Trip_ID),
+      api.getExpenses(liveTrip.Trip_ID),
+      api.getItinerary(liveTrip.Trip_ID),
+    ]).then(([membersResult, expensesResult, itineraryResult]) => {
+      if (cancelled) return;
+      const members = (membersResult as any).success ? ((membersResult as any).data || []) : [];
+      const expenses = (expensesResult as any).success ? ((expensesResult as any).data || []) : [];
+      const itinerary = (itineraryResult as any).success ? ((itineraryResult as any).data || []) : [];
+      const next = itinerary.find((item: any) => item.Activity_Name || item.Location_Name || item.Title);
+      setPortalSummary({
+        members: members.length,
+        totalExpense: expenses.reduce((sum: number, expense: any) => sum + (Number(expense.Base_Amount) || 0), 0),
+        nextStop: next?.Activity_Name || next?.Location_Name || next?.Title || '規劃下一站',
+      });
+    }).catch(() => {
+      if (!cancelled) setPortalSummary({ members: 0, totalExpense: 0, nextStop: '規劃下一站' });
+    });
+    return () => { cancelled = true; };
+  }, [liveTrip?.Trip_ID]);
 
-        {liveTrip && (
-          <button
-            onClick={() => navigate(`/trip/${liveTrip.Trip_ID}`)}
-            className="relative mt-7 w-full max-w-3xl text-left flex items-center gap-4 rounded-2xl border border-white/15 bg-white/10 px-4 py-3.5 hover:bg-white/15 transition-colors"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0"><Plane size={18} className="-rotate-12" /></div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] tracking-[0.14em] font-bold text-blue-200 uppercase">{getTripStatus(liveTrip.Start_Date, liveTrip.End_Date).label}</p>
-              <p className="mt-0.5 font-semibold truncate">{liveTrip.Trip_Name}</p>
+  const portalTools = [
+    { number: '01', eyebrow: 'PLAN', emoji: '🗺️', title: '每日行程', description: '下一站、地圖與交通安排', tab: 'itinerary', featured: true },
+    { number: '02', eyebrow: 'SPEND', emoji: '💳', title: '記錄支出', description: '拍照收據、付款與分帳', tab: 'expenses', featured: false },
+    { number: '03', eyebrow: 'PACK', emoji: '🎒', title: '打包清單', description: '出發前的必要準備', tab: 'packing', featured: false },
+    { number: '04', eyebrow: 'STAY & FLIGHT', emoji: '✈️', title: '航班與住宿', description: '確認預訂與入住資料', tab: 'info', featured: false },
+    { number: '05', eyebrow: 'ASSIST', emoji: '✨', title: '旅程助手', description: '根據目前行程整理提醒', tab: 'ai', featured: false },
+  ];
+
+  return (
+    <div className="space-y-8 sm:space-y-10 route-enter">
+      <section className="portal-pass relative overflow-hidden rounded-[1.75rem] px-6 py-7 text-white sm:px-9 sm:py-9">
+        <div className="absolute inset-0 route-grid opacity-40" />
+        <div className="absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#ffc91a]/15 blur-3xl" />
+        <div className="relative">
+          {liveTrip ? (
+            <>
+              <div className="flex items-start justify-between gap-4">
+                <p className="portal-eyebrow flex items-center gap-2 text-[#f5f2e8]/60"><span className="h-2 w-2 rounded-full bg-[#ffc91a]" /> TRIP / {getTripStatus(liveTrip.Start_Date, liveTrip.End_Date).label}</p>
+                <span className="rounded-full bg-[#ffc91a] px-3 py-1 text-xs font-bold text-[#111111]">{getTripStatus(liveTrip.Start_Date, liveTrip.End_Date).daysText}</span>
+              </div>
+              <h1 className="mt-6 max-w-3xl text-3xl font-extrabold tracking-tight sm:text-5xl">{liveTrip.Trip_Name}</h1>
+              <p className="mt-3 text-sm font-medium text-[#f5f2e8]/75 sm:text-base">{formatDate(liveTrip.Start_Date)} — {formatDate(liveTrip.End_Date)} <span className="mx-2 text-white/25">/</span> {liveTrip.Base_Currency}</p>
+              <div className="mt-7 grid gap-4 border-t border-white/15 pt-5 sm:grid-cols-3">
+                <div><p className="portal-eyebrow text-white/45">TODAY</p><p className="mt-1 text-base font-bold">{getTripStatus(liveTrip.Start_Date, liveTrip.End_Date).daysText}</p></div>
+                <div><p className="portal-eyebrow text-white/45">NEXT STOP</p><p className="mt-1 truncate text-base font-bold">{portalSummary.nextStop || '規劃下一站'}</p></div>
+                <div><p className="portal-eyebrow text-white/45">TRIP TEAM / SPEND</p><p className="mt-1 text-base font-bold">{portalSummary.members || '—'} 位旅伴 <span className="text-white/30">·</span> {liveTrip.Base_Currency} {portalSummary.totalExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p></div>
+              </div>
+              <Button onClick={() => navigate(`/trip/${liveTrip.Trip_ID}?tab=itinerary`)} className="mt-7 bg-[#ffc91a] text-[#111111] hover:bg-[#f1b900] focus:ring-white">
+                <MapPin size={17} /> 查看今天行程 <ArrowRight size={16} />
+              </Button>
+            </>
+          ) : (
+            <div className="max-w-2xl">
+              <p className="portal-eyebrow text-[#ffc91a]">TRIP / START HERE</p>
+              <h1 className="mt-5 text-3xl font-extrabold tracking-tight sm:text-5xl">先建立一趟想出發的旅程。</h1>
+              <p className="mt-4 text-sm leading-7 text-[#f5f2e8]/70 sm:text-base">名稱、日期與貨幣足夠開始；路線、預訂、支出與旅伴會在需要時逐步出現。</p>
+              <Button onClick={() => setShowCreate(true)} className="mt-7"><CirclePlus size={17} /> 建立新行程</Button>
             </div>
-            <div className="hidden sm:block text-right text-xs text-slate-300">
-              <p>{formatDate(liveTrip.Start_Date)} — {formatDate(liveTrip.End_Date)}</p>
-              <p className="mt-0.5 text-blue-200 font-semibold">{getTripStatus(liveTrip.Start_Date, liveTrip.End_Date).daysText}</p>
-            </div>
-            <ArrowRight size={18} className="text-blue-200 shrink-0" />
-          </button>
-        )}
+          )}
+        </div>
       </section>
+
+      {liveTrip && (
+        <section className="route-enter-delay">
+          <div className="mb-4 flex items-end justify-between gap-4 px-1"><div><p className="portal-eyebrow text-[#9b907c]">SECTION / YOUR TRIP TOOLS</p><h2 className="mt-1 text-xl font-extrabold text-[#171717]">下一步，從這裡開始</h2></div><span className="text-2xl font-extrabold text-[#b7aa91]">05</span></div>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+            {portalTools.map(tool => (
+              <button key={tool.number} onClick={() => navigate(`/trip/${liveTrip.Trip_ID}?tab=${tool.tab}`)} className={`min-h-40 rounded-[1.35rem] p-5 text-left transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2 ${tool.featured ? 'bg-[#111111] text-white shadow-[0_14px_30px_rgba(17,17,17,0.16)] hover:-translate-y-0.5' : 'border border-[#e3ddcf] bg-white text-[#171717] shadow-[0_12px_28px_rgba(17,17,17,0.06)] hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(17,17,17,0.10)]'}`}>
+                <p className={`portal-eyebrow ${tool.featured ? 'text-[#ffc91a]' : 'text-[#9b907c]'}`}>{tool.number} / {tool.eyebrow}</p>
+                <p className="mt-5 text-lg font-extrabold leading-tight">{tool.emoji} {tool.title}</p>
+                <p className={`mt-2 text-xs leading-5 ${tool.featured ? 'text-white/65' : 'text-slate-500'}`}>{tool.description}</p>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-sm font-semibold">
+            <button onClick={() => setShowJoin(true)} className="inline-flex items-center gap-2 text-slate-600 transition-colors hover:text-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2"><LogIn size={15} /> 加入旅伴行程</button>
+            <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 text-slate-600 transition-colors hover:text-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-2"><CirclePlus size={15} /> 建立另一趟行程</button>
+          </div>
+        </section>
+      )}
 
       {tripsLoading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" /></div>
@@ -433,32 +474,32 @@ function getTripStatus(start: string, end: string): { label: string; color: stri
   const diffStart = Math.ceil((startDate.getTime() - now.getTime()) / 86400000);
   const diffEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86400000);
   if (diffStart > 0) {
-    return { label: '計劃中', color: 'bg-blue-100 text-blue-700', daysText: `${diffStart} 天後出發` };
+    return { label: '計劃中', color: 'bg-[#fff3c4] text-[#8a6500]', daysText: `${diffStart} 天後出發` };
   } else if (diffEnd >= 0) {
     const dayNum = Math.abs(diffStart) + 1;
-    return { label: '旅行中', color: 'bg-emerald-100 text-emerald-700', daysText: `第 ${dayNum} 天` };
+    return { label: '旅行中', color: 'bg-[#111111] text-[#ffc91a]', daysText: `第 ${dayNum} 天` };
   } else {
-    return { label: '已結束', color: 'bg-slate-100 text-slate-500', daysText: '已完成' };
+    return { label: '已結束', color: 'bg-[#ece7da] text-slate-500', daysText: '已完成' };
   }
 }
 
 function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete, onShare }: TripCardProps) {
   const status = getTripStatus(trip.Start_Date, trip.End_Date);
   return (
-    <Card className="group overflow-hidden hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(15,23,42,0.10)] transition-all cursor-pointer border-slate-200">
+    <Card className="group cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(17,17,17,0.10)]">
       <div onClick={onNavigate} className="p-5" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onNavigate(); }}>
         <div className="flex items-start justify-between mb-3">
-          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${isOwner ? 'bg-blue-50' : 'bg-violet-50'}`}>
-            {isOwner ? <Plane size={20} className="text-blue-600 -rotate-12" /> : <Users size={20} className="text-violet-600" />}
+          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isOwner ? 'bg-[#fff3c4]' : 'bg-[#ece7da]'}`}>
+            {isOwner ? <Plane size={20} className="-rotate-12 text-[#9a7100]" /> : <Users size={20} className="text-slate-600" />}
           </div>
           <div className="flex items-center gap-1.5">
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>
               {status.label}
             </span>
             {!isOwner && (
-              <span className="text-xs font-medium bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">協作</span>
+              <span className="rounded-full bg-[#ece7da] px-2 py-0.5 text-xs font-medium text-slate-600">協作</span>
             )}
-            <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded-full">
+            <span className="rounded-full bg-[#f5f2e8] px-2 py-1 text-xs font-medium text-slate-600">
               {trip.Base_Currency}
             </span>
           </div>
@@ -473,7 +514,7 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete
             <MapPin size={13} />
             <span>{getDuration(trip.Start_Date, trip.End_Date)}</span>
           </div>
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600">繼續規劃 <ArrowRight size={14} /></span>
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-[#9a7100]">繼續規劃 <ArrowRight size={14} /></span>
         </div>
       </div>
       {isOwner && (
@@ -483,7 +524,7 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete
           {onShare && (
             <button
               onClick={(e) => { e.stopPropagation(); onShare(); }}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-[#fff3c4] hover:text-[#9a7100]"
               title="分享行程"
             >
               <Share2 size={15} />

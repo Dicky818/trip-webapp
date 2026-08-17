@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 /*
- * Design system: "旅途作戰桌" — overview answers: where are we, what is
- * prepared, and which trip facts need attention before showing detail lists.
+ * Design system: "編輯式旅程入口" — a compact Ink Black journey pass explains
+ * status and one next step before Paper White facts and reference details.
  */
 import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
@@ -120,23 +120,23 @@ export default function InfoTab({ trip, onNavigate }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <section className="relative overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white">
+      <section className="portal-pass relative overflow-hidden rounded-[1.5rem] px-5 py-6 text-white">
         <div className="absolute inset-0 route-grid opacity-40" />
-        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-500/25 blur-3xl" />
+        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#ffc91a]/15 blur-3xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-bold tracking-[0.15em] text-blue-200 uppercase">現在</p>
-            <h3 className="mt-2 text-xl font-bold">{journeyLabel}</h3>
-            <p className="mt-2 text-sm text-slate-300">{nextStep.detail}</p>
+            <p className="portal-eyebrow text-[#ffc91a]">JOURNEY / NOW</p>
+            <h3 className="mt-3 text-xl font-extrabold">{journeyLabel}</h3>
+            <p className="mt-2 text-sm text-[#f5f2e8]/70">{nextStep.detail}</p>
           </div>
-          <button type="button" onClick={() => onNavigate(nextStep.target)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-bold text-white shadow-sm transition-all duration-150 hover:bg-blue-400 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">{nextStep.label}<ArrowRight size={15} /></button>
+          <button type="button" onClick={() => onNavigate(nextStep.target)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#ffc91a] px-4 py-3 text-sm font-bold text-[#111111] shadow-sm transition-all duration-150 hover:bg-[#f1b900] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]">{nextStep.label}<ArrowRight size={15} /></button>
         </div>
       </section>
 
-      <section className="grid grid-cols-3 divide-x divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <section className="grid grid-cols-3 divide-x divide-[#ece7da] overflow-hidden rounded-2xl border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
         <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500">👥 旅伴</p></div>
         <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{bookingExpenses.length}</p><p className="text-xs text-slate-500">🎟️ 預訂</p></div>
-        <button type="button" onClick={() => onNavigate('expenses')} className="px-4 py-3 text-left transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"><p className="text-lg font-bold text-slate-950">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-blue-700">💳 總支出</p></button>
+        <button type="button" onClick={() => onNavigate('expenses')} className="px-4 py-3 text-left transition-colors hover:bg-[#fff8df] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2563eb]"><p className="text-lg font-bold text-slate-950">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-[#9a7100]">💳 總支出</p></button>
       </section>
 
       {/* ── 行程成員（第一個區塊） ── */}

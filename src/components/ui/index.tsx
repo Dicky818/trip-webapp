@@ -1,3 +1,5 @@
+/* Design system: "編輯式旅程入口" — shared controls use Journey Yellow only
+ * for decisive actions, with Ink Black focus and calm Paper White materials. */
 import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
@@ -10,13 +12,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = 'primary', size = 'md', loading, children, className = '', disabled, ...props }: ButtonProps) {
-  const base = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed';
+  const base = 'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-slate-100 text-slate-700 hover:bg-slate-200 focus:ring-slate-400',
+    primary: 'bg-[#ffc91a] text-[#111111] hover:bg-[#f1b900] focus:ring-[#111111]',
+    secondary: 'bg-[#ece7da] text-[#2a2926] hover:bg-[#e1dac9] focus:ring-[#111111]',
     danger: 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-400',
-    ghost: 'text-slate-600 hover:bg-slate-100 focus:ring-slate-400',
-    outline: 'border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-slate-400',
+    ghost: 'text-slate-600 hover:bg-[#ece7da] focus:ring-[#111111]',
+    outline: 'border border-[#c9c1af] text-slate-700 hover:bg-[#faf8f2] focus:ring-[#111111]',
   };
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-base' };
   return (
@@ -46,10 +48,10 @@ export function Input({ label, error, required, className = '', id, ...props }: 
       <input
         id={inputId}
         className={`w-full min-w-0 px-3 py-2 text-sm border rounded-lg bg-white text-slate-900 placeholder-slate-400
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+          focus:outline-none focus:ring-2 focus:ring-[#111111] focus:border-transparent
           disabled:bg-slate-50 disabled:text-slate-500
           ${props.type === 'date' ? 'appearance-none' : ''}
-          ${error ? 'border-red-400' : 'border-slate-300'}
+          ${error ? 'border-red-400' : 'border-[#c9c1af]'}
           ${className}`}
         {...props}
       />
@@ -78,8 +80,8 @@ export function Select({ label, error, required, options, className = '', id, ..
       <select
         id={selectId}
         className={`w-full px-3 py-2 text-sm border rounded-lg bg-white text-slate-900
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-          ${error ? 'border-red-400' : 'border-slate-300'}
+          focus:outline-none focus:ring-2 focus:ring-[#111111] focus:border-transparent
+          ${error ? 'border-red-400' : 'border-[#c9c1af]'}
           ${className}`}
         {...props}
       >
@@ -111,8 +113,8 @@ export function Textarea({ label, error, required, className = '', id, ...props 
       <textarea
         id={textareaId}
         className={`w-full px-3 py-2 text-sm border rounded-lg bg-white text-slate-900 placeholder-slate-400
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y
-          ${error ? 'border-red-400' : 'border-slate-300'}
+          focus:outline-none focus:ring-2 focus:ring-[#111111] focus:border-transparent resize-y
+          ${error ? 'border-red-400' : 'border-[#c9c1af]'}
           ${className}`}
         {...props}
       />
@@ -200,7 +202,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
 // ── Card ───────────────────────────────────────────────────
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>
+    <div className={`bg-white rounded-[1.25rem] border border-[#e3ddcf] shadow-[0_12px_28px_rgba(17,17,17,0.06)] ${className}`}>
       {children}
     </div>
   );

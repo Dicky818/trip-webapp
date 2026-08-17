@@ -1,8 +1,8 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 /*
- * Design system: "旅途作戰桌" — trip work is grouped by a journey sequence,
- * with persistent orientation and a contextual next action in every section.
+ * Design system: "編輯式旅程入口" — the journey pass establishes trip identity,
+ * while the task rail and dock remain quiet, contextual travel shortcuts.
  */
 import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock, FileDown, MoreHorizontal } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -37,6 +37,7 @@ function TabSpinner() {
 export default function TripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { showToast } = useApp();
 
   const [trip, setTrip] = useState<Trip | null>(null);
@@ -67,6 +68,11 @@ export default function TripDetailPage() {
   };
 
   useEffect(() => { fetchTrip(); }, [tripId]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && TABS.some(tab => tab.id === requestedTab)) setActiveTab(requestedTab);
+  }, [searchParams]);
 
   const handleSaveName = async () => {
     if (!trip || !editName.trim()) return;
@@ -116,10 +122,10 @@ export default function TripDetailPage() {
   const diffEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86400000);
   const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
   const tripStatus = diffStart > 0
-    ? { label: `還有 ${diffStart} 天出發`, className: 'text-blue-100 bg-blue-500/20 border-blue-300/20' }
+    ? { label: `還有 ${diffStart} 天出發`, className: 'border-white/15 bg-white/10 text-[#f5f2e8]' }
     : diffEnd >= 0
-      ? { label: `旅行中 · 第 ${Math.abs(diffStart) + 1}/${totalDays} 天`, className: 'text-emerald-100 bg-emerald-500/20 border-emerald-300/20' }
-      : { label: '行程已結束', className: 'text-slate-300 bg-white/10 border-white/15' };
+      ? { label: `旅行中 · 第 ${Math.abs(diffStart) + 1}/${totalDays} 天`, className: 'border-[#ffc91a] bg-[#ffc91a] text-[#111111]' }
+      : { label: '行程已結束', className: 'border-white/15 bg-white/10 text-slate-300' };
   const activeSection = TABS.find(tab => tab.id === activeTab) || TABS[0];
   const exportBooklet = async () => {
     if (exporting) return;
@@ -139,11 +145,11 @@ export default function TripDetailPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <section className="relative overflow-hidden rounded-[1.5rem] bg-slate-950 text-white px-5 py-5 sm:px-7 sm:py-6 shadow-[0_18px_45px_rgba(15,23,42,0.18)] route-enter">
+      <section className="portal-pass relative overflow-hidden rounded-[1.75rem] px-5 py-6 text-white sm:px-8 sm:py-7 route-enter">
         <div className="absolute inset-0 route-grid opacity-40" />
-        <div className="absolute -right-16 -bottom-20 h-56 w-56 rounded-full bg-blue-500/25 blur-3xl" />
+        <div className="absolute -right-16 -bottom-20 h-56 w-56 rounded-full bg-[#ffc91a]/15 blur-3xl" />
         <div className="relative">
-          <button onClick={() => navigate('/')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+          <button onClick={() => navigate('/')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#f5f2e8]/70 transition-colors hover:text-white">
             <ArrowLeft size={15} /> 所有行程
           </button>
 
@@ -159,11 +165,12 @@ export default function TripDetailPage() {
           ) : (
             <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{trip.Trip_Name}</h1><span className={`border rounded-full px-2.5 py-1 text-xs font-bold ${tripStatus.className}`}>{tripStatus.label}</span></div>
-                <p className="mt-2 text-sm text-slate-300">{formatDate(trip.Start_Date)} — {formatDate(trip.End_Date)} <span className="mx-2 text-slate-500">/</span><span className="font-semibold text-blue-200">{trip.Base_Currency}</span></p>
+                <p className="portal-eyebrow text-[#f5f2e8]/50">TRIP / WORKSPACE</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3"><h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl">{trip.Trip_Name}</h1><span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${tripStatus.className}`}>{tripStatus.label}</span></div>
+                <p className="mt-2 text-sm text-[#f5f2e8]/70">{formatDate(trip.Start_Date)} — {formatDate(trip.End_Date)} <span className="mx-2 text-white/25">/</span><span className="font-semibold text-[#ffc91a]">{trip.Base_Currency}</span></p>
               </div>
               <details className="relative self-start sm:self-auto">
-                <summary className="list-none inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 transition-colors"><MoreHorizontal size={16} /> 更多</summary>
+                <summary className="list-none inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10"><MoreHorizontal size={16} /> 更多</summary>
                 <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-36 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-xl">
                   <button onClick={exportBooklet} disabled={exporting} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-slate-50 disabled:opacity-50"><FileDown size={15} className={exporting ? 'animate-pulse' : ''} /> 匯出小冊子</button>
                   <button onClick={() => { setEditName(trip.Trip_Name); setEditStartDate(trip.Start_Date); setEditEndDate(trip.End_Date); setEditCurrency(trip.Base_Currency); setEditingName(true); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-slate-50"><Edit2 size={15} /> 編輯行程</button>
@@ -176,21 +183,21 @@ export default function TripDetailPage() {
 
       <div className="grid gap-5 xl:grid-cols-[224px_minmax(0,1fr)] route-enter-delay">
         <aside className="hidden xl:block">
-          <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-            <p className="px-3 py-2 text-[11px] font-bold tracking-[0.14em] text-slate-400 uppercase">工作區</p>
+          <div className="sticky top-24 rounded-2xl border border-[#e3ddcf] bg-white p-2 shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
+            <p className="portal-eyebrow px-3 py-2 text-[#9b907c]">WORKSPACE</p>
             <nav className="space-y-1">
-              {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full text-left rounded-xl px-3 py-2.5 transition-colors ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}><span className="flex items-center gap-2.5 text-sm font-bold"><span aria-hidden="true">{tab.emoji}</span>{tab.label}</span></button>)}
+              {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full text-left rounded-xl px-3 py-2.5 transition-colors ${activeTab === tab.id ? 'bg-[#111111] text-[#ffc91a] shadow-sm' : 'text-slate-600 hover:bg-[#f5f2e8]'}`}><span className="flex items-center gap-2.5 text-sm font-bold"><span aria-hidden="true">{tab.emoji}</span>{tab.label}</span></button>)}
             </nav>
           </div>
         </aside>
 
         <div className="min-w-0">
-          <div className="mb-4 flex items-center gap-3 px-1">
-            <span className="text-base" aria-hidden="true">{activeSection.emoji}</span>
-            <div><p className="text-[11px] font-bold tracking-[0.14em] text-blue-600 uppercase">現在位置</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{activeSection.label}</h2></div>
-          </div>
+            <div className="mb-4 flex items-center gap-3 px-1">
+              <span className="text-base" aria-hidden="true">{activeSection.emoji}</span>
+            <div><p className="portal-eyebrow text-[#9b907c]">NOW / {activeSection.id}</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{activeSection.label}</h2></div>
+            </div>
 
-          <div className="bg-white rounded-[1.5rem] border border-slate-200 shadow-sm min-h-[32rem] overflow-hidden">
+          <div className="min-h-[32rem] overflow-hidden rounded-[1.5rem] border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
             <Suspense fallback={<TabSpinner />}>
               {activeTab === 'info' && <InfoTab trip={trip} onNavigate={setActiveTab} />}
               {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
@@ -202,9 +209,9 @@ export default function TripDetailPage() {
         </div>
       </div>
 
-      <nav className="xl:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-xl px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]" aria-label="行程工作區">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e3ddcf] bg-[#f5f2e8]/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_24px_rgba(17,17,17,0.08)] backdrop-blur-xl xl:hidden" aria-label="行程工作區">
         <div className="grid grid-cols-5">
-          {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold transition-colors ${activeTab === tab.id ? 'text-blue-700 bg-blue-50' : 'text-slate-400'}`}><span className="text-sm" aria-hidden="true">{tab.emoji}</span><span>{tab.shortLabel}</span></button>)}
+          {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold transition-colors ${activeTab === tab.id ? 'bg-[#111111] text-[#ffc91a]' : 'text-slate-400'}`}><span className="text-sm" aria-hidden="true">{tab.emoji}</span><span>{tab.shortLabel}</span></button>)}
         </div>
       </nav>
     </div>
