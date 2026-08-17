@@ -101,4 +101,4 @@
 - [x] Implement the approved Trip Pass, six numbered portal tools, Travel Support panel, and editorial visual system.
 - [x] Apply the approved portal hierarchy to overview, itinerary, expenses, stay and flight, and journey-assistant entry points.
 - [x] Validate the Tabitime-inspired Trip Portal redesign on desktop and iPhone-sized layouts before publication.
-- [ ] Replace the daily-itinerary blue-on-white selected control treatment with the approved neutral and Ink Black portal palette.
+- [x] Replace the daily-itinerary blue-on-white selected control treatment with the approved neutral and Ink Black portal palette.
