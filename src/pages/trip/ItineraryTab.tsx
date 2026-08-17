@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 /*
  * Design system: "Tabitime-inspired Trip Portal" — daily plans stay touch-first,
- * but selected controls use Ink Black and Journey Yellow rather than blue-on-white.
+ * controls, map launchers, links, and focus states use Ink Black and Canvas Ivory.
  */
 import { Plus, Trash2, Edit2, GripVertical, Hotel, Copy, ChevronDown, ChevronRight, List, MapPin, Navigation, X as XIcon, ArrowRightCircle, CheckSquare, Square, Shuffle, ExternalLink, AlignLeft, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Calendar, MoreHorizontal } from 'lucide-react';
 import {
@@ -139,11 +139,11 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
   return (
     <div ref={setNodeRef} style={style}
       className={`flex items-start gap-2 rounded-lg border bg-white p-3 transition-colors group ${
-        isSelected ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-200'
+        isSelected ? 'border-[#111111] bg-[#f5f2e8] ring-1 ring-[#111111]' : 'border-[#e3ddcf] hover:border-[#111111]'
       }`}>
       {selectMode ? (
         <button onClick={() => onToggleSelect(item.Itinerary_ID)}
-          className="p-1 text-blue-500 flex-shrink-0 mt-0.5">
+          className="mt-0.5 flex-shrink-0 p-1 text-[#111111]">
           {isSelected ? <CheckSquare size={16} /> : <Square size={16} className="text-slate-300" />}
         </button>
       ) : (
@@ -157,11 +157,11 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
       <div className="flex-1 min-w-0">
         <button
           onClick={() => openGoogleMaps(activityName, item.Lat, item.Lng)}
-          className="text-sm font-medium text-slate-800 hover:text-blue-600 hover:underline text-left break-words flex items-center gap-1 group/name"
+          className="flex items-center gap-1 break-words text-left text-sm font-medium text-slate-800 underline-offset-2 hover:text-[#111111] hover:underline group/name"
           title="在 Google Maps 開啟"
         >
           {activityName}
-          <ExternalLink size={11} className="opacity-0 group-hover/name:opacity-100 text-blue-400 flex-shrink-0" />
+          <ExternalLink size={11} className="flex-shrink-0 text-[#9a7100] opacity-0 group-hover/name:opacity-100" />
         </button>
         {item.Activity_Name && item.Activity && (
           <p className="text-xs text-slate-500 mt-0.5 whitespace-pre-wrap break-words">{item.Activity}</p>
@@ -173,7 +173,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
               if (!trimmed) return null;
               return /^https?:\/\//.test(trimmed) ? (
                 <a key={i} href={trimmed} target="_blank" rel="noopener noreferrer"
-                  className="block text-xs text-blue-500 underline hover:text-blue-700 break-all italic">
+                  className="block break-all text-xs italic text-slate-600 underline decoration-[#c9c1af] underline-offset-2 hover:text-[#111111] hover:decoration-[#111111]">
                   {trimmed}
                 </a>
               ) : (
@@ -185,7 +185,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
       </div>
       {!selectMode && (
         <div className="flex gap-1 flex-shrink-0">
-          <button onClick={() => onEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
+          <button onClick={() => onEdit(item)} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-[#f5f2e8] hover:text-[#111111]">
             <Edit2 size={13} />
           </button>
           <button onClick={() => onDelete(item)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -929,7 +929,7 @@ export default function ItineraryTab({ trip }: Props) {
                         <div className="border-t border-slate-100 pt-2">
                           <button
                             onClick={() => toggleAltSection(day)}
-                            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 transition-colors w-full text-left py-1"
+                            className="flex w-full items-center gap-1.5 py-1 text-left text-xs text-slate-500 transition-colors hover:text-[#111111]"
                           >
                             <AlignLeft size={12} />
                             <span className="font-medium">替代行程</span>
@@ -953,11 +953,11 @@ export default function ItineraryTab({ trip }: Props) {
                                     <div className="flex-1 min-w-0">
                                       <button
                                         onClick={() => openGoogleMaps(alt.Activity_Name || alt.Activity || '', alt.Lat, alt.Lng)}
-                                        className="text-sm font-medium text-amber-800 hover:text-blue-600 hover:underline text-left break-words flex items-center gap-1 group/name"
+                                        className="flex items-center gap-1 break-words text-left text-sm font-medium text-amber-800 underline-offset-2 hover:text-[#111111] hover:underline group/name"
                                         title="在 Google Maps 開啟"
                                       >
                                         {alt.Activity_Name || alt.Activity}
-                                        <ExternalLink size={11} className="opacity-0 group-hover/name:opacity-100 text-blue-400 flex-shrink-0" />
+                                        <ExternalLink size={11} className="flex-shrink-0 text-[#9a7100] opacity-0 group-hover/name:opacity-100" />
                                       </button>
                                       {alt.Activity_Name && alt.Activity && (
                                         <p className="text-xs text-amber-700 mt-0.5 whitespace-pre-wrap break-words">{alt.Activity}</p>
@@ -969,7 +969,7 @@ export default function ItineraryTab({ trip }: Props) {
                                             if (!trimmed) return null;
                                             return /^https?:\/\//.test(trimmed) ? (
                                               <a key={i} href={trimmed} target="_blank" rel="noopener noreferrer"
-                                                className="block text-xs text-blue-500 underline hover:text-blue-700 break-all italic">
+                                                className="block break-all text-xs italic text-slate-600 underline decoration-[#c9c1af] underline-offset-2 hover:text-[#111111] hover:decoration-[#111111]">
                                                 {trimmed}
                                               </a>
                                             ) : (
@@ -981,7 +981,7 @@ export default function ItineraryTab({ trip }: Props) {
                                     </div>
                                     <div className="flex gap-1 flex-shrink-0">
                                       <button onClick={() => openAltModal(day, alt)}
-                                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
+                                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-[#f5f2e8] hover:text-[#111111]">
                                         <Edit2 size={13} />
                                       </button>
                                       <button onClick={() => setDeleteAlt(alt)}
