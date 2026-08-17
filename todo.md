@@ -102,4 +102,5 @@
 - [x] Apply the approved portal hierarchy to overview, itinerary, expenses, stay and flight, and journey-assistant entry points.
 - [x] Validate the Tabitime-inspired Trip Portal redesign on desktop and iPhone-sized layouts before publication.
 - [x] Replace the daily-itinerary blue-on-white selected control treatment with the approved neutral and Ink Black portal palette.
-- [ ] Replace Route Blue interface treatments for map controls, external links, and keyboard focus with restrained Ink Black and Canvas Ivory styling.
+- [x] Replace Route Blue interface treatments for map controls, external links, and keyboard focus with restrained Ink Black and Canvas Ivory styling.
+- [x] Restore expired GitHub deployment authentication and publish the already committed map, link, and focus palette correction.
