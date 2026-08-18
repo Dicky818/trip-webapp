@@ -110,3 +110,5 @@
 - [x] Implement the approved homepage and overview Trip Health cards with shared health-state derivation.
 - [x] Implement approved itinerary deep-link focus and sync actions without automatic trip-data changes.
 - [x] Validate the P0 Trip Health release on desktop and iPhone-sized layouts before publication.
+- [x] Review the market roadmap, P0 outcomes, and current data capabilities to recommend the highest-value P1 scope.
+- [x] Draft an approval-only P1 development recommendation and detailed UI/UX and technical design specification.
