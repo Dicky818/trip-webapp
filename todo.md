@@ -133,3 +133,4 @@
 - [x] Diagnose the receipt image-analysis Edge Function request failure without storing receipt images or changing expense data.
 - [x] Repair receipt transport and validate non-persistent request handling with clear user-facing failure guidance.
 - [ ] Reconfirm successful receipt OCR after the configured Gemini provider quota or availability recovers.
+- [ ] Revalidate the existing Gemini receipt-analysis service with a non-persistent synthetic image after its provider quota is restored; the 2026-08-19 cooldown recheck remained provider-limited.

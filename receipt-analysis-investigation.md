@@ -17,3 +17,7 @@ The frontend now compresses receipt images above 2 MB to a maximum prepared targ
 ## Validation result
 
 An authenticated, non-persistent health check reached the live Edge Function and received structured provider responses rather than a browser transport failure. The current Gemini provider response was `429` (temporary quota / rate limit), followed by `502` on a later attempt. The function now returns these conditions as actionable user-facing errors instead of timing out. Successful OCR will require the configured Gemini provider quota and service availability to recover; no change to trip or expense data was made during validation.
+
+## Follow-up revalidation
+
+After a two-minute cooldown, a generated synthetic receipt request again reached the active version 5 function but received `429`, initially indicating a one-second retry delay and then a further twenty-second provider delay. This confirms that the remaining blocker is the configured Gemini provider quota or availability, not the browser request, image transport, CORS, authentication, or expense-writing path.
