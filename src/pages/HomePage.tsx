@@ -256,7 +256,7 @@ export default function HomePage() {
         <TripHealthCard
           trip={liveTrip}
           variant="portal"
-          onNavigate={(target, focusToday) => navigate(`/trip/${liveTrip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}`)}
+          onNavigate={(target, focusToday, openLens, focusItemIds) => navigate(`/trip/${liveTrip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}${openLens ? '&lens=load' : ''}${focusItemIds?.length ? `&focusItems=${encodeURIComponent(focusItemIds.join(','))}` : ''}`)}
         />
       )}
 

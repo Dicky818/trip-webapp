@@ -12,7 +12,7 @@ import { deriveTripHealth, TripHealthSignal, TripHealthTarget } from '../lib/tri
 interface Props {
   trip: Trip;
   variant: 'portal' | 'overview';
-  onNavigate: (target: TripHealthTarget, focusToday?: boolean) => void;
+  onNavigate: (target: TripHealthTarget, focusToday?: boolean, openLens?: boolean, focusItemIds?: string[]) => void;
 }
 
 function SignalIcon({ signal }: { signal: TripHealthSignal }) {
@@ -60,7 +60,7 @@ export default function TripHealthCard({ trip, variant, onNavigate }: Props) {
   };
 
   const openSignal = (signal: TripHealthSignal) => {
-    if (signal.target) onNavigate(signal.target, signal.target === 'itinerary');
+    if (signal.target) onNavigate(signal.target, signal.target === 'itinerary', signal.openLens, signal.focusItemIds);
   };
 
   if (loading) {

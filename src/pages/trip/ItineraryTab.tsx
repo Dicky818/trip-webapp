@@ -18,6 +18,8 @@ import MapTab from './MapTab';
 import TimetableTab from './TimetableTab';
 import TransportCard from './TransportCard';
 import { GOOGLE_MAPS_API_KEY } from '../../lib/googleMaps';
+import { deriveDayFeasibility } from '../../lib/dayFeasibility';
+import { DayLens, DayLoadBadge } from '../../components/DayLens';
 
 // Load Google Maps script once
 let googleMapsLoaded = false;
@@ -40,7 +42,7 @@ function loadGoogleMaps(callback: () => void) {
   document.head.appendChild(script);
 }
 
-interface Props { trip: Trip; focusToday?: boolean; }
+interface Props { trip: Trip; focusToday?: boolean; focusLens?: boolean; focusItemIds?: string[]; }
 
 function formatTimeDisplay(t: string): string {
   if (!t) return '';
@@ -117,13 +119,14 @@ function openGoogleMaps(name: string, _lat?: string | number, _lng?: string | nu
 }
 
 // Sortable item component
-function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, selectMode }: {
+function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, selectMode, isLensFocused = false }: {
   item: ItineraryItem;
   onEdit: (item: ItineraryItem) => void;
   onDelete: (item: ItineraryItem) => void;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   selectMode: boolean;
+  isLensFocused?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.Itinerary_ID });
   const style = {
@@ -139,7 +142,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
   return (
     <div ref={setNodeRef} style={style}
       className={`flex items-start gap-2 rounded-lg border bg-white p-3 transition-colors group ${
-        isSelected ? 'border-[#111111] bg-[#f5f2e8] ring-1 ring-[#111111]' : 'border-[#e3ddcf] hover:border-[#111111]'
+        isSelected || isLensFocused ? 'border-[#111111] bg-[#f5f2e8] ring-1 ring-[#111111]' : 'border-[#e3ddcf] hover:border-[#111111]'
       }`}>
       {selectMode ? (
         <button onClick={() => onToggleSelect(item.Itinerary_ID)}
@@ -197,7 +200,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
   );
 }
 
-export default function ItineraryTab({ trip, focusToday = false }: Props) {
+export default function ItineraryTab({ trip, focusToday = false, focusLens = false, focusItemIds = [] }: Props) {
   const { showToast } = useApp();
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
@@ -209,6 +212,8 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'map' | 'timetable'>('list');
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [healthFocusedDay, setHealthFocusedDay] = useState<number | null>(null);
+  const [lensDays, setLensDays] = useState<Set<number>>(new Set());
+  const [lensFocusedItems, setLensFocusedItems] = useState<string[]>([]);
 
   // Cross-day move selection
   const [selectMode, setSelectMode] = useState(false);
@@ -259,6 +264,7 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
   const [weatherData, setWeatherData] = useState<Record<string, { code: number; max: number; min: number }>>({});
 
   const tripDays = useMemo(() => getTripDays(trip.Start_Date, trip.End_Date), [trip.Start_Date, trip.End_Date]);
+  const feasibilityByDay = useMemo(() => new Map(tripDays.map(({ day, date }) => [day, deriveDayFeasibility(date, day, items.filter(item => Number(item.Day_Number) === day))])), [items, tripDays]);
 
   const fetchAll = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -292,7 +298,7 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
   useEffect(() => { fetchAll(); }, [trip.Trip_ID]);
 
   useEffect(() => {
-    if (!focusToday || loading) return;
+    if ((!focusToday && !focusLens) || loading) return;
     const today = new Date();
     const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const todayDay = tripDays.find(day => day.date === todayDate);
@@ -305,12 +311,20 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
       return next;
     });
     setHealthFocusedDay(todayDay.day);
+    if (focusLens) setLensDays(previous => new Set(previous).add(todayDay.day));
     const timer = window.setTimeout(() => {
       const card = document.getElementById(`trip-day-${todayDay.day}`);
       card?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [focusToday, loading, tripDays]);
+  }, [focusToday, focusLens, loading, tripDays]);
+
+  useEffect(() => {
+    if (focusItemIds.length === 0) return;
+    setLensFocusedItems(focusItemIds);
+    const timer = window.setTimeout(() => setLensFocusedItems([]), 2800);
+    return () => window.clearTimeout(timer);
+  }, [focusItemIds.join(',')]);
 
   // Fetch weather from open-meteo.com
   useEffect(() => {
@@ -830,6 +844,8 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
                 const showAlts = showAltSection.has(day);
                 const weather = weatherData[date];
                 const weatherInfo = weather ? getWeatherInfo(weather.code) : null;
+                const feasibility = feasibilityByDay.get(day)!;
+                const lensOpen = lensDays.has(day);
 
                 return (
                   <div id={`trip-day-${day}`} key={day} className={`w-[min(88vw,34rem)] flex-none snap-start overflow-hidden rounded-xl border bg-white transition-[box-shadow,border-color] duration-200 ${healthFocusedDay === day ? 'border-[#111111] ring-2 ring-[#111111] ring-offset-2 ring-offset-[#f5f2e8] shadow-[0_12px_28px_rgba(17,17,17,0.12)]' : 'border-slate-200'}`}>
@@ -859,6 +875,7 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
                             <Hotel size={11} /> {accName}
                           </span>
                         )}
+                        <DayLoadBadge feasibility={feasibility} expanded={lensOpen} onToggle={() => setLensDays(previous => { const next = new Set(previous); if (next.has(day)) next.delete(day); else next.add(day); return next; })} />
                       </div>
                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                         {/* Daily summary stats */}
@@ -890,6 +907,7 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
                     {/* Day Content */}
                     {!isCollapsed && (
                       <div className="p-3 space-y-2">
+                        {lensOpen && <DayLens feasibility={feasibility} onClose={() => setLensDays(previous => { const next = new Set(previous); next.delete(day); return next; })} onOpenTimetable={() => { setSelectedDay(day); setActiveSubTab('timetable'); }} />}
                         {/* Accommodation selector */}
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                           <Hotel size={14} className="text-slate-400" />
@@ -922,6 +940,7 @@ export default function ItineraryTab({ trip, focusToday = false }: Props) {
                                         isSelected={selectedItems.has(item.Itinerary_ID)}
                                         onToggleSelect={toggleItemSelect}
                                         selectMode={selectMode}
+                                        isLensFocused={lensFocusedItems.includes(item.Itinerary_ID)}
                                       />
                                     </div>
                                     {idx < dayItems.length - 1 &&

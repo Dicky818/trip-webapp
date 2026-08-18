@@ -112,3 +112,7 @@
 - [x] Validate the P0 Trip Health release on desktop and iPhone-sized layouts before publication.
 - [x] Review the market roadmap, P0 outcomes, and current data capabilities to recommend the highest-value P1 scope.
 - [x] Draft an approval-only P1 development recommendation and detailed UI/UX and technical design specification.
+- [ ] Map the approved P1.1 daily-feasibility rules to current itinerary cards, Trip Health deep links, route parameters, and tests.
+- [ ] Implement pure daily-feasibility derivation, Day Lens badges and panels, and unit coverage without writing trip data.
+- [ ] Integrate approved Trip Health deep links, focused-item highlighting, and existing timetable navigation for Day Lens.
+- [ ] Validate the P1.1 Day Feasibility Lens on desktop and iPhone-sized layouts before publication.

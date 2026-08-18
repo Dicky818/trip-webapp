@@ -3,6 +3,7 @@
  * signals from existing trip data; it never writes or mutates trip records.
  */
 import type { Expense, ItineraryItem, Trip } from '../api/supabaseApi';
+import { deriveDayFeasibility } from './dayFeasibility';
 
 export type TripHealthTarget = 'info' | 'itinerary' | 'expenses';
 export type TripHealthSeverity = 'neutral' | 'attention' | 'critical' | 'sync';
@@ -14,6 +15,8 @@ export interface TripHealthSignal {
   target?: TripHealthTarget;
   severity: TripHealthSeverity;
   allowSync?: boolean;
+  openLens?: boolean;
+  focusItemIds?: string[];
 }
 
 export interface TripHealthState {
@@ -151,10 +154,9 @@ export function deriveTripHealth(
     signals.push({ id: 'stay-missing', label: '尚未加入住宿資料', detail: '出發前可先記錄入住與退房資料', target: 'info', severity: 'attention' });
   }
 
-  const timedToday = todayItems.map(item => ({ item, time: minutes(item.Time) })).filter((entry): entry is { item: ItineraryItem; time: number } => entry.time !== null);
-  const isTight = todayItems.length >= 7 || timedToday.some((entry, index) => index > 0 && entry.time - timedToday[index - 1].time < 15);
-  if (phase === 'live' && isTight) {
-    signals.push({ id: 'tight-day', label: '今天安排較緊', detail: '可先確認交通與下一站時間', target: 'itinerary', severity: 'attention' });
+  const todayLoad = phase === 'live' && todayDay ? deriveDayFeasibility(today, todayDay, todayItems) : null;
+  if (todayLoad && (todayLoad.level === 'tight' || todayLoad.level === 'review')) {
+    signals.push({ id: 'tight-day', label: '今天安排較緊', detail: todayLoad.summary, target: 'itinerary', severity: 'attention', openLens: true, focusItemIds: todayLoad.reasons.flatMap(reason => reason.itemIds || []) });
   }
 
   let headline = '旅程正在準備中';

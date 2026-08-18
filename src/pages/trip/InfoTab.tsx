@@ -40,7 +40,7 @@ function isAccommodationExpense(exp: Expense): boolean {
 
 interface Props {
   trip: Trip;
-  onNavigate: (target: 'info' | 'itinerary' | 'expenses', focusToday?: boolean) => void;
+  onNavigate: (target: 'info' | 'itinerary' | 'expenses', focusToday?: boolean, openLens?: boolean, focusItemIds?: string[]) => void;
 }
 
 export default function InfoTab({ trip, onNavigate }: Props) {
