@@ -21,3 +21,7 @@ After the repaired bundle was published, an old service worker still served the 
 The recovery panel isolated the production exception as `timedToday is not defined`. `deriveTripHealth()` referenced that list only when a trip was live, but the declaration had been omitted during an earlier health-card change. The bug therefore affected signed-in travellers with an active trip and unmounted the authenticated React tree, leaving only the background visible.
 
 The repair restores the `timedToday` derivation from same-day itinerary records and their valid times. The root-level recovery panel is retained, but its temporary raw error-message display has been removed; future unexpected startup errors will be logged locally while users receive clear, non-technical recovery guidance.
+
+## Final validation
+
+The final GitHub Pages build was published from commit `bdc8aac`. After clearing the prior service-worker cache in the automated browser, the authenticated production homepage mounted normally with the active-trip pass, Trip Health card, Departure Package card, six tool entries, travel-support panel, and existing trip cards. The regression test suite now has 31 passing tests, including a live-trip Trip Health test that prevents the missing `timedToday` timing list from recurring.

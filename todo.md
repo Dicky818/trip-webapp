@@ -128,5 +128,5 @@
 - [x] Install and enable automated SSH brute-force protection on the remote computer.
 - [x] Validate the remote SSH hardening and record safe recovery guidance.
 - [x] Generate, deliver, and validate a new user-held SSH recovery key before disabling password access.
-- [ ] Diagnose and repair the GitHub Pages blank-screen regression without changing user trip data.
-- [ ] Verify the repaired production page on desktop and mobile-sized layouts.
+- [x] Diagnose and repair the GitHub Pages blank-screen regression without changing user trip data.
+- [ ] Verify the repaired production page on mobile-sized layouts; authenticated desktop production rendering is confirmed.
