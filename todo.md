@@ -105,3 +105,4 @@
 - [x] Replace Route Blue interface treatments for map controls, external links, and keyboard focus with restrained Ink Black and Canvas Ivory styling.
 - [x] Restore expired GitHub deployment authentication and publish the already committed map, link, and focus palette correction.
 - [x] Research leading travel-planning products and prepare a sourced Trip-WebApp strengths, gaps, and improvement-priority report before any further product changes.
+- [x] Draft an approval-only detailed UI/UX specification for the P0 Trip Health and Today’s Operations Card before implementation.
