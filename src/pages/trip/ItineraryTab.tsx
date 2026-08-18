@@ -40,7 +40,7 @@ function loadGoogleMaps(callback: () => void) {
   document.head.appendChild(script);
 }
 
-interface Props { trip: Trip; }
+interface Props { trip: Trip; focusToday?: boolean; }
 
 function formatTimeDisplay(t: string): string {
   if (!t) return '';
@@ -197,7 +197,7 @@ function SortableItem({ item, onEdit, onDelete, isSelected, onToggleSelect, sele
   );
 }
 
-export default function ItineraryTab({ trip }: Props) {
+export default function ItineraryTab({ trip, focusToday = false }: Props) {
   const { showToast } = useApp();
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
@@ -208,6 +208,7 @@ export default function ItineraryTab({ trip }: Props) {
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'map' | 'timetable'>('list');
   const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [healthFocusedDay, setHealthFocusedDay] = useState<number | null>(null);
 
   // Cross-day move selection
   const [selectMode, setSelectMode] = useState(false);
@@ -289,6 +290,27 @@ export default function ItineraryTab({ trip }: Props) {
   };
 
   useEffect(() => { fetchAll(); }, [trip.Trip_ID]);
+
+  useEffect(() => {
+    if (!focusToday || loading) return;
+    const today = new Date();
+    const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayDay = tripDays.find(day => day.date === todayDate);
+    if (!todayDay) return;
+    setSelectedDay(todayDay.day);
+    setCollapsedDays(prev => {
+      if (!prev.has(todayDay.day)) return prev;
+      const next = new Set(prev);
+      next.delete(todayDay.day);
+      return next;
+    });
+    setHealthFocusedDay(todayDay.day);
+    const timer = window.setTimeout(() => {
+      const card = document.getElementById(`trip-day-${todayDay.day}`);
+      card?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [focusToday, loading, tripDays]);
 
   // Fetch weather from open-meteo.com
   useEffect(() => {
@@ -810,7 +832,7 @@ export default function ItineraryTab({ trip }: Props) {
                 const weatherInfo = weather ? getWeatherInfo(weather.code) : null;
 
                 return (
-                  <div key={day} className="w-[min(88vw,34rem)] flex-none snap-start overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div id={`trip-day-${day}`} key={day} className={`w-[min(88vw,34rem)] flex-none snap-start overflow-hidden rounded-xl border bg-white transition-[box-shadow,border-color] duration-200 ${healthFocusedDay === day ? 'border-[#111111] ring-2 ring-[#111111] ring-offset-2 ring-offset-[#f5f2e8] shadow-[0_12px_28px_rgba(17,17,17,0.12)]' : 'border-slate-200'}`}>
                     {/* Day Header */}
                     <div
                       className="flex items-center justify-between px-4 py-3 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"

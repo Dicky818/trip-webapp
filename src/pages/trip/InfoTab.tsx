@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
+import TripHealthCard from '../../components/TripHealthCard';
 
 // 只取日期部分
 function formatDateOnly(d: string): string {
@@ -39,7 +40,7 @@ function isAccommodationExpense(exp: Expense): boolean {
 
 interface Props {
   trip: Trip;
-  onNavigate: (target: 'itinerary' | 'expenses') => void;
+  onNavigate: (target: 'info' | 'itinerary' | 'expenses', focusToday?: boolean) => void;
 }
 
 export default function InfoTab({ trip, onNavigate }: Props) {
@@ -102,36 +103,9 @@ export default function InfoTab({ trip, onNavigate }: Props) {
 
   // Trip overview stats
   const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.Base_Amount) || 0), 0);
-  const tripDuration = (() => {
-    const parseD = (d: string) => { const s = d.includes('T') ? d.slice(0, 10) : d; const [y, m, day] = s.split('-').map(Number); return new Date(y, m - 1, day); };
-    return Math.round((parseD(trip.End_Date).getTime() - parseD(trip.Start_Date).getTime()) / 86400000) + 1;
-  })();
-
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  const start = new Date(formatDateOnly(trip.Start_Date));
-  const end = new Date(formatDateOnly(trip.End_Date));
-  const daysToStart = Math.ceil((start.getTime() - now.getTime()) / 86400000);
-  const dayInTrip = Math.abs(daysToStart) + 1;
-  const isLive = daysToStart <= 0 && end >= now;
-  const journeyLabel = daysToStart > 0 ? `${daysToStart} 天後出發` : isLive ? `旅行中 · 第 ${dayInTrip}/${tripDuration} 天` : '此行程已完成';
-  const nextStep = isLive
-    ? { label: '📍 查看今天路線', detail: '先確認下一站與今天安排', target: 'itinerary' as const }
-    : { label: '🗺️ 開始規劃路線', detail: '先加入第一個行程地點', target: 'itinerary' as const };
-
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <section className="portal-pass relative overflow-hidden rounded-[1.5rem] px-5 py-6 text-white">
-        <div className="absolute inset-0 route-grid opacity-40" />
-        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#ffc91a]/15 blur-3xl" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="portal-eyebrow text-[#ffc91a]">JOURNEY / NOW</p>
-            <h3 className="mt-3 text-xl font-extrabold">{journeyLabel}</h3>
-            <p className="mt-2 text-sm text-[#f5f2e8]/70">{nextStep.detail}</p>
-          </div>
-          <button type="button" onClick={() => onNavigate(nextStep.target)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#ffc91a] px-4 py-3 text-sm font-bold text-[#111111] shadow-sm transition-all duration-150 hover:bg-[#f1b900] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]">{nextStep.label}<ArrowRight size={15} /></button>
-        </div>
-      </section>
+      <TripHealthCard trip={trip} variant="overview" onNavigate={onNavigate} />
 
       <section className="grid grid-cols-3 divide-x divide-[#ece7da] overflow-hidden rounded-2xl border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
         <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500">👥 旅伴</p></div>

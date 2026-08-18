@@ -199,8 +199,8 @@ export default function TripDetailPage() {
 
           <div className="min-h-[32rem] overflow-hidden rounded-[1.5rem] border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
             <Suspense fallback={<TabSpinner />}>
-              {activeTab === 'info' && <InfoTab trip={trip} onNavigate={setActiveTab} />}
-              {activeTab === 'itinerary' && <ItineraryTab trip={trip} />}
+              {activeTab === 'info' && <InfoTab trip={trip} onNavigate={(target, focusToday) => navigate(`/trip/${trip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}`)} />}
+              {activeTab === 'itinerary' && <ItineraryTab trip={trip} focusToday={searchParams.get('focus') === 'today'} />}
               {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
               {activeTab === 'packing' && <PackingListTab trip={trip} />}
               {activeTab === 'ai' && <AITab trip={trip} />}

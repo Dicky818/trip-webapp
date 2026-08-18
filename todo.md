@@ -106,3 +106,7 @@
 - [x] Restore expired GitHub deployment authentication and publish the already committed map, link, and focus palette correction.
 - [x] Research leading travel-planning products and prepare a sourced Trip-WebApp strengths, gaps, and improvement-priority report before any further product changes.
 - [x] Draft an approval-only detailed UI/UX specification for the P0 Trip Health and Today’s Operations Card before implementation.
+- [ ] Map approved Trip Health rules to existing itinerary, booking, expense, navigation, and sync interfaces.
+- [ ] Implement the approved homepage and overview Trip Health cards with shared health-state derivation.
+- [ ] Implement approved itinerary deep-link focus and sync actions without automatic trip-data changes.
+- [ ] Validate the P0 Trip Health release on desktop and iPhone-sized layouts before publication.

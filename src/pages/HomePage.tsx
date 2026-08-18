@@ -9,6 +9,7 @@ import { Plus, Plane, Calendar, Trash2, MapPin, Share2, Users, Link2, Copy, Chec
 import { useApp } from '../context/AppContext';
 import { api, Trip } from '../api/supabaseApi';
 import { Button, Card, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner } from '../components/ui';
+import TripHealthCard from '../components/TripHealthCard';
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
@@ -240,6 +241,14 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {liveTrip && (
+        <TripHealthCard
+          trip={liveTrip}
+          variant="portal"
+          onNavigate={(target, focusToday) => navigate(`/trip/${liveTrip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}`)}
+        />
+      )}
 
       {liveTrip && (
         <section className="route-enter-delay">
