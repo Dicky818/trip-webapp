@@ -116,3 +116,5 @@
 - [x] Implement pure daily-feasibility derivation, Day Lens badges and panels, and unit coverage without writing trip data.
 - [x] Integrate approved Trip Health deep links, focused-item highlighting, and existing timetable navigation for Day Lens.
 - [x] Validate the P1.1 Day Feasibility Lens on desktop and iPhone-sized layouts before publication.
+- [x] Review the market roadmap, P0 and P1.1 outcomes, and current data capabilities to recommend the highest-value P2 scope.
+- [x] Draft an approval-only P2 development recommendation with detailed UI/UX and technical design specifications.
