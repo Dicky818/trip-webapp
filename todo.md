@@ -122,3 +122,11 @@
 - [x] Implement per-user local readiness derivation, minimal departure-package storage, and the Departure Package interface.
 - [x] Integrate approved PDF, sync, itinerary, booking, and offline-readiness actions without automatic data changes.
 - [ ] Validate the P2.1 Departure Package on desktop and iPhone-sized layouts before publication.
+- [x] Diagnose the connected remote computer for resource, service, network, storage, and system-log issues without making changes.
+- [x] Report remote-computer findings and obtain approval before any remediation.
+- [x] Back up and harden remote SSH access with key-only authentication and reduced retry limits.
+- [x] Install and enable automated SSH brute-force protection on the remote computer.
+- [x] Validate the remote SSH hardening and record safe recovery guidance.
+- [x] Generate, deliver, and validate a new user-held SSH recovery key before disabling password access.
+- [ ] Diagnose and repair the GitHub Pages blank-screen regression without changing user trip data.
+- [ ] Verify the repaired production page on desktop and mobile-sized layouts.
