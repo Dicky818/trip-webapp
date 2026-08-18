@@ -9,11 +9,11 @@ import './index.css';
  * during deploy propagation; a forced reload in that window can loop and leave
  * the React root visibly empty.
  */
-class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean; message: string }> {
+  state = { failed: false, message: '' };
 
-  static getDerivedStateFromError() {
-    return { failed: true };
+  static getDerivedStateFromError(error: Error) {
+    return { failed: true, message: error.message || '未提供錯誤訊息' };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -28,6 +28,7 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, {
             <p className="portal-eyebrow text-[#9a7100]">TRIP / RECOVERY</p>
             <h1 className="mt-3 text-2xl font-extrabold tracking-tight">暫時無法載入旅程桌</h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">請重新載入此頁。你的行程資料沒有被更改；如問題持續，請告訴我們你看到的時間與畫面。</p>
+            <p className="mt-3 break-words rounded-lg bg-[#f5f2e8] px-3 py-2 font-mono text-[11px] leading-5 text-slate-500" aria-label="錯誤訊息">{this.state.message}</p>
             <button type="button" onClick={() => window.location.reload()} className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-[#ffc91a] px-4 py-2.5 text-sm font-bold text-[#111111] transition-colors hover:bg-[#f1b900] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111] focus-visible:ring-offset-2 active:scale-[0.98]">
               重新載入
             </button>

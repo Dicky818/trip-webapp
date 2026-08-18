@@ -11,3 +11,7 @@ The next diagnostic steps are to inspect the delivered HTML and module dependenc
 The production document loads the current hashed entry module, CSS, HomePage chunk, Departure Package chunk, and associated dependencies successfully. The active controller is the expected `/trip-webapp/sw.js` service worker; it has no waiting or installing successor. Despite these resources loading, `#root` remains empty and the browser console does not expose a startup exception.
 
 The startup code explicitly registers and updates the service worker whenever the page gains focus or visibility, then forces a full reload on every `controllerchange`. The generated worker already uses `skipWaiting` and `clientsClaim`. This combination is a plausible production-only reload-loop or transient-empty-root cause, particularly across GitHub Pages propagation and cached client versions. The repair will remove the redundant forced reload behavior and add a visible root-level recovery state for any future render exception.
+
+## Repair verification finding
+
+After the repaired bundle was published, an old service worker still served the previous entry asset until its cache was explicitly cleared in the automated browser. The new bundle then rendered the added visible recovery panel instead of a blank root, proving that a real React startup exception is also present. The next step is to capture that boundary error and repair its underlying cause; the fallback remains in place so users will no longer receive a wholly blank page if a future startup failure occurs.
