@@ -112,6 +112,12 @@ export function deriveTripHealth(
   const todayItems = itinerary
     .filter(item => dayKey(item.Date) === today)
     .sort((a, b) => (minutes(a.Time) ?? Number.MAX_SAFE_INTEGER) - (minutes(b.Time) ?? Number.MAX_SAFE_INTEGER) || Number(a.Sort_Order) - Number(b.Sort_Order));
+  const timedToday = todayItems
+    .map(item => {
+      const time = minutes(item.Time);
+      return time === null ? null : { item, time };
+    })
+    .filter((entry): entry is { item: ItineraryItem; time: number } => entry !== null);
   const signals: TripHealthSignal[] = [];
 
   if (!sync.online) {

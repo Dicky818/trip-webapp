@@ -15,3 +15,9 @@ The startup code explicitly registers and updates the service worker whenever th
 ## Repair verification finding
 
 After the repaired bundle was published, an old service worker still served the previous entry asset until its cache was explicitly cleared in the automated browser. The new bundle then rendered the added visible recovery panel instead of a blank root, proving that a real React startup exception is also present. The next step is to capture that boundary error and repair its underlying cause; the fallback remains in place so users will no longer receive a wholly blank page if a future startup failure occurs.
+
+## Root cause and permanent repair
+
+The recovery panel isolated the production exception as `timedToday is not defined`. `deriveTripHealth()` referenced that list only when a trip was live, but the declaration had been omitted during an earlier health-card change. The bug therefore affected signed-in travellers with an active trip and unmounted the authenticated React tree, leaving only the background visible.
+
+The repair restores the `timedToday` derivation from same-day itinerary records and their valid times. The root-level recovery panel is retained, but its temporary raw error-message display has been removed; future unexpected startup errors will be logged locally while users receive clear, non-technical recovery guidance.
