@@ -187,7 +187,17 @@ export default function HomePage() {
       const members = (membersResult as any).success ? ((membersResult as any).data || []) : [];
       const expenses = (expensesResult as any).success ? ((expensesResult as any).data || []) : [];
       const itinerary = (itineraryResult as any).success ? ((itineraryResult as any).data || []) : [];
-      const next = itinerary.find((item: any) => item.Activity_Name || item.Location_Name || item.Title);
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const currentMinutes = today.getHours() * 60 + today.getMinutes();
+      const timedToday = itinerary
+        .filter((item: any) => String(item.Date || '').slice(0, 10) === todayKey && (item.Activity_Name || item.Location_Name || item.Title))
+        .sort((a: any, b: any) => String(a.Time || '').localeCompare(String(b.Time || '')));
+      const nextToday = timedToday.find((item: any) => {
+        const [hour, minute] = String(item.Time || '').slice(-5).split(':').map(Number);
+        return !Number.isNaN(hour) && !Number.isNaN(minute) && (hour * 60 + minute) >= currentMinutes;
+      });
+      const next = nextToday || timedToday[0] || itinerary.find((item: any) => item.Activity_Name || item.Location_Name || item.Title);
       setPortalSummary({
         members: members.length,
         totalExpense: expenses.reduce((sum: number, expense: any) => sum + (Number(expense.Base_Amount) || 0), 0),
