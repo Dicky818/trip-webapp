@@ -118,3 +118,7 @@
 - [x] Validate the P1.1 Day Feasibility Lens on desktop and iPhone-sized layouts before publication.
 - [x] Review the market roadmap, P0 and P1.1 outcomes, and current data capabilities to recommend the highest-value P2 scope.
 - [x] Draft an approval-only P2 development recommendation with detailed UI/UX and technical design specifications.
+- [x] Map approved P2.1 Departure Package rules to existing trip, PDF, offline-sync, local-storage, and navigation capabilities.
+- [x] Implement per-user local readiness derivation, minimal departure-package storage, and the Departure Package interface.
+- [x] Integrate approved PDF, sync, itinerary, booking, and offline-readiness actions without automatic data changes.
+- [ ] Validate the P2.1 Departure Package on desktop and iPhone-sized layouts before publication.

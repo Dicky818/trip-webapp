@@ -74,6 +74,13 @@ export default function TripDetailPage() {
     if (requestedTab && TABS.some(tab => tab.id === requestedTab)) setActiveTab(requestedTab);
   }, [searchParams]);
 
+  useEffect(() => {
+    if (searchParams.get('panel') !== 'departure') return;
+    setActiveTab('info');
+    const timer = window.setTimeout(() => document.getElementById('departure-package')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 180);
+    return () => window.clearTimeout(timer);
+  }, [searchParams]);
+
   const handleSaveName = async () => {
     if (!trip || !editName.trim()) return;
     setSavingName(true);
@@ -127,8 +134,8 @@ export default function TripDetailPage() {
       ? { label: `旅行中 · 第 ${Math.abs(diffStart) + 1}/${totalDays} 天`, className: 'border-[#ffc91a] bg-[#ffc91a] text-[#111111]' }
       : { label: '行程已結束', className: 'border-white/15 bg-white/10 text-slate-300' };
   const activeSection = TABS.find(tab => tab.id === activeTab) || TABS[0];
-  const exportBooklet = async () => {
-    if (exporting) return;
+  const exportBooklet = async (): Promise<boolean> => {
+    if (exporting) return false;
     setExporting(true);
     try {
       const [expRes, itiRes, fliRes, accRes, memRes] = await Promise.all([
@@ -138,8 +145,10 @@ export default function TripDetailPage() {
       const { generateTravelBooklet } = await import('../../lib/pdfExport');
       await generateTravelBooklet({ trip, expenses: expRes.success ? expRes.data : [], itinerary: itiRes.success ? itiRes.data : [], flights: fliRes.success ? fliRes.data : [], accommodations: accRes.success ? accRes.data : [], members: memRes.success ? memRes.data : [], settlement: settlement.success ? settlement.data : null });
       showToast('PDF 旅行小冊子已下載');
+      return true;
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : '匯出失敗', 'error');
+      return false;
     } finally { setExporting(false); }
   };
 
@@ -199,7 +208,7 @@ export default function TripDetailPage() {
 
           <div className="min-h-[32rem] overflow-hidden rounded-[1.5rem] border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
             <Suspense fallback={<TabSpinner />}>
-              {activeTab === 'info' && <InfoTab trip={trip} onNavigate={(target, focusToday, openLens, focusItemIds) => navigate(`/trip/${trip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}${openLens ? '&lens=load' : ''}${focusItemIds?.length ? `&focusItems=${encodeURIComponent(focusItemIds.join(','))}` : ''}`)} />}
+              {activeTab === 'info' && <InfoTab trip={trip} onExportPdf={exportBooklet} onNavigate={(target, focusToday, openLens, focusItemIds) => navigate(`/trip/${trip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}${openLens ? '&lens=load' : ''}${focusItemIds?.length ? `&focusItems=${encodeURIComponent(focusItemIds.join(','))}` : ''}`)} />}
               {activeTab === 'itinerary' && <ItineraryTab trip={trip} focusToday={searchParams.get('focus') === 'today'} focusLens={searchParams.get('lens') === 'load'} focusItemIds={(searchParams.get('focusItems') || '').split(',').filter(Boolean)} />}
               {activeTab === 'expenses' && <ExpensesTab trip={trip} />}
               {activeTab === 'packing' && <PackingListTab trip={trip} />}

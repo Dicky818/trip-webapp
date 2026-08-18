@@ -7,6 +7,7 @@ import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight } from 'lucide-r
 import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
 import TripHealthCard from '../../components/TripHealthCard';
+import DeparturePackageCard from '../../components/DeparturePackageCard';
 
 // 只取日期部分
 function formatDateOnly(d: string): string {
@@ -41,9 +42,10 @@ function isAccommodationExpense(exp: Expense): boolean {
 interface Props {
   trip: Trip;
   onNavigate: (target: 'info' | 'itinerary' | 'expenses', focusToday?: boolean, openLens?: boolean, focusItemIds?: string[]) => void;
+  onExportPdf: () => Promise<boolean>;
 }
 
-export default function InfoTab({ trip, onNavigate }: Props) {
+export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +108,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <TripHealthCard trip={trip} variant="overview" onNavigate={onNavigate} />
+      <DeparturePackageCard trip={trip} variant="checklist" onNavigate={onNavigate} onExportPdf={onExportPdf} />
 
       <section className="grid grid-cols-3 divide-x divide-[#ece7da] overflow-hidden rounded-2xl border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
         <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500">👥 旅伴</p></div>
@@ -142,7 +145,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
       </section>
 
       {/* ── 航班資訊（從支出讀取） ── */}
-      <section>
+      <section id="departure-package-flights">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Plane size={18} className="text-[#9a7100]" />
@@ -244,7 +247,7 @@ export default function InfoTab({ trip, onNavigate }: Props) {
       </section>
 
       {/* ── 住宿資訊（從支出讀取） ── */}
-      <section>
+      <section id="departure-package-accommodations">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Hotel size={18} className="text-[#9a7100]" />

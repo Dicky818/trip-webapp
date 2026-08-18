@@ -10,6 +10,7 @@ import { useApp } from '../context/AppContext';
 import { api, Trip } from '../api/supabaseApi';
 import { Button, Card, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner } from '../components/ui';
 import TripHealthCard from '../components/TripHealthCard';
+import DeparturePackageCard from '../components/DeparturePackageCard';
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
@@ -257,6 +258,14 @@ export default function HomePage() {
           trip={liveTrip}
           variant="portal"
           onNavigate={(target, focusToday, openLens, focusItemIds) => navigate(`/trip/${liveTrip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}${openLens ? '&lens=load' : ''}${focusItemIds?.length ? `&focusItems=${encodeURIComponent(focusItemIds.join(','))}` : ''}`)}
+        />
+      )}
+
+      {liveTrip && (
+        <DeparturePackageCard
+          trip={liveTrip}
+          variant="portal"
+          onOpen={() => navigate(`/trip/${liveTrip.Trip_ID}?tab=info&panel=departure`)}
         />
       )}
 
