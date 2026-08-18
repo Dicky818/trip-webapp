@@ -22,9 +22,11 @@ import SettlementTab from './SettlementTab';
 interface Props { trip: Trip; }
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
-const MAX_RECEIPT_BYTES = 6 * 1024 * 1024;
-const RECEIPT_COMPRESSION_TARGET_BYTES = 5 * 1024 * 1024;
-const MAX_RECEIPT_DIMENSION = 1920;
+// Base64 adds roughly one third to the image size. Keep the prepared image well
+// below the Edge Function transport limit, especially for iPhone camera PNGs.
+const MAX_RECEIPT_BYTES = 2 * 1024 * 1024;
+const RECEIPT_COMPRESSION_TARGET_BYTES = 1500 * 1024;
+const MAX_RECEIPT_DIMENSION = 1600;
 
 type PreparedReceiptImage = {
   blob: Blob;
@@ -90,7 +92,7 @@ async function prepareReceiptImage(file: File, signal: AbortSignal): Promise<Pre
       width = Math.max(1, Math.round(width * 0.75));
       height = Math.max(1, Math.round(height * 0.75));
     }
-    throw new Error('圖片壓縮後仍超過安全上限，請裁剪收據範圍後再試');
+    throw new Error('圖片壓縮後仍太大，請只拍攝收據範圍後再試');
   } finally {
     source.release();
   }

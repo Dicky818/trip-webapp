@@ -130,3 +130,5 @@
 - [x] Generate, deliver, and validate a new user-held SSH recovery key before disabling password access.
 - [x] Diagnose and repair the GitHub Pages blank-screen regression without changing user trip data.
 - [ ] Verify the repaired production page on mobile-sized layouts; authenticated desktop production rendering is confirmed.
+- [ ] Diagnose the receipt image-analysis Edge Function request failure without storing receipt images or changing expense data.
+- [ ] Repair and validate receipt analysis with a non-persistent request and clear user-facing failure guidance.

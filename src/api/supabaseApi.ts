@@ -1598,12 +1598,20 @@ export const api = {
             // The response was not JSON; use the generic transport error below.
           }
         }
-        return err(error.message || '收據辨識服務暫時不可用');
+        const message = error.message || '';
+        if (/failed to send a request to the edge function|functionsfetcherror/i.test(message)) {
+          return err('收據圖片未能傳送到辨識服務。請確認網絡後重試；系統會先在此裝置壓縮相片。');
+        }
+        return err(message || '收據辨識服務暫時不可用');
       }
       if (data?.error) return err(String(data.error));
       return ok(data as ReceiptAnalysis);
     } catch (e: unknown) {
-      return err(e instanceof Error ? e.message : '收據辨識服務暫時不可用');
+      const message = e instanceof Error ? e.message : '';
+      if (/failed to send a request to the edge function|functionsfetcherror/i.test(message)) {
+        return err('收據圖片未能傳送到辨識服務。請確認網絡後重試；系統會先在此裝置壓縮相片。');
+      }
+      return err(message || '收據辨識服務暫時不可用');
     }
   },
 
