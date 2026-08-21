@@ -1,6 +1,6 @@
 /**
- * Design system: "編輯式旅程入口" — mobile install guidance is a compact
- * Paper White utility card with one Journey Yellow action above thumb navigation.
+ * Design system: "Trip entry gallery" — install guidance stays out of the
+ * trip-selection home screen so that screen contains trip-entry cards only.
  */
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
@@ -52,7 +52,7 @@ export function InstallPrompt() {
     sessionStorage.setItem('pwa-install-dismissed', 'true');
   };
 
-  if (!showPrompt || dismissed || !deferredPrompt || location.pathname.startsWith('/trip/')) return null;
+  if (!showPrompt || dismissed || !deferredPrompt || location.pathname === '/' || location.pathname.startsWith('/trip/')) return null;
 
   return (
     <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 md:left-auto md:right-4 md:w-96
