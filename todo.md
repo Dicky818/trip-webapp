@@ -134,6 +134,7 @@
 - [x] Repair receipt transport and validate non-persistent request handling with clear user-facing failure guidance.
 - [ ] Reconfirm successful receipt OCR after the configured Gemini provider quota or availability recovers.
 - [ ] Revalidate the existing Gemini receipt-analysis service with a non-persistent synthetic image after its provider quota is restored; the 2026-08-19 cooldown recheck remained provider-limited.
-- [ ] Simplify the home page to show only the requested August Osaka–Kyoto and June Kyoto trip-entry cards.
-- [ ] Move workspace actions into consistent 01–09 numbered tool cards after a trip is opened.
-- [ ] Validate and publish the revised two-level trip navigation on desktop and mobile-sized layouts.
+- [x] Simplify the home page to show only the requested August Osaka–Kyoto and June Kyoto trip-entry cards.
+- [x] Move workspace actions into consistent 01–09 numbered tool cards after a trip is opened.
+- [x] Validate and publish the revised two-level trip navigation in an authenticated desktop production session.
+- [ ] Recheck the revised two-level trip navigation in an iPhone-sized browser session.
