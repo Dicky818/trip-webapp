@@ -26,6 +26,20 @@ const TABS = [
   { id: 'ai', label: '旅程助手', shortLabel: '助手', emoji: '✨', description: '整理需要留意的事', icon: <Sparkles size={17} /> },
 ];
 
+// Design system: "Trip workspace tool rail" — all primary actions live after
+// trip selection, using the same numbered editorial cards from 01 through 09.
+const WORKSPACE_TOOLS = [
+  { number: '01', eyebrow: 'NOW', emoji: '📍', title: '今日路線', description: '下一站、時間與交通', tab: 'itinerary', query: 'focus=today', tone: 'ink' },
+  { number: '02', eyebrow: 'PLAN', emoji: '🗺️', title: '規劃路線', description: '每一天的站點與備案', tab: 'itinerary', query: '', tone: 'paper' },
+  { number: '03', eyebrow: 'SPEND', emoji: '💳', title: '記錄支出', description: '收據、付款與分帳', tab: 'expenses', query: '', tone: 'paper' },
+  { number: '04', eyebrow: 'STAY', emoji: '✈️', title: '航班與住宿', description: '入住、航班與確認資料', tab: 'info', query: '', tone: 'paper' },
+  { number: '05', eyebrow: 'PACK', emoji: '🎒', title: '打包清單', description: '出發前的必要準備', tab: 'packing', query: '', tone: 'paper' },
+  { number: '06', eyebrow: 'GUIDE', emoji: '✨', title: '旅程助手', description: '依目前資料整理提醒', tab: 'ai', query: '', tone: 'paper' },
+  { number: '07', eyebrow: 'SUPPORT', emoji: '💬', title: '旅程支援', description: '連線提示與旅程提醒', tab: 'ai', query: '', tone: 'yellow' },
+  { number: '08', eyebrow: 'OPERATIONS', emoji: '⏱️', title: '今日作戰', description: '查看今天的緊湊安排', tab: 'itinerary', query: 'focus=today', tone: 'paper' },
+  { number: '09', eyebrow: 'DEPARTURE', emoji: '🧳', title: '出發前包', description: '行程、PDF 與同步準備', tab: 'info', query: 'panel=departure', tone: 'paper' },
+] as const;
+
 function TabSpinner() {
   return (
     <div className="flex justify-center py-12">
@@ -134,6 +148,10 @@ export default function TripDetailPage() {
       ? { label: `旅行中 · 第 ${Math.abs(diffStart) + 1}/${totalDays} 天`, className: 'border-[#ffc91a] bg-[#ffc91a] text-[#111111]' }
       : { label: '行程已結束', className: 'border-white/15 bg-white/10 text-slate-300' };
   const activeSection = TABS.find(tab => tab.id === activeTab) || TABS[0];
+  const openWorkspaceTool = (tool: typeof WORKSPACE_TOOLS[number]) => {
+    setActiveTab(tool.tab);
+    navigate(`/trip/${trip.Trip_ID}?tab=${tool.tab}${tool.query ? `&${tool.query}` : ''}`);
+  };
   const exportBooklet = async (): Promise<boolean> => {
     if (exporting) return false;
     setExporting(true);
@@ -187,6 +205,38 @@ export default function TripDetailPage() {
               </details>
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="route-enter-delay">
+        <div className="mb-4 flex items-end justify-between gap-4 px-1">
+          <div>
+            <p className="portal-eyebrow text-[#9b907c]">SECTION / YOUR TRIP TOOLS</p>
+            <h2 className="mt-1 text-xl font-extrabold text-[#171717]">下一步，從這裡開始</h2>
+          </div>
+          <span className="text-2xl font-extrabold text-[#b7aa91]">09</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+          {WORKSPACE_TOOLS.map(tool => {
+            const className = tool.tone === 'ink'
+              ? 'bg-[#111111] text-white shadow-[0_14px_30px_rgba(17,17,17,0.16)] hover:-translate-y-0.5'
+              : tool.tone === 'yellow'
+                ? 'bg-[#ffc91a] text-[#111111] shadow-[0_14px_30px_rgba(156,116,0,0.14)] hover:-translate-y-0.5'
+                : 'border border-[#e3ddcf] bg-white text-[#171717] shadow-[0_12px_28px_rgba(17,17,17,0.06)] hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(17,17,17,0.10)]';
+            const eyebrowClass = tool.tone === 'ink' ? 'text-[#ffc91a]' : tool.tone === 'yellow' ? 'text-[#735700]' : 'text-[#9b907c]';
+            const descriptionClass = tool.tone === 'ink' ? 'text-white/65' : tool.tone === 'yellow' ? 'text-[#4d3900]' : 'text-slate-500';
+            return (
+              <button
+                key={tool.number}
+                onClick={() => openWorkspaceTool(tool)}
+                className={`min-h-36 rounded-[1.35rem] p-5 text-left transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111] focus-visible:ring-offset-2 ${className}`}
+              >
+                <p className={`portal-eyebrow ${eyebrowClass}`}>{tool.number} / {tool.eyebrow}</p>
+                <p className="mt-4 text-lg font-extrabold leading-tight">{tool.emoji} {tool.title}</p>
+                <p className={`mt-2 text-xs leading-5 ${descriptionClass}`}>{tool.description}</p>
+              </button>
+            );
+          })}
         </div>
       </section>
 
