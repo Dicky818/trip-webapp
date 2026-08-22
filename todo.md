@@ -138,4 +138,5 @@
 - [x] Move workspace actions into consistent 01–09 numbered tool cards after a trip is opened.
 - [x] Validate and publish the revised two-level trip navigation in an authenticated desktop production session.
 - [ ] Recheck the revised two-level trip navigation in an iPhone-sized browser session.
+- [x] Renumber workspace tabs from 01 onward and remove the redundant WORKSPACE label.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.

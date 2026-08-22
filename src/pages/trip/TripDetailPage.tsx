@@ -19,11 +19,11 @@ const PackingListTab = React.lazy(() => import('./PackingListTab'));
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
 const TABS = [
-  { id: 'info', label: '概覽', shortLabel: '概覽', emoji: '🧭', description: '掌握今天與下一站', icon: <Plane size={17} /> },
-  { id: 'itinerary', label: '規劃路線', shortLabel: '路線', emoji: '📍', description: '安排每天的時間與地點', icon: <Map size={17} /> },
-  { id: 'expenses', label: '記錄支出', shortLabel: '支出', emoji: '💳', description: '收據、分帳與總覽', icon: <DollarSign size={17} /> },
-  { id: 'packing', label: '打包清單', shortLabel: '打包', emoji: '🎒', description: '出發前的必需品', icon: <Package size={17} /> },
-  { id: 'ai', label: '旅程助手', shortLabel: '助手', emoji: '✨', description: '整理需要留意的事', icon: <Sparkles size={17} /> },
+  { id: 'info', number: '01', label: '概覽', shortLabel: '概覽', emoji: '🧭', description: '掌握今天與下一站', icon: <Plane size={17} /> },
+  { id: 'itinerary', number: '02', label: '規劃路線', shortLabel: '路線', emoji: '📍', description: '安排每天的時間與地點', icon: <Map size={17} /> },
+  { id: 'expenses', number: '03', label: '記錄支出', shortLabel: '支出', emoji: '💳', description: '收據、分帳與總覽', icon: <DollarSign size={17} /> },
+  { id: 'packing', number: '04', label: '打包清單', shortLabel: '打包', emoji: '🎒', description: '出發前的必需品', icon: <Package size={17} /> },
+  { id: 'ai', number: '05', label: '旅程助手', shortLabel: '助手', emoji: '✨', description: '整理需要留意的事', icon: <Sparkles size={17} /> },
 ];
 
 // Design system: "Trip workspace tool rail" — all primary actions live after
@@ -243,9 +243,8 @@ export default function TripDetailPage() {
       <div className="grid gap-5 xl:grid-cols-[224px_minmax(0,1fr)] route-enter-delay">
         <aside className="hidden xl:block">
           <div className="sticky top-24 rounded-2xl border border-[#e3ddcf] bg-white p-2 shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
-            <p className="portal-eyebrow px-3 py-2 text-[#9b907c]">WORKSPACE</p>
             <nav className="space-y-1">
-              {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full text-left rounded-xl px-3 py-2.5 transition-colors ${activeTab === tab.id ? 'bg-[#111111] text-[#ffc91a] shadow-sm' : 'text-slate-600 hover:bg-[#f5f2e8]'}`}><span className="flex items-center gap-2.5 text-sm font-bold"><span aria-hidden="true">{tab.emoji}</span>{tab.label}</span></button>)}
+              {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full text-left rounded-xl px-3 py-2.5 transition-colors ${activeTab === tab.id ? 'bg-[#111111] text-[#ffc91a] shadow-sm' : 'text-slate-600 hover:bg-[#f5f2e8]'}`}><span className="flex items-center gap-2.5 text-sm font-bold"><span className="w-4 text-[10px] tracking-wide opacity-70">{tab.number}</span><span aria-hidden="true">{tab.emoji}</span>{tab.label}</span></button>)}
             </nav>
           </div>
         </aside>
@@ -253,7 +252,7 @@ export default function TripDetailPage() {
         <div className="min-w-0">
             <div className="mb-4 flex items-center gap-3 px-1">
               <span className="text-base" aria-hidden="true">{activeSection.emoji}</span>
-            <div><p className="portal-eyebrow text-[#9b907c]">NOW / {activeSection.id}</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{activeSection.label}</h2></div>
+            <div><p className="portal-eyebrow text-[#9b907c]">{activeSection.number} / SECTION</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{activeSection.label}</h2></div>
             </div>
 
           <div className="min-h-[32rem] overflow-hidden rounded-[1.5rem] border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
