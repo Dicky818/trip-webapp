@@ -215,7 +215,7 @@ export default function TripDetailPage() {
             <p className="portal-eyebrow text-[#9b907c]">SECTION / YOUR TRIP TOOLS</p>
             <h2 className="mt-1 text-xl font-extrabold text-[#171717]">下一步，從這裡開始</h2>
           </div>
-          <span className="text-2xl font-extrabold text-[#b7aa91]">09</span>
+          <span className="text-2xl font-extrabold text-[#b7aa91]">{String(WORKSPACE_TOOLS.length).padStart(2, '0')}</span>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {WORKSPACE_TOOLS.map(tool => {

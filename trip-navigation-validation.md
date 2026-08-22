@@ -11,3 +11,5 @@ After the final production publish, the pre-selection page was rechecked with it
 During the sequential-label verification, a remaining hero eyebrow reading `TRIP / WORKSPACE` was identified. It has been replaced with `TRIP / PLAN` so no English WORKSPACE label remains in the selected-trip view.
 
 The final production check confirms the selected trip now shows `TRIP / PLAN`, tab labels `01` through `05`, and an active-section eyebrow of `01 / SECTION` for the Overview tab. The prior standalone `WORKSPACE` navigation heading and all English WORKSPACE wording have been removed.
+
+After Overview was added as the first tool card, the production grid correctly displayed cards `01 / OVERVIEW` through `10 / DEPARTURE`. The visual section counter above the grid still displayed `09`, however, and requires a final correction to `10` or a dynamic count.
