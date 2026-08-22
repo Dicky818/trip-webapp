@@ -142,4 +142,6 @@
 - [x] Verify all 01–09 tool-card navigation routes in the production app without modifying trip data.
 - [x] Compare 07–09 format and route behavior against 01–06 and verify the two requested home trip cards.
 - [ ] Confirm whether the live `2026 6月京都` trip should be renamed to `2026 6月東京` before changing source data.
+- [x] Add Overview as workspace tool card 01 and renumber all existing workspace tools through 10.
+- [ ] Validate and publish the 01–10 tool-card navigation sequence without modifying trip data.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.

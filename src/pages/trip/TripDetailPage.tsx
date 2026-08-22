@@ -29,15 +29,16 @@ const TABS = [
 // Design system: "Trip workspace tool rail" — all primary actions live after
 // trip selection, using the same numbered editorial cards from 01 through 09.
 const WORKSPACE_TOOLS = [
-  { number: '01', eyebrow: 'NOW', emoji: '📍', title: '今日路線', description: '下一站、時間與交通', tab: 'itinerary', query: 'focus=today', tone: 'ink' },
-  { number: '02', eyebrow: 'PLAN', emoji: '🗺️', title: '規劃路線', description: '每一天的站點與備案', tab: 'itinerary', query: '', tone: 'paper' },
-  { number: '03', eyebrow: 'SPEND', emoji: '💳', title: '記錄支出', description: '收據、付款與分帳', tab: 'expenses', query: '', tone: 'paper' },
-  { number: '04', eyebrow: 'STAY', emoji: '✈️', title: '航班與住宿', description: '入住、航班與確認資料', tab: 'info', query: '', tone: 'paper' },
-  { number: '05', eyebrow: 'PACK', emoji: '🎒', title: '打包清單', description: '出發前的必要準備', tab: 'packing', query: '', tone: 'paper' },
-  { number: '06', eyebrow: 'GUIDE', emoji: '✨', title: '旅程助手', description: '依目前資料整理提醒', tab: 'ai', query: '', tone: 'paper' },
-  { number: '07', eyebrow: 'SUPPORT', emoji: '💬', title: '旅程支援', description: '連線提示與旅程提醒', tab: 'ai', query: '', tone: 'yellow' },
-  { number: '08', eyebrow: 'OPERATIONS', emoji: '⏱️', title: '今日作戰', description: '查看今天的緊湊安排', tab: 'itinerary', query: 'focus=today', tone: 'paper' },
-  { number: '09', eyebrow: 'DEPARTURE', emoji: '🧳', title: '出發前包', description: '行程、PDF 與同步準備', tab: 'info', query: 'panel=departure', tone: 'paper' },
+  { number: '01', eyebrow: 'OVERVIEW', emoji: '🧭', title: '概覽', description: '旅程摘要、健康與出發準備', tab: 'info', query: '', tone: 'ink' },
+  { number: '02', eyebrow: 'NOW', emoji: '📍', title: '今日路線', description: '下一站、時間與交通', tab: 'itinerary', query: 'focus=today', tone: 'paper' },
+  { number: '03', eyebrow: 'PLAN', emoji: '🗺️', title: '規劃路線', description: '每一天的站點與備案', tab: 'itinerary', query: '', tone: 'paper' },
+  { number: '04', eyebrow: 'SPEND', emoji: '💳', title: '記錄支出', description: '收據、付款與分帳', tab: 'expenses', query: '', tone: 'paper' },
+  { number: '05', eyebrow: 'STAY', emoji: '✈️', title: '航班與住宿', description: '入住、航班與確認資料', tab: 'info', query: '', tone: 'paper' },
+  { number: '06', eyebrow: 'PACK', emoji: '🎒', title: '打包清單', description: '出發前的必要準備', tab: 'packing', query: '', tone: 'paper' },
+  { number: '07', eyebrow: 'GUIDE', emoji: '✨', title: '旅程助手', description: '依目前資料整理提醒', tab: 'ai', query: '', tone: 'paper' },
+  { number: '08', eyebrow: 'SUPPORT', emoji: '💬', title: '旅程支援', description: '連線提示與旅程提醒', tab: 'ai', query: '', tone: 'yellow' },
+  { number: '09', eyebrow: 'OPERATIONS', emoji: '⏱️', title: '今日作戰', description: '查看今天的緊湊安排', tab: 'itinerary', query: 'focus=today', tone: 'paper' },
+  { number: '10', eyebrow: 'DEPARTURE', emoji: '🧳', title: '出發前包', description: '行程、PDF 與同步準備', tab: 'info', query: 'panel=departure', tone: 'paper' },
 ] as const;
 
 function TabSpinner() {
