@@ -9,3 +9,5 @@ The August Osaka–Kyoto workspace was opened in the same production session. It
 After the final production publish, the pre-selection page was rechecked with its PWA cache cleared. It now contains exactly the two requested trip-entry cards and no install prompt, portal hero, support panel, health card, departure card, or numbered workspace tools.
 
 During the sequential-label verification, a remaining hero eyebrow reading `TRIP / WORKSPACE` was identified. It has been replaced with `TRIP / PLAN` so no English WORKSPACE label remains in the selected-trip view.
+
+The final production check confirms the selected trip now shows `TRIP / PLAN`, tab labels `01` through `05`, and an active-section eyebrow of `01 / SECTION` for the Overview tab. The prior standalone `WORKSPACE` navigation heading and all English WORKSPACE wording have been removed.
