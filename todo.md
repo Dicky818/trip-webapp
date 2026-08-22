@@ -139,4 +139,7 @@
 - [x] Validate and publish the revised two-level trip navigation in an authenticated desktop production session.
 - [ ] Recheck the revised two-level trip navigation in an iPhone-sized browser session.
 - [x] Renumber workspace tabs from 01 onward and remove the redundant WORKSPACE label.
+- [x] Verify all 01–09 tool-card navigation routes in the production app without modifying trip data.
+- [x] Compare 07–09 format and route behavior against 01–06 and verify the two requested home trip cards.
+- [ ] Confirm whether the live `2026 6月京都` trip should be renamed to `2026 6月東京` before changing source data.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.
