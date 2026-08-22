@@ -7,3 +7,5 @@ The remaining validation is to open a trip and confirm that the relocated 01–0
 The August Osaka–Kyoto workspace was opened in the same production session. It displays the complete `01 / NOW` through `09 / DEPARTURE` tool rail before the workspace content. The `09 / DEPARTURE` card correctly routes to `tab=info&panel=departure`, opening the existing departure-package readiness section without changing trip data.
 
 After the final production publish, the pre-selection page was rechecked with its PWA cache cleared. It now contains exactly the two requested trip-entry cards and no install prompt, portal hero, support panel, health card, departure card, or numbered workspace tools.
+
+During the sequential-label verification, a remaining hero eyebrow reading `TRIP / WORKSPACE` was identified. It has been replaced with `TRIP / PLAN` so no English WORKSPACE label remains in the selected-trip view.

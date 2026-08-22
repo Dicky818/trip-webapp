@@ -192,7 +192,7 @@ export default function TripDetailPage() {
           ) : (
             <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="portal-eyebrow text-[#f5f2e8]/50">TRIP / WORKSPACE</p>
+                <p className="portal-eyebrow text-[#f5f2e8]/50">TRIP / PLAN</p>
                 <div className="mt-3 flex flex-wrap items-center gap-3"><h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl">{trip.Trip_Name}</h1><span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${tripStatus.className}`}>{tripStatus.label}</span></div>
                 <p className="mt-2 text-sm text-[#f5f2e8]/70">{formatDate(trip.Start_Date)} — {formatDate(trip.End_Date)} <span className="mx-2 text-white/25">/</span><span className="font-semibold text-[#ffc91a]">{trip.Base_Currency}</span></p>
               </div>
