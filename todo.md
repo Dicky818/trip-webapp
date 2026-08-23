@@ -146,4 +146,5 @@
 - [x] Validate and publish the 01–10 tool-card navigation sequence without modifying trip data.
 - [x] Diagnose why an existing browser still receives the prior 01–09 workspace bundle after the Overview-first release.
 - [x] Repair and validate PWA update delivery so cached sessions receive the current 01–10 workspace interface.
+- [x] Run a final no-write production test of the updated PWA worker and all Overview-first 01–10 tool-card destinations.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.
