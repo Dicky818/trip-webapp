@@ -144,6 +144,6 @@
 - [ ] Confirm whether the live `2026 6月京都` trip should be renamed to `2026 6月東京` before changing source data.
 - [x] Add Overview as workspace tool card 01 and renumber all existing workspace tools through 10.
 - [x] Validate and publish the 01–10 tool-card navigation sequence without modifying trip data.
-- [ ] Diagnose why an existing browser still receives the prior 01–09 workspace bundle after the Overview-first release.
-- [ ] Repair and validate PWA update delivery so cached sessions receive the current 01–10 workspace interface.
+- [x] Diagnose why an existing browser still receives the prior 01–09 workspace bundle after the Overview-first release.
+- [x] Repair and validate PWA update delivery so cached sessions receive the current 01–10 workspace interface.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.
