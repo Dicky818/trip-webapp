@@ -43,9 +43,13 @@ export default defineConfig({
           }
         ]
       },
-        workbox: {
+      workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        // HashRouter never needs an HTML navigation fallback. Leaving the
+        // default fallback enabled can make an older worker serve a cached
+        // index.html indefinitely after a GitHub Pages deployment.
+        navigateFallback: undefined,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
