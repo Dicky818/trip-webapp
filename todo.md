@@ -147,4 +147,9 @@
 - [x] Diagnose why an existing browser still receives the prior 01–09 workspace bundle after the Overview-first release.
 - [x] Repair and validate PWA update delivery so cached sessions receive the current 01–10 workspace interface.
 - [x] Run a final no-write production test of the updated PWA worker and all Overview-first 01–10 tool-card destinations.
+- [ ] Add a homepage 「＋ 新增行程」 control that opens the existing trip-creation flow.
+- [ ] Fix the selected-trip 「更多」 menu so all actions are visible and usable on desktop, iPad, and iPhone layouts.
+- [ ] Remove the workspace tool-card preface labels and load detailed content only after a 01–10 card is selected.
+- [ ] Run a read-only inventory of Supabase Autotrader_Pro schemas, tables, and row counts before final deletion confirmation.
+- [x] Complete the read-only Autotrader_Pro schema inventory and identify associated public legacy tables before deletion confirmation.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.

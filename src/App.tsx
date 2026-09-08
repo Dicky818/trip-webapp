@@ -52,6 +52,7 @@ function ProtectedRoutes() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="trip/:tripId" element={<TripDetailPage />} />
+            <Route path="trip/:tripId/tool/:toolNumber" element={<TripDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

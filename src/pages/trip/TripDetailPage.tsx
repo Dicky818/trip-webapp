@@ -1,8 +1,8 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 /*
- * Design system: "編輯式旅程入口" — the journey pass establishes trip identity,
- * while the task rail and dock remain quiet, contextual travel shortcuts.
+ * Design system: "Numbered trip desk" — the selected-trip landing screen is
+ * card-only. A number opens its own detail URL and provides a clear return path.
  */
 import { ArrowLeft, Plane, Map, DollarSign, Sparkles, Edit2, Check, X, Package, Clock, FileDown, MoreHorizontal } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -50,7 +50,7 @@ function TabSpinner() {
 }
 
 export default function TripDetailPage() {
-  const { tripId } = useParams<{ tripId: string }>();
+  const { tripId, toolNumber } = useParams<{ tripId: string; toolNumber?: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { showToast } = useApp();
@@ -88,6 +88,13 @@ export default function TripDetailPage() {
     const requestedTab = searchParams.get('tab');
     if (requestedTab && TABS.some(tab => tab.id === requestedTab)) setActiveTab(requestedTab);
   }, [searchParams]);
+
+  const selectedTool = WORKSPACE_TOOLS.find(tool => tool.number === toolNumber);
+  const isToolDetail = Boolean(selectedTool);
+
+  useEffect(() => {
+    if (selectedTool) setActiveTab(selectedTool.tab);
+  }, [selectedTool]);
 
   useEffect(() => {
     if (searchParams.get('panel') !== 'departure') return;
@@ -151,7 +158,7 @@ export default function TripDetailPage() {
   const activeSection = TABS.find(tab => tab.id === activeTab) || TABS[0];
   const openWorkspaceTool = (tool: typeof WORKSPACE_TOOLS[number]) => {
     setActiveTab(tool.tab);
-    navigate(`/trip/${trip.Trip_ID}?tab=${tool.tab}${tool.query ? `&${tool.query}` : ''}`);
+    navigate(`/trip/${trip.Trip_ID}/tool/${tool.number}${tool.query ? `?${tool.query}` : ''}`);
   };
   const exportBooklet = async (): Promise<boolean> => {
     if (exporting) return false;
@@ -173,12 +180,12 @@ export default function TripDetailPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <section className="portal-pass relative overflow-hidden rounded-[1.75rem] px-5 py-6 text-white sm:px-8 sm:py-7 route-enter">
+      <section className="portal-pass relative overflow-visible rounded-[1.75rem] px-5 py-6 text-white sm:px-8 sm:py-7 route-enter">
         <div className="absolute inset-0 route-grid opacity-40" />
         <div className="absolute -right-16 -bottom-20 h-56 w-56 rounded-full bg-[#ffc91a]/15 blur-3xl" />
         <div className="relative">
-          <button onClick={() => navigate('/')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#f5f2e8]/70 transition-colors hover:text-white">
-            <ArrowLeft size={15} /> 所有行程
+          <button onClick={() => navigate(isToolDetail ? `/trip/${trip.Trip_ID}` : '/')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#f5f2e8]/70 transition-colors hover:text-white">
+            <ArrowLeft size={15} /> {isToolDetail ? '返回工具卡' : '所有行程'}
           </button>
 
           {editingName ? (
@@ -197,9 +204,9 @@ export default function TripDetailPage() {
                 <div className="mt-3 flex flex-wrap items-center gap-3"><h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl">{trip.Trip_Name}</h1><span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${tripStatus.className}`}>{tripStatus.label}</span></div>
                 <p className="mt-2 text-sm text-[#f5f2e8]/70">{formatDate(trip.Start_Date)} — {formatDate(trip.End_Date)} <span className="mx-2 text-white/25">/</span><span className="font-semibold text-[#ffc91a]">{trip.Base_Currency}</span></p>
               </div>
-              <details className="relative self-start sm:self-auto">
+              <details className="relative z-30 self-start sm:self-auto">
                 <summary className="list-none inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10"><MoreHorizontal size={16} /> 更多</summary>
-                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-36 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-xl">
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-xl">
                   <button onClick={exportBooklet} disabled={exporting} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-slate-50 disabled:opacity-50"><FileDown size={15} className={exporting ? 'animate-pulse' : ''} /> 匯出小冊子</button>
                   <button onClick={() => { setEditName(trip.Trip_Name); setEditStartDate(trip.Start_Date); setEditEndDate(trip.End_Date); setEditCurrency(trip.Base_Currency); setEditingName(true); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-slate-50"><Edit2 size={15} /> 編輯行程</button>
                 </div>
@@ -209,14 +216,8 @@ export default function TripDetailPage() {
         </div>
       </section>
 
+      {!isToolDetail ? (
       <section className="route-enter-delay">
-        <div className="mb-4 flex items-end justify-between gap-4 px-1">
-          <div>
-            <p className="portal-eyebrow text-[#9b907c]">SECTION / YOUR TRIP TOOLS</p>
-            <h2 className="mt-1 text-xl font-extrabold text-[#171717]">下一步，從這裡開始</h2>
-          </div>
-          <span className="text-2xl font-extrabold text-[#b7aa91]">{String(WORKSPACE_TOOLS.length).padStart(2, '0')}</span>
-        </div>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           {WORKSPACE_TOOLS.map(tool => {
             const className = tool.tone === 'ink'
@@ -240,20 +241,13 @@ export default function TripDetailPage() {
           })}
         </div>
       </section>
+      ) : (
 
-      <div className="grid gap-5 xl:grid-cols-[224px_minmax(0,1fr)] route-enter-delay">
-        <aside className="hidden xl:block">
-          <div className="sticky top-24 rounded-2xl border border-[#e3ddcf] bg-white p-2 shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
-            <nav className="space-y-1">
-              {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full text-left rounded-xl px-3 py-2.5 transition-colors ${activeTab === tab.id ? 'bg-[#111111] text-[#ffc91a] shadow-sm' : 'text-slate-600 hover:bg-[#f5f2e8]'}`}><span className="flex items-center gap-2.5 text-sm font-bold"><span className="w-4 text-[10px] tracking-wide opacity-70">{tab.number}</span><span aria-hidden="true">{tab.emoji}</span>{tab.label}</span></button>)}
-            </nav>
-          </div>
-        </aside>
-
+      <section className="route-enter-delay">
         <div className="min-w-0">
             <div className="mb-4 flex items-center gap-3 px-1">
-              <span className="text-base" aria-hidden="true">{activeSection.emoji}</span>
-            <div><p className="portal-eyebrow text-[#9b907c]">{activeSection.number} / SECTION</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{activeSection.label}</h2></div>
+              <span className="text-base" aria-hidden="true">{selectedTool?.emoji || activeSection.emoji}</span>
+            <div><p className="portal-eyebrow text-[#9b907c]">{selectedTool?.number || activeSection.number} / {selectedTool?.eyebrow || 'SECTION'}</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{selectedTool?.title || activeSection.label}</h2></div>
             </div>
 
           <div className="min-h-[32rem] overflow-hidden rounded-[1.5rem] border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
@@ -266,13 +260,9 @@ export default function TripDetailPage() {
             </Suspense>
           </div>
         </div>
-      </div>
+      </section>
+      )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e3ddcf] bg-[#f5f2e8]/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_24px_rgba(17,17,17,0.08)] backdrop-blur-xl xl:hidden" aria-label="行程工作區">
-        <div className="grid grid-cols-5">
-          {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-bold transition-colors ${activeTab === tab.id ? 'bg-[#111111] text-[#ffc91a]' : 'text-slate-400'}`}><span className="text-sm" aria-hidden="true">{tab.emoji}</span><span>{tab.shortLabel}</span></button>)}
-        </div>
-      </nav>
     </div>
   );
 }

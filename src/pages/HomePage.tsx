@@ -160,27 +160,36 @@ export default function HomePage() {
     <div className="space-y-6 route-enter">
       {tripsLoading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-      ) : homeTrips.length === 0 ? (
-        <section className="rounded-[1.5rem] border border-[#e3ddcf] bg-white p-6 shadow-[0_12px_28px_rgba(17,17,17,0.06)] sm:p-8 route-enter-delay">
-          <p className="portal-eyebrow text-[#9a7100]">TRIP / SELECT</p>
-          <h2 className="mt-2 text-xl font-extrabold text-[#111111]">找不到可開啟的指定行程。</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500">請確認你已加入「2026 8月 大阪京都」或「2026 6月京都」。</p>
-        </section>
       ) : (
-        <div className="grid grid-cols-1 gap-4 route-enter-delay sm:grid-cols-2">
-          {homeTrips.map(trip => (
-            <TripCard
-              key={trip.Trip_ID}
-              trip={trip}
-              isOwner={trip.Is_Owner !== false}
-              formatDate={formatDate}
-              getDuration={getDuration}
-              onNavigate={() => navigate(`/trip/${trip.Trip_ID}`)}
-              onDelete={null}
-              onShare={null}
-            />
-          ))}
-        </div>
+        <>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowCreate(true)} className="min-h-11 bg-[#ffc91a] text-[#111111] hover:bg-[#f1b900]">
+              <CirclePlus size={17} /> 新增行程
+            </Button>
+          </div>
+          {homeTrips.length === 0 ? (
+            <section className="rounded-[1.5rem] border border-[#e3ddcf] bg-white p-6 shadow-[0_12px_28px_rgba(17,17,17,0.06)] sm:p-8 route-enter-delay">
+              <p className="portal-eyebrow text-[#9a7100]">TRIP / SELECT</p>
+              <h2 className="mt-2 text-xl font-extrabold text-[#111111]">尚未有可開啟的行程。</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">請按「新增行程」建立第一個旅程。</p>
+            </section>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 route-enter-delay sm:grid-cols-2">
+              {homeTrips.map(trip => (
+                <TripCard
+                  key={trip.Trip_ID}
+                  trip={trip}
+                  isOwner={trip.Is_Owner !== false}
+                  formatDate={formatDate}
+                  getDuration={getDuration}
+                  onNavigate={() => navigate(`/trip/${trip.Trip_ID}`)}
+                  onDelete={null}
+                  onShare={null}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* 新增行程 Modal */}
