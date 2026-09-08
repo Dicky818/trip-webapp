@@ -147,9 +147,23 @@
 - [x] Diagnose why an existing browser still receives the prior 01–09 workspace bundle after the Overview-first release.
 - [x] Repair and validate PWA update delivery so cached sessions receive the current 01–10 workspace interface.
 - [x] Run a final no-write production test of the updated PWA worker and all Overview-first 01–10 tool-card destinations.
-- [ ] Add a homepage 「＋ 新增行程」 control that opens the existing trip-creation flow.
-- [ ] Fix the selected-trip 「更多」 menu so all actions are visible and usable on desktop, iPad, and iPhone layouts.
-- [ ] Remove the workspace tool-card preface labels and load detailed content only after a 01–10 card is selected.
+- [x] Add a homepage 「＋ 新增行程」 control that opens the existing trip-creation flow.
+- [x] Fix the selected-trip 「更多」 menu so all actions are visible and usable on desktop, iPad, and iPhone layouts.
+- [x] Remove the workspace tool-card preface labels and load detailed content only after a 01–10 card is selected.
 - [ ] Run a read-only inventory of Supabase Autotrader_Pro schemas, tables, and row counts before final deletion confirmation.
 - [x] Complete the read-only Autotrader_Pro schema inventory and identify associated public legacy tables before deletion confirmation.
+- [ ] Delete the user-confirmed Autotrader_Pro schema and associated legacy public trading tables while preserving `trip_planner` and Supabase platform schemas.
+- [ ] Verify the deletion result and confirm Trip Planner tables and data remain intact.
+- [ ] Update the confirmed Supabase `anon` and `authenticated` search paths to `trip_planner, public` after the Autotrader_Pro schema removal.
+- [ ] Revalidate the Supabase REST API and the no-write production 01–10 tool-detail experience after the search-path recovery.
+- [ ] Update the confirmed Supabase `service_role` search path to `trip_planner, public` and reload REST configuration.
+- [ ] Repair the confirmed PostgREST exposed-schema configuration to expose only `public` and `trip_planner`.
+- [ ] Verify REST recovery and all preserved Trip Planner tables after the PostgREST repair.
+- [ ] Verify missing Trip Planner read privileges and active RLS protections before any access restoration.
+- [ ] Obtain explicit approval before restoring only the Trip Planner read privileges required by the application.
+- [ ] Restore the user-approved authenticated SELECT privilege on `trip_planner.trips` while retaining all existing RLS policies.
+- [ ] Replace the invalid legacy Supabase frontend key with the confirmed active publishable key and republish the application.
+- [x] Revalidate the authenticated production home page, workspace, More menu, and 01–10 detail routes after the key replacement.
+- [x] Restore the user-approved authenticated SELECT privilege on `trip_planner.trips` while retaining all existing RLS policies.
+- [x] Replace the invalid legacy Supabase frontend key with the confirmed active publishable key and republish the application.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.
