@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 /*
- * Design system: "Trip entry gallery" — the home screen exposes only the
- * requested trip passes. All operational tools appear after a trip is opened.
+ * Design system: "Trip entry gallery" — the home screen exposes every active
+ * trip pass returned by the authenticated source of truth. All operational
+ * tools appear after a trip is opened.
  */
 import { Plane, Calendar, Trash2, MapPin, Share2, Users, Link2, Copy, Check, ArrowRight, CirclePlus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -153,8 +154,7 @@ export default function HomePage() {
   };
 
   const activeTrips = trips.filter(t => t.Status !== 'Deleted');
-  const homeTripNames = new Set(['2026 8月 大阪京都', '2026 6月京都']);
-  const homeTrips = activeTrips.filter(trip => homeTripNames.has(trip.Trip_Name));
+  const homeTrips = activeTrips;
 
   return (
     <div className="space-y-6 route-enter">

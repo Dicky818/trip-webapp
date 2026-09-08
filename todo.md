@@ -164,6 +164,8 @@
 - [ ] Restore the user-approved authenticated SELECT privilege on `trip_planner.trips` while retaining all existing RLS policies.
 - [ ] Replace the invalid legacy Supabase frontend key with the confirmed active publishable key and republish the application.
 - [x] Revalidate the authenticated production home page, workspace, More menu, and 01–10 detail routes after the key replacement.
+- [ ] Confirm the two newly created trips exist and identify why the homepage currently lists only the original two trips.
+- [ ] Remove the homepage two-trip display restriction and verify all user-accessible trips appear without modifying trip records.
 - [x] Restore the user-approved authenticated SELECT privilege on `trip_planner.trips` while retaining all existing RLS policies.
 - [x] Replace the invalid legacy Supabase frontend key with the confirmed active publishable key and republish the application.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.
