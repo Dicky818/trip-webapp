@@ -185,6 +185,8 @@ export default function ExpensesTab({ trip }: Props) {
     Flight_Date: '', Departure_Time: '', Landing_Time: '', Arrival_Date: '', Arrival_Time: '', Return_Landing_Time: '', Flight_Status: '',
     Accommodation_Name: '', Accommodation_Address: '', Check_In_Date: '', Check_Out_Date: '',
     Rail_Start_Date: '', Rail_End_Date: '', Rail_Order_No: '', Rail_Platform: '',
+    Rental_Pickup_Date: '', Rental_Return_Date: '',
+    Insurance_Start_Date: '', Insurance_End_Date: '',
     Is_Booking: false,
   });
   const [savingExpense, setSavingExpense] = useState(false);
@@ -507,6 +509,10 @@ export default function ExpensesTab({ trip }: Props) {
         Rail_End_Date: expense.Rail_End_Date || '',
         Rail_Order_No: expense.Rail_Order_No || '',
         Rail_Platform: expense.Rail_Platform || '',
+        Rental_Pickup_Date: expense.Rental_Pickup_Date || '',
+        Rental_Return_Date: expense.Rental_Return_Date || '',
+        Insurance_Start_Date: expense.Insurance_Start_Date || '',
+        Insurance_End_Date: expense.Insurance_End_Date || '',
         Is_Booking: expense.Is_Booking || false,
       });
     } else {
@@ -536,8 +542,23 @@ export default function ExpensesTab({ trip }: Props) {
     console.log('[SaveExpense] Payer:', JSON.stringify(expenseForm.Payer), 'Payer_ID:', tripMembers.find(m => m.Member_Name === expenseForm.Payer)?.Member_ID);
     setSavingExpense(true);
     try {
-      const isFlightCategory = expenseForm.Main_Category === '機票' || expenseForm.Sub_Category === '機票';
-      const isAccommodationCategory = expenseForm.Main_Category === '住宿' || expenseForm.Sub_Category === '住宿';
+      const mainCategory = String(expenseForm.Main_Category || '').trim();
+      const subCategory = String(expenseForm.Sub_Category || '').trim();
+      const categoryText = `${mainCategory} ${subCategory}`.toLowerCase();
+      const isFlightCategory = mainCategory === '機票' || subCategory === '機票';
+      const isAccommodationCategory = mainCategory === '住宿' || subCategory === '住宿';
+      const isRentalCarCategory = mainCategory === '交通' && (subCategory.includes('租賃汽車') || subCategory.includes('租車') || categoryText.includes('rental'));
+      const isInsuranceCategory = categoryText.includes('保險') || categoryText.includes('insurance');
+      const validateRange = (start: string, end: string, label: string) => {
+        if (!start || !end) { showToast(`請填寫${label}開始及結束日期`, 'error'); return false; }
+        if (start > end) { showToast(`${label}結束日期不能早於開始日期`, 'error'); return false; }
+        if ((trip.Start_Date && start < trip.Start_Date) || (trip.End_Date && end > trip.End_Date)) {
+          showToast(`${label}日期必須在旅程期間內`, 'error'); return false;
+        }
+        return true;
+      };
+      if (isRentalCarCategory && !validateRange(String(expenseForm.Rental_Pickup_Date || ''), String(expenseForm.Rental_Return_Date || ''), '租賃汽車')) return;
+      if (isInsuranceCategory && !validateRange(String(expenseForm.Insurance_Start_Date || ''), String(expenseForm.Insurance_End_Date || ''), '保險')) return;
       const payload: Partial<Expense> = {
         Trip_ID: trip.Trip_ID,
         Date: expenseForm.Date,
@@ -575,6 +596,14 @@ export default function ExpensesTab({ trip }: Props) {
         Rail_End_Date: expenseForm.Rail_End_Date || undefined,
         Rail_Order_No: expenseForm.Rail_Order_No || undefined,
         Rail_Platform: expenseForm.Rail_Platform || undefined,
+        ...(isRentalCarCategory ? {
+          Rental_Pickup_Date: expenseForm.Rental_Pickup_Date,
+          Rental_Return_Date: expenseForm.Rental_Return_Date,
+        } : {}),
+        ...(isInsuranceCategory ? {
+          Insurance_Start_Date: expenseForm.Insurance_Start_Date,
+          Insurance_End_Date: expenseForm.Insurance_End_Date,
+        } : {}),
         Is_Booking: expenseForm.Is_Booking,
       };
       let createdExpenseId: string | null = null;
@@ -679,6 +708,7 @@ export default function ExpensesTab({ trip }: Props) {
       '航班號', '航空公司', '出發地', '目的地', '航班日期', '出發時間', '到達時間', '回程日期', '回程時間', '到港時間', '航班狀態',
       '住宿名稱', '住宿地址', '入住日期', '退房日期',
       '鐵路開始日期', '鐵路結束日期', '鐵路訂單號', '購買平台',
+      '租賃汽車取車日期', '租賃汽車還車日期', '保險開始日期', '保險結束日期',
       '預訂資訊',
     ];
     const rows = expenses.map(exp => [
@@ -712,6 +742,10 @@ export default function ExpensesTab({ trip }: Props) {
       exp.Rail_End_Date || '',
       exp.Rail_Order_No || '',
       exp.Rail_Platform || '',
+      exp.Rental_Pickup_Date || '',
+      exp.Rental_Return_Date || '',
+      exp.Insurance_Start_Date || '',
+      exp.Insurance_End_Date || '',
       exp.Is_Booking ? '是' : '否',
     ]);
     const csvContent = [headers, ...rows]
@@ -1059,6 +1093,34 @@ export default function ExpensesTab({ trip }: Props) {
                 onChange={e => setExpenseForm(f => ({ ...f, Check_In_Date: e.target.value }))} />
               <Input label="退房日期" type="date" value={expenseForm.Check_Out_Date || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Check_Out_Date: e.target.value }))} />
+            </>
+          )}
+
+          {/* 租賃汽車額外欄位 */}
+          {expenseForm.Main_Category === '交通' && ['租賃汽車', '租車', 'rental'].some(k => (expenseForm.Sub_Category || '').toLowerCase().includes(k.toLowerCase())) && (
+            <>
+              <div className="col-span-2 border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">租賃汽車資訊</p>
+                <p className="text-xs text-slate-400">取車與還車日期均包括在每日費用分析內，且必須在旅程期間內。</p>
+              </div>
+              <Input label="取車日期" type="date" required value={expenseForm.Rental_Pickup_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Rental_Pickup_Date: e.target.value }))} />
+              <Input label="還車日期" type="date" required value={expenseForm.Rental_Return_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Rental_Return_Date: e.target.value }))} />
+            </>
+          )}
+
+          {/* 保險額外欄位 */}
+          {['保險', 'insurance'].some(k => `${expenseForm.Main_Category || ''} ${expenseForm.Sub_Category || ''}`.toLowerCase().includes(k.toLowerCase())) && (
+            <>
+              <div className="col-span-2 border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">保險資訊</p>
+                <p className="text-xs text-slate-400">開始與結束日期均包括在每日費用分析內，且必須在旅程期間內。</p>
+              </div>
+              <Input label="開始日期" type="date" required value={expenseForm.Insurance_Start_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Insurance_Start_Date: e.target.value }))} />
+              <Input label="結束日期" type="date" required value={expenseForm.Insurance_End_Date || ''}
+                onChange={e => setExpenseForm(f => ({ ...f, Insurance_End_Date: e.target.value }))} />
             </>
           )}
 

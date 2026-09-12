@@ -16,6 +16,9 @@ export interface Trip {
   Updated_At: string;
   Status: string;
   Share_Code?: string;
+  Owner_Display_Name?: string;
+  Traveler_Names?: string[];
+  Deleted_At?: string | null;
   // Share_Password removed — column dropped from DB for security
   Is_Owner?: boolean;
 }
@@ -160,6 +163,12 @@ export interface Expense {
   Rail_End_Date?: string;
   Rail_Order_No?: string;
   Rail_Platform?: string;
+  // Rental-car fields
+  Rental_Pickup_Date?: string;
+  Rental_Return_Date?: string;
+  // Insurance fields
+  Insurance_Start_Date?: string;
+  Insurance_End_Date?: string;
   // Booking flag
   Is_Booking?: boolean;
   Created_At: string;
@@ -227,8 +236,11 @@ function rowToTrip(r: Record<string, unknown>): Trip {
     Base_Currency: (r.base_currency as string) || 'HKD',
     Created_At: (r.created_at as string) || '',
     Updated_At: (r.updated_at as string) || '',
-    Status: 'active',
+    Status: r.deleted_at ? 'Deleted' : 'active',
     Share_Code: (r.share_code as string) || '',
+    Owner_Display_Name: (r.owner_display_name as string) || '',
+    Traveler_Names: Array.isArray(r.traveler_names) ? (r.traveler_names as unknown[]).filter((name): name is string => typeof name === 'string' && name.trim().length > 0) : [],
+    Deleted_At: (r.deleted_at as string) || null,
     // NOTE: share_password is intentionally NOT mapped here to prevent exposure in API responses.
     // Password verification is handled server-side via verify_share_password() RPC.
   };
@@ -341,6 +353,10 @@ function rowToExpense(r: Record<string, unknown>): Expense {
     Rail_End_Date: '',
     Rail_Order_No: '',
     Rail_Platform: '',
+    Rental_Pickup_Date: '',
+    Rental_Return_Date: '',
+    Insurance_Start_Date: '',
+    Insurance_End_Date: '',
     Is_Booking: (r.is_booking as boolean) || false,
     Created_At: (r.created_at as string) || '',
     Updated_At: (r.updated_at as string) || '',
@@ -484,7 +500,7 @@ async function fetchExchangeRate(from: string, to: string, signal?: AbortSignal)
 // ── API ────────────────────────────────────────────────────
 // Never request share_password_hash in browser-accessible trip queries.
 // The database also enforces this separation with column privileges.
-const TRIP_READ_FIELDS = 'id, user_id, trip_name, start_date, end_date, base_currency, share_code, owner_display_name, created_at, updated_at';
+const TRIP_READ_FIELDS = 'id, user_id, trip_name, start_date, end_date, base_currency, share_code, owner_display_name, traveler_names, deleted_at, created_at, updated_at';
 
 export const api = {
 
@@ -497,7 +513,8 @@ export const api = {
     const { data: ownedTrips, error: ownedError } = await supabase
       .from('trips')
       .select(TRIP_READ_FIELDS)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
 
     if (ownedError) return err(ownedError.message);
 
@@ -513,11 +530,12 @@ export const api = {
     let collabTrips: any[] = [];
     if (collabRecords && collabRecords.length > 0) {
       const tripIds = collabRecords.map(r => r.trip_id);
-      const { data: sharedTrips, error: sharedError } = await supabase
-        .from('trips')
-        .select(TRIP_READ_FIELDS)
-        .in('id', tripIds);
-        
+        const { data: sharedTrips, error: sharedError } = await supabase
+          .from('trips')
+          .select(TRIP_READ_FIELDS)
+          .in('id', tripIds)
+          .is('deleted_at', null);
+
       if (!sharedError && sharedTrips) {
         collabTrips = sharedTrips;
       }
@@ -549,6 +567,7 @@ export const api = {
       .from('trips')
       .select(TRIP_READ_FIELDS)
       .eq('id', tripId)
+      .is('deleted_at', null)
       .single();
     if (error) return err(error.message);
     const trip = rowToTrip(data);
@@ -559,14 +578,23 @@ export const api = {
 
   createTrip: async (body: Partial<Trip>) => {
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return err('User not logged in');
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .maybeSingle();
+    const ownerName = String(profile?.display_name || '').trim();
     const { data, error } = await supabase
       .from('trips')
       .insert({
-        user_id: user?.id || null,
+        user_id: user.id,
         trip_name: body.Trip_Name,
         start_date: body.Start_Date || null,
         end_date: body.End_Date || null,
         base_currency: body.Base_Currency || 'HKD',
+        owner_display_name: ownerName || null,
+        traveler_names: ownerName ? [ownerName] : [],
       })
       .select(TRIP_READ_FIELDS)
       .single();
@@ -583,13 +611,26 @@ export const api = {
     if (body.Start_Date !== undefined) updates.start_date = body.Start_Date || null;
     if (body.End_Date !== undefined) updates.end_date = body.End_Date || null;
     if (body.Base_Currency !== undefined) updates.base_currency = body.Base_Currency;
+    if (body.Owner_Display_Name !== undefined) updates.owner_display_name = body.Owner_Display_Name || null;
+    if (body.Traveler_Names !== undefined) {
+      const names = Array.from(new Set((body.Traveler_Names || []).map(name => String(name).trim()).filter(Boolean)));
+      updates.traveler_names = names;
+    }
+    if (body.Deleted_At !== undefined) updates.deleted_at = body.Deleted_At || null;
     const { error } = await supabase.from('trips').update(updates).eq('id', tripId);
     if (error) return err(error.message);
     return ok({ Trip_ID: tripId });
   },
 
   deleteTrip: async (tripId: string) => {
-    const { error } = await supabase.from('trips').delete().eq('id', tripId);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return err('User not logged in');
+    const { error } = await supabase
+      .from('trips')
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', tripId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
     if (error) return err(error.message);
     return ok(null);
   },
@@ -1077,6 +1118,12 @@ export const api = {
           if (dd.rail_end_date !== undefined) base.Rail_End_Date = dd.rail_end_date || '';
           if (dd.rail_order_no !== undefined) base.Rail_Order_No = dd.rail_order_no || '';
           if (dd.rail_platform !== undefined) base.Rail_Platform = dd.rail_platform || '';
+        } else if (d.detail_type === 'rental_car') {
+          if (dd.rental_pickup_date !== undefined) base.Rental_Pickup_Date = dd.rental_pickup_date || '';
+          if (dd.rental_return_date !== undefined) base.Rental_Return_Date = dd.rental_return_date || '';
+        } else if (d.detail_type === 'insurance') {
+          if (dd.insurance_start_date !== undefined) base.Insurance_Start_Date = dd.insurance_start_date || '';
+          if (dd.insurance_end_date !== undefined) base.Insurance_End_Date = dd.insurance_end_date || '';
         }
       });
       return base;
@@ -1123,6 +1170,8 @@ export const api = {
     const isFlightCat = mainCat.includes('機票') || subCat.includes('機票') || subCat.includes('flight');
     const isAccomCat = mainCat.includes('住宿') || subCat.includes('之容') || subCat.includes('酒店') || subCat.includes('民宿') || subCat.includes('airbnb') || subCat.includes('accommodation');
     const isRailCat = subCat.includes('鐵路') || subCat.includes('rail') || subCat.includes('火車');
+    const isRentalCarCat = mainCat.includes('交通') && (subCat.includes('租賃汽車') || subCat.includes('租車') || subCat.includes('rental'));
+    const isInsuranceCat = mainCat.includes('保險') || subCat.includes('保險') || mainCat.includes('insurance') || subCat.includes('insurance');
 
     if (isFlightCat && (body.Flight_No || body.Airline || body.Departure_Location)) {
       await supabase.from('expense_details').insert({
@@ -1162,6 +1211,24 @@ export const api = {
           rail_end_date: body.Rail_End_Date || '',
           rail_order_no: body.Rail_Order_No || '',
           rail_platform: body.Rail_Platform || '',
+        },
+      });
+    } else if (isRentalCarCat && (body.Rental_Pickup_Date || body.Rental_Return_Date)) {
+      await supabase.from('expense_details').insert({
+        expense_id: expenseId,
+        detail_type: 'rental_car',
+        detail_data: {
+          rental_pickup_date: body.Rental_Pickup_Date || '',
+          rental_return_date: body.Rental_Return_Date || '',
+        },
+      });
+    } else if (isInsuranceCat && (body.Insurance_Start_Date || body.Insurance_End_Date)) {
+      await supabase.from('expense_details').insert({
+        expense_id: expenseId,
+        detail_type: 'insurance',
+        detail_data: {
+          insurance_start_date: body.Insurance_Start_Date || '',
+          insurance_end_date: body.Insurance_End_Date || '',
         },
       });
     }
@@ -1226,6 +1293,8 @@ export const api = {
       body.Check_In_Date !== undefined || body.Check_Out_Date !== undefined;
     const hasRailFields = body.Rail_Start_Date !== undefined || body.Rail_End_Date !== undefined ||
       body.Rail_Order_No !== undefined || body.Rail_Platform !== undefined;
+    const hasRentalCarFields = body.Rental_Pickup_Date !== undefined || body.Rental_Return_Date !== undefined;
+    const hasInsuranceFields = body.Insurance_Start_Date !== undefined || body.Insurance_End_Date !== undefined;
 
     if (hasFlightFields) {
       // Check if flight detail record exists
@@ -1289,6 +1358,40 @@ export const api = {
         await supabase.from('expense_details').update({ detail_data: newData }).eq('id', existingDetail.id);
       } else {
         await supabase.from('expense_details').insert({ expense_id: expenseId, detail_type: 'rail', detail_data: newData });
+      }
+    }
+
+    if (hasRentalCarFields) {
+      const { data: existingDetail } = await supabase
+        .from('expense_details')
+        .select('id, detail_data')
+        .eq('expense_id', expenseId)
+        .eq('detail_type', 'rental_car')
+        .single();
+      const newData: Record<string, unknown> = { ...(existingDetail?.detail_data as Record<string, unknown> || {}) };
+      if (body.Rental_Pickup_Date !== undefined) newData.rental_pickup_date = body.Rental_Pickup_Date;
+      if (body.Rental_Return_Date !== undefined) newData.rental_return_date = body.Rental_Return_Date;
+      if (existingDetail) {
+        await supabase.from('expense_details').update({ detail_data: newData }).eq('id', existingDetail.id);
+      } else {
+        await supabase.from('expense_details').insert({ expense_id: expenseId, detail_type: 'rental_car', detail_data: newData });
+      }
+    }
+
+    if (hasInsuranceFields) {
+      const { data: existingDetail } = await supabase
+        .from('expense_details')
+        .select('id, detail_data')
+        .eq('expense_id', expenseId)
+        .eq('detail_type', 'insurance')
+        .single();
+      const newData: Record<string, unknown> = { ...(existingDetail?.detail_data as Record<string, unknown> || {}) };
+      if (body.Insurance_Start_Date !== undefined) newData.insurance_start_date = body.Insurance_Start_Date;
+      if (body.Insurance_End_Date !== undefined) newData.insurance_end_date = body.Insurance_End_Date;
+      if (existingDetail) {
+        await supabase.from('expense_details').update({ detail_data: newData }).eq('id', existingDetail.id);
+      } else {
+        await supabase.from('expense_details').insert({ expense_id: expenseId, detail_type: 'insurance', detail_data: newData });
       }
     }
 

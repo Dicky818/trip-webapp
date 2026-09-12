@@ -67,8 +67,9 @@ export default function HomePage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await api.deleteTrip(deleteTarget.Trip_ID);
-      showToast('行程已刪除');
+      const result = await api.deleteTrip(deleteTarget.Trip_ID);
+      if (!result.success) throw new Error(result.error);
+      showToast('行程已移除（資料已安全保留）');
       setDeleteTarget(null);
       await fetchTrips();
     } catch (e: unknown) {
@@ -78,7 +79,7 @@ export default function HomePage() {
     }
   };
 
-  const handleOpenShare = async (trip: Trip) => {
+  const handleOpenShare = (trip: Trip) => {
     setShareTrip(trip);
     setShareCode(trip.Share_Code || '');
     setSharePassword(''); // Password is never stored/returned; only shown after generation
@@ -153,7 +154,7 @@ export default function HomePage() {
     return new Date(y, m - 1, day).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const activeTrips = trips.filter(t => t.Status !== 'Deleted');
+  const activeTrips = trips.filter(t => t.Status !== 'Deleted' && !t.Deleted_At);
   const homeTrips = activeTrips;
 
   return (
@@ -183,8 +184,8 @@ export default function HomePage() {
                   formatDate={formatDate}
                   getDuration={getDuration}
                   onNavigate={() => navigate(`/trip/${trip.Trip_ID}`)}
-                  onDelete={null}
-                  onShare={null}
+                  onDelete={trip.Is_Owner !== false ? () => setDeleteTarget(trip) : null}
+                  onShare={trip.Is_Owner !== false ? () => { void handleOpenShare(trip); } : null}
                 />
               ))}
             </div>
@@ -230,7 +231,7 @@ export default function HomePage() {
         <div className="flex flex-col gap-4">
           <div className="bg-blue-50 rounded-xl p-4">
             <p className="text-sm text-blue-700 font-medium mb-1">邀請協作者</p>
-            <p className="text-xs text-blue-600">分享以下分享碼和密碼給協作者，他們可以在「加入行程」中輸入後加入。協作者可以新增、編輯和刪除所有行程內容，但無法刪除行程本身。</p>
+            <p className="text-xs text-blue-600">分享以下分享碼和密碼給協作者，他們可以在「加入行程」中輸入後加入。旅伴姓名及分享設定只可由行程創建者修改。</p>
           </div>
 
           {shareCode ? (
@@ -321,8 +322,8 @@ export default function HomePage() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="刪除行程"
-        message={`確定要刪除「${deleteTarget?.Trip_Name}」嗎？此操作無法復原，相關的行程和支出資料都將一併刪除。`}
+        title="移除行程"
+        message={`確定要將「${deleteTarget?.Trip_Name}」從首頁移除嗎？這會使用安全軟刪除，保留相關行程及支出資料，不會永久刪除。`}
         loading={deleting}
       />
     </div>
@@ -400,6 +401,7 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete
               onClick={(e) => { e.stopPropagation(); onShare(); }}
               className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-[#fff3c4] hover:text-[#9a7100]"
               title="分享行程"
+              aria-label="分享行程"
             >
               <Share2 size={15} />
             </button>
@@ -408,7 +410,8 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-              title="刪除行程（僅擁有者）"
+              title="移除行程（僅擁有者，軟刪除）"
+              aria-label="移除行程"
             >
               <Trash2 size={15} />
             </button>

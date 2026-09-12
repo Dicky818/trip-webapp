@@ -169,3 +169,50 @@
 - [x] Restore the user-approved authenticated SELECT privilege on `trip_planner.trips` while retaining all existing RLS policies.
 - [x] Replace the invalid legacy Supabase frontend key with the confirmed active publishable key and republish the application.
 - [x] Remove the residual PWA install prompt from the pre-selection home screen so only the two requested trip cards remain.
+
+
+## New requested changes — implementation and verification
+- [x] Add rental-car pickup and return dates; validate same-day as one billable day and include both endpoints in daily allocation.
+- [x] Add insurance start and end dates with the same inclusive daily allocation and expose results in charts and summary totals.
+- [x] Add homepage share-trip action using the existing share-code/password mechanism.
+- [x] Add homepage soft-delete-trip action with confirmation and protected collaborator behavior.
+- [x] Replace account-derived traveler count with creator-managed traveler name list; collaborators may view but not edit sharing/traveler settings.
+- [x] Confirm the creator is included automatically, rental/insurance dates stay within trip dates, and daily allocation affects analysis only.
+- [ ] Validate the new flows on desktop and iPhone-sized layouts before publication.
+
+## Approval assumptions to confirm
+- [x] End date cannot precede start date; same-day start/end counts as one day.
+- [x] Inclusive day count is used for the daily amount; rounding remainder is applied to the final day.
+- [x] Soft deletion hides the trip from normal lists while preserving related records for recovery/audit.
+- [x] Existing share-code/password flow remains the source of truth for sharing.
+- [x] Creator-only editing applies to traveler names and share settings; collaborators remain read-only for these settings.
+- [x] Creator inclusion and trip-date boundary behavior are explicitly confirmed before schema or UI changes.
+需求規則已由使用者全部確認，已開始實作與驗證。
+
+## Implementation notes
+- Rental cars alone use pickup/return labels; insurance uses start/end labels.
+- Daily allocation must be visible in analysis charts and summary totals.
+- Traveler entries are names/labels, not necessarily authenticated accounts.
+- No destructive delete will be performed; only soft deletion is planned.
+- Collaborators can view but cannot edit traveler or sharing settings.
+
+## Design direction
+- Preserve the existing Tabitime-inspired editorial hierarchy, restrained Ink Black/Canvas Ivory palette, and clear primary actions.
+- Keep each new control contextual and avoid adding a dense toolbar to the homepage.
+- Keep creator-only settings visibly locked/read-only for collaborators.
+
+## Data safety
+- Do not modify existing trip, expense, or membership data during validation.
+- Do not permanently delete any record.
+- Preserve existing RLS and share-password protections unless a later approved change is required.
+- Use no-write browser validation before publication.
+
+## Pending user confirmation
+- [x] Confirm creator inclusion in traveler list.
+- [x] Confirm whether rental/insurance dates must fall within the trip dates.
+- [x] Confirm whether daily allocation affects only analytics or also per-person settlement/splitting.
+- [x] Confirm whether insurance start/end labels should be localized separately from rental-car pickup/return labels.
+
+## Status
+- Requirements confirmed; schema migration and frontend implementation are in place. No-write UI and production validation remain before publication.
+- Attachment `trip_webapp_ui_ux_review.md` remains available for final design review during verification.

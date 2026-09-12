@@ -149,6 +149,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     const sub = (e.Sub_Category || '').toLowerCase();
     const isRailPass = (main === '交通' || main === '鐵路') &&
       (sub.includes('鐵路') || sub.includes('套票') || sub.includes('pass') || sub.includes('rail') || main.includes('鐵路'));
+    const isRentalCar = main === '交通' && (sub.includes('租賃汽車') || sub.includes('租車') || sub.includes('rental'));
+    const isInsurance = main.includes('保險') || sub.includes('保險') || main.includes('insurance') || sub.includes('insurance');
     const isAccommodation = main === '住宿' || sub.includes('酒店') || sub.includes('民宿') || sub.includes('airbnb') || sub.includes('bnb');
     const isFlight = main === '機票' || sub === '機票';
 
@@ -171,6 +173,16 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
       return dates;
     };
 
+    if (isRentalCar) {
+      const start = toDateStr(e.Rental_Pickup_Date || e.Date || '');
+      const end = toDateStr(e.Rental_Return_Date || e.Date || '');
+      return spreadDates(start, end);
+    }
+    if (isInsurance) {
+      const start = toDateStr(e.Insurance_Start_Date || e.Date || '');
+      const end = toDateStr(e.Insurance_End_Date || e.Date || '');
+      return spreadDates(start, end);
+    }
     if (isRailPass) {
       // 鐵路套票：用 Check_In_Date / Check_Out_Date 或 Flight_Date / Arrival_Date 或 Date
       const start = toDateStr(e.Check_In_Date || e.Flight_Date || e.Date || '');
@@ -217,15 +229,19 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
       const sub = e.Sub_Category || '（未分類）';
       const amt = getEffectiveAmount(e);
       const dates = getDateSpread(e);
-      const perDay = dates.length > 0 ? amt / dates.length : amt;
       if (!map[main]) map[main] = {};
       if (!map[main][sub]) map[main][sub] = {};
       if (dates.length === 0) {
         // 無日期，放到空字串 key
         map[main][sub][''] = (map[main][sub][''] || 0) + amt;
       } else {
-        dates.forEach(date => {
-          map[main][sub][date] = (map[main][sub][date] || 0) + perDay;
+        // 以分為單位分配，最後一天吸收四捨五入餘數，確保每日總和等於原支出。
+        const totalCents = Math.round(amt * 100);
+        const baseCents = Math.floor(totalCents / dates.length);
+        const remainderCents = totalCents - baseCents * dates.length;
+        dates.forEach((date, index) => {
+          const dayAmount = (baseCents + (index === dates.length - 1 ? remainderCents : 0)) / 100;
+          map[main][sub][date] = (map[main][sub][date] || 0) + dayAmount;
         });
       }
     });
@@ -273,7 +289,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     return result;
   }, [amountMap]);
 
-  // 每天的總計（使用 amountMap 確保分攤後的金額）
+    // 每天的總計（使用 amountMap 確保分攤後的金額）
+
   const dateTotals = useMemo(() => {
     const result: Record<string, number> = {};
     Object.values(amountMap).forEach(subMap => {
@@ -300,6 +317,10 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   );
 
   const grandTotalDisplay = convertAmt(grandTotal);
+  const hasInclusiveDateExpenses = filteredExpenses.some(exp =>
+    (exp.Rental_Pickup_Date && exp.Rental_Return_Date) ||
+    (exp.Insurance_Start_Date && exp.Insurance_End_Date)
+  );
 
   return (
     <div className="p-4">
@@ -351,6 +372,11 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
           </span>
         )}
       </div>
+      {hasInclusiveDateExpenses && (
+        <p className="mb-4 rounded-lg bg-[#fff8df] px-3 py-2 text-xs leading-5 text-[#8a6500]">
+          租賃汽車及保險按開始至結束日期首尾兩日計算；每日分析金額以分為單位分配，四捨五入餘數放在最後一天。此分配只影響分析，不改變分帳結算總額。
+        </p>
+      )}
 
       {/* Mobile: card view for small screens */}
       <div className="sm:hidden space-y-3">

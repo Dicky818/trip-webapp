@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
  * gives one next action before calm, editorial reference sections.
  */
 import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
-import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
+import { api, Trip, Expense } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
+import { useApp } from '../../context/AppContext';
 import TripHealthCard from '../../components/TripHealthCard';
 import DeparturePackageCard from '../../components/DeparturePackageCard';
 
@@ -46,55 +47,74 @@ interface Props {
 }
 
 export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
+  const { showToast } = useApp();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [travelerNames, setTravelerNames] = useState<string[]>([]);
+  const [newTravelerName, setNewTravelerName] = useState('');
+  const [savingTravelers, setSavingTravelers] = useState(false);
+  const [persistedTravelerKey, setPersistedTravelerKey] = useState('');
+  const isOwner = trip.Is_Owner !== false;
+  const savedTravelerKey = (trip.Traveler_Names || []).join('|');
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [exp, tm] = await Promise.all([
-        api.getExpenses(trip.Trip_ID),
-        api.getTripMembers(trip.Trip_ID),
-      ]);
+      const exp = await api.getExpenses(trip.Trip_ID);
       setExpenses((exp as any).data || []);
-      setTripMembers((tm as any).data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { fetchAll(); }, [trip.Trip_ID]);
 
-  // Derive all unique participant names from expenses (payer + splitters)
-  const expenseParticipants = useMemo(() => {
-    const names = new Set<string>();
-    expenses.forEach(exp => {
-      if (exp.Payer) names.add(exp.Payer.trim());
-      if (exp.Splitters) {
-        exp.Splitters.split(',').map(s => s.trim()).filter(Boolean).forEach(n => names.add(n));
-      }
-    });
-    return names;
-  }, [expenses]);
+  useEffect(() => {
+    const saved = (trip.Traveler_Names || []).map(name => name.trim()).filter(Boolean);
+    const creator = trip.Owner_Display_Name?.trim() || saved[0] || '創建者';
+    setTravelerNames(Array.from(new Set([creator, ...saved])));
+    setPersistedTravelerKey(Array.from(new Set([creator, ...saved])).join('|'));
+  }, [trip.Trip_ID, trip.Owner_Display_Name, savedTravelerKey]);
 
-  // Merge trip_members (real users) with virtual members from expenses
-  const allMembers = useMemo(() => {
-    const realNames = new Set(tripMembers.map(m => m.Member_Name));
-    const virtual: TripMember[] = [];
-    expenseParticipants.forEach(name => {
-      if (!realNames.has(name)) {
-        virtual.push({
-          Trip_Member_ID: `virtual-${name}`,
-          Trip_ID: trip.Trip_ID,
-          Member_ID: '',
-          Member_Name: name,
-          Is_Owner: false,
-          Created_At: '',
-        });
-      }
-    });
-    return [...tripMembers, ...virtual.sort((a, b) => a.Member_Name.localeCompare(b.Member_Name))];
-  }, [tripMembers, expenseParticipants, trip.Trip_ID]);
+  const creatorName = trip.Owner_Display_Name?.trim() || travelerNames[0] || '創建者';
+  const normalizedTravelerNames = useMemo(
+    () => Array.from(new Set([creatorName, ...travelerNames.map(name => name.trim()).filter(Boolean)])),
+    [creatorName, travelerNames],
+  );
+  const travelerListChanged = normalizedTravelerNames.join('|') !== persistedTravelerKey;
+
+  const addTraveler = () => {
+    const name = newTravelerName.trim();
+    if (!name) return;
+    if (normalizedTravelerNames.includes(name)) {
+      setNewTravelerName('');
+      return;
+    }
+    setTravelerNames([...normalizedTravelerNames, name]);
+    setNewTravelerName('');
+  };
+
+  const removeTraveler = (name: string) => {
+    if (name === creatorName) {
+      showToast('創建者必須保留在同行者清單中', 'info');
+      return;
+    }
+    setTravelerNames(current => current.filter(item => item !== name));
+  };
+
+  const saveTravelerNames = async () => {
+    setSavingTravelers(true);
+    try {
+      const result = await api.updateTrip(trip.Trip_ID, { Traveler_Names: normalizedTravelerNames });
+      if (!result.success) throw new Error(result.error);
+      setTravelerNames(normalizedTravelerNames);
+      setPersistedTravelerKey(normalizedTravelerNames.join('|'));
+      showToast('同行者清單已更新');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '同行者清單更新失敗', 'error');
+    } finally {
+      setSavingTravelers(false);
+    }
+  };
 
   // Filter expenses by category
   const flightExpenses = expenses.filter(isFlightExpense);
@@ -111,7 +131,7 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
       <DeparturePackageCard trip={trip} variant="checklist" onNavigate={onNavigate} onExportPdf={onExportPdf} />
 
       <section className="grid grid-cols-3 divide-x divide-[#ece7da] overflow-hidden rounded-2xl border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
-        <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{allMembers.length}</p><p className="text-xs text-slate-500">👥 旅伴</p></div>
+        <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{normalizedTravelerNames.length}</p><p className="text-xs text-slate-500">👥 旅伴</p></div>
         <div className="px-4 py-3"><p className="text-lg font-bold text-slate-950">{bookingExpenses.length}</p><p className="text-xs text-slate-500">🎟️ 預訂</p></div>
         <button type="button" onClick={() => onNavigate('expenses')} className="px-4 py-3 text-left transition-colors hover:bg-[#fff8df] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2563eb]"><p className="text-lg font-bold text-slate-950">{trip.Base_Currency} {totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p><p className="text-xs text-[#9a7100]">💳 總支出</p></button>
       </section>
@@ -121,26 +141,43 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
         <div className="flex items-center gap-2 mb-3">
           <Users size={18} className="text-[#9a7100]" />
           <h3 className="font-bold text-slate-950">一起出發的人</h3>
-          <span className="text-xs text-slate-400">({allMembers.length})</span>
+          <span className="text-xs text-slate-400">({normalizedTravelerNames.length})</span>
         </div>
-        {allMembers.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-3">尚無成員</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {allMembers.map(member => (
-              <div key={member.Trip_Member_ID}
-                className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0
-                  ${member.Is_Owner ? 'bg-[#111111]' : member.Member_ID === '' ? 'bg-[#9a7100]' : 'bg-slate-400'}`}>
-                  {(member.Member_Name || '?').charAt(0).toUpperCase()}
-                </div>
-                <span className="text-sm font-medium text-slate-700">{member.Member_Name}</span>
-                {member.Is_Owner && (
-                  <span className="rounded-full bg-[#fff3c4] px-1.5 py-0.5 text-xs text-[#8a6500]">擁有者</span>
-                )}
+        <div className="flex flex-wrap gap-2">
+          {normalizedTravelerNames.map((name, index) => (
+            <div key={`${name}-${index}`} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${index === 0 ? 'bg-[#111111]' : 'bg-[#9a7100]'}`}>
+                {name.charAt(0).toUpperCase()}
               </div>
-            ))}
+              <span className="text-sm font-medium text-slate-700">{name}</span>
+              {index === 0 && <span className="rounded-full bg-[#fff3c4] px-1.5 py-0.5 text-xs text-[#8a6500]">創建者</span>}
+              {isOwner && index > 0 && (
+                <button type="button" onClick={() => removeTraveler(name)} className="rounded-md px-1 text-slate-400 hover:bg-red-50 hover:text-red-500" aria-label={`移除${name}`}>
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {isOwner ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={newTravelerName}
+                onChange={event => setNewTravelerName(event.target.value)}
+                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addTraveler(); } }}
+                placeholder="輸入同行者姓名／名稱"
+                className="min-h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-[#111111] focus:ring-2 focus:ring-[#ffc91a]"
+                aria-label="同行者姓名或名稱"
+              />
+              <button type="button" onClick={addTraveler} className="min-h-10 rounded-xl border border-[#111111] bg-[#111111] px-4 text-sm font-bold text-[#ffc91a] hover:bg-[#252525]">加入</button>
+            </div>
+            {travelerListChanged && (
+              <Button size="sm" onClick={saveTravelerNames} loading={savingTravelers}>儲存同行者清單</Button>
+            )}
           </div>
+        ) : (
+          <p className="mt-3 text-xs text-slate-400">同行者清單由行程創建者管理；協作者只能查看。</p>
         )}
       </section>
 
