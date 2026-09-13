@@ -216,3 +216,11 @@
 ## Status
 - Requirements confirmed; schema migration and frontend implementation are in place. No-write UI and production validation remain before publication.
 - Attachment `trip_webapp_ui_ux_review.md` remains available for final design review during verification.
+
+
+## TWD analysis loading regression — pending
+- [ ] Reproduce the TWD/non-base-currency expense analysis failure using existing records without inserting test data.
+- [ ] Identify whether the recovery page is triggered by currency formatting, analysis aggregation, or an upstream trip fetch failure.
+- [ ] Add null-safe multi-currency formatting and analysis guards without changing stored expense values or settlement logic.
+- [ ] Verify TWD amounts render in the analysis chart and summary table, then run typecheck, build, and production read-only validation.
+- [ ] Publish the fix only after the existing TWD trip data and all four trip cards remain intact.

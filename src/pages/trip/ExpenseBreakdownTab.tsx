@@ -3,6 +3,7 @@ import { Trip, Expense, TripMember, Category } from '../../api/supabaseApi';
 import { Spinner, EmptyState } from '../../components/ui';
 import { DollarSign, RefreshCw } from 'lucide-react';
 import { api } from '../../api/supabaseApi';
+import { formatCurrencyAmount, isFiniteRate, normalizeCurrency, SUPPORTED_CURRENCIES } from '../../lib/currency';
 
 interface Props {
   trip: Trip;
@@ -11,8 +12,6 @@ interface Props {
   categories: Category[];
   loading: boolean;
 }
-
-const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
 
 // 解析本地日期字串（避免 UTC 偏移）
 function parseLocalDate(d: string): Date {
@@ -53,33 +52,76 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
 
   // 顯示貨幣（個人偏好，儲存於 localStorage）
   const [displayCurrency, setDisplayCurrency] = useState<string>(() => {
-    return localStorage.getItem(DISPLAY_CURRENCY_KEY) || trip.Base_Currency;
+    let savedCurrency = '';
+    try {
+      savedCurrency = localStorage.getItem(DISPLAY_CURRENCY_KEY) || '';
+    } catch {
+      // Private browsing or storage policy should not prevent the analysis table from rendering.
+    }
+    return normalizeCurrency(savedCurrency, normalizeCurrency(trip.Base_Currency, 'HKD'));
   });
-  const [exchangeRate, setExchangeRate] = useState<number>(1); // base → display
+  const [exchangeRate, setExchangeRate] = useState<number | null>(() => (
+    displayCurrency === normalizeCurrency(trip.Base_Currency, 'HKD') ? 1 : null
+  )); // base → display
   const [rateLoading, setRateLoading] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
 
   // 更新 localStorage 並取得匯率
-  const handleCurrencyChange = async (newCurrency: string) => {
-    setDisplayCurrency(newCurrency);
-    localStorage.setItem(DISPLAY_CURRENCY_KEY, newCurrency);
+  const handleCurrencyChange = (newCurrency: string) => {
+    const safeCurrency = normalizeCurrency(newCurrency, normalizeCurrency(trip.Base_Currency, 'HKD'));
+    setDisplayCurrency(safeCurrency);
+    setExchangeRate(safeCurrency === normalizeCurrency(trip.Base_Currency, 'HKD') ? 1 : null);
+    setRateError(null);
+    try {
+      localStorage.setItem(DISPLAY_CURRENCY_KEY, safeCurrency);
+    } catch {
+      // A storage failure should not block the current view.
+    }
   };
 
-  // 取得匯率（base → display）
+  // 取得匯率（base → display）；失敗時回退基礎貨幣並保留分析內容。
   useEffect(() => {
-    if (displayCurrency === trip.Base_Currency) {
+    const baseCurrency = normalizeCurrency(trip.Base_Currency, 'HKD');
+    if (displayCurrency === baseCurrency) {
       setExchangeRate(1);
+      setRateError(null);
+      setRateLoading(false);
       return;
     }
+
+    const controller = new AbortController();
+    let active = true;
     setRateLoading(true);
-    api.getExchangeRate(trip.Base_Currency, displayCurrency)
+    setRateError(null);
+    api.getExchangeRate(baseCurrency, displayCurrency, controller.signal)
       .then(result => {
-        if (result.success) setExchangeRate(result.rate);
+        if (!active) return;
+        if (result.success && isFiniteRate(result.rate)) {
+          setExchangeRate(result.rate);
+          setRateError(null);
+        } else {
+          setExchangeRate(null);
+          setRateError('匯率暫時無法取得，分析先以旅程基礎貨幣顯示。');
+        }
       })
-      .finally(() => setRateLoading(false));
+      .catch(() => {
+        if (!active) return;
+        setExchangeRate(null);
+        setRateError('匯率暫時無法取得，分析先以旅程基礎貨幣顯示。');
+      })
+      .finally(() => {
+        if (active) setRateLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [displayCurrency, trip.Base_Currency]);
 
-  // 轉換金額（base → display）
-  const convertAmt = (baseAmt: number) => baseAmt * exchangeRate;
+  const effectiveDisplayCurrency = exchangeRate === null ? normalizeCurrency(trip.Base_Currency, 'HKD') : displayCurrency;
+
+  // 轉換金額（base → display）；無匯率時只回退數值，不把基礎金額誤標成 TWD。
+  const convertAmt = (baseAmt: number) => baseAmt * (exchangeRate ?? 1);
 
   // 行程成員（直接使用 tripMembers，已包含擁有者和協作者）
   const tripMemberObjects = tripMembers;
@@ -307,8 +349,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   const fmtAmt = (baseAmt: number, showCurrency = false): string => {
     if (baseAmt === 0) return '';
     const displayAmt = convertAmt(baseAmt);
-    const formatted = displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return showCurrency ? `${displayCurrency} ${formatted}` : formatted;
+    const formatted = formatCurrencyAmount(displayAmt, effectiveDisplayCurrency);
+    return showCurrency ? formatted : formatted.replace(`${effectiveDisplayCurrency} `, '');
   };
 
   if (loading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
@@ -346,29 +388,35 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
             onChange={e => handleCurrencyChange(e.target.value)}
             className="text-sm border border-blue-200 rounded-lg px-2 py-1.5 bg-blue-50 text-blue-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {CURRENCIES.map(c => (
+            {SUPPORTED_CURRENCIES.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
           {rateLoading && <RefreshCw size={13} className="animate-spin text-blue-500" />}
-          {displayCurrency !== trip.Base_Currency && !rateLoading && (
+          {displayCurrency !== trip.Base_Currency && !rateLoading && exchangeRate !== null && (
             <span className="text-xs text-slate-400">
-              1 {trip.Base_Currency} = {exchangeRate.toFixed(4)} {displayCurrency}
+              1 {normalizeCurrency(trip.Base_Currency, 'HKD')} = {exchangeRate.toFixed(4)} {displayCurrency}
             </span>
           )}
         </div>
       </div>
 
+      {rateError && (
+        <p role="status" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+          {rateError} 你仍可切換貨幣；取得匯率後會自動更新。
+        </p>
+      )}
+
       {/* 總計 */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm text-slate-500">
           總計：<span className="font-semibold text-slate-900">
-            {displayCurrency} {grandTotalDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatCurrencyAmount(grandTotalDisplay, effectiveDisplayCurrency)}
           </span>
         </span>
         {displayCurrency !== trip.Base_Currency && (
           <span className="text-xs text-slate-400">
-            ({trip.Base_Currency} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+            ({formatCurrencyAmount(grandTotal, normalizeCurrency(trip.Base_Currency, 'HKD'))})
           </span>
         )}
       </div>
@@ -504,7 +552,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
                 );
               })}
               <td className="px-3 py-2 text-right border-r border-blue-500 whitespace-nowrap">
-                {displayCurrency} {grandTotalDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrencyAmount(grandTotalDisplay, effectiveDisplayCurrency)}
               </td>
               <td className="px-3 py-2 text-right whitespace-nowrap">100%</td>
             </tr>
