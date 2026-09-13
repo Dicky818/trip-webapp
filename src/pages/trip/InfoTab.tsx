@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
 /*
  * Design system: "Tabitime-inspired Trip Portal" — a compact Trip Pass
  * gives one next action before calm, editorial reference sections.
  */
-import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
-import { api, Trip, Expense } from '../../api/supabaseApi';
+import { useEffect, useMemo, useState } from 'react';
+import { Plane, Hotel, Ticket, Clock, MapPin, Users, ArrowRight, Pencil, Check, X } from 'lucide-react';
+import { api, Trip, Expense, TripMember } from '../../api/supabaseApi';
 import { EmptyState, Spinner, Badge } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import TripHealthCard from '../../components/TripHealthCard';
@@ -44,16 +44,19 @@ interface Props {
   trip: Trip;
   onNavigate: (target: 'info' | 'itinerary' | 'expenses', focusToday?: boolean, openLens?: boolean, focusItemIds?: string[]) => void;
   onExportPdf: () => Promise<boolean>;
+  onTripUpdated?: () => Promise<void>;
 }
 
-export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
+export default function InfoTab({ trip, onNavigate, onExportPdf, onTripUpdated }: Props) {
   const { showToast } = useApp();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [travelerNames, setTravelerNames] = useState<string[]>([]);
   const [newTravelerName, setNewTravelerName] = useState('');
+  const [editingTraveler, setEditingTraveler] = useState<string | null>(null);
+  const [editingTravelerName, setEditingTravelerName] = useState('');
   const [savingTravelers, setSavingTravelers] = useState(false);
-  const [persistedTravelerKey, setPersistedTravelerKey] = useState('');
   const isOwner = trip.Is_Owner !== false;
   const savedTravelerKey = (trip.Traveler_Names || []).join('|');
   const uniqueTravelerNames = (names: string[]) => {
@@ -69,8 +72,9 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const exp = await api.getExpenses(trip.Trip_ID);
+      const [exp, members] = await Promise.all([api.getExpenses(trip.Trip_ID), api.getTripMembers(trip.Trip_ID)]);
       setExpenses((exp as any).data || []);
+      setTripMembers((members as any).data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -82,7 +86,6 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
     const creator = trip.Owner_Display_Name?.trim() || saved[0] || '創建者';
     const names = uniqueTravelerNames([creator, ...saved]);
     setTravelerNames(names);
-    setPersistedTravelerKey(names.join('|'));
   }, [trip.Trip_ID, trip.Owner_Display_Name, savedTravelerKey]);
 
   const creatorName = trip.Owner_Display_Name?.trim() || travelerNames[0] || '創建者';
@@ -90,40 +93,107 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
     () => uniqueTravelerNames([creatorName, ...travelerNames]),
     [creatorName, travelerNames],
   );
-  const travelerListChanged = normalizedTravelerNames.join('|') !== persistedTravelerKey;
-
-  const addTraveler = () => {
-    const name = newTravelerName.trim();
-    if (!name) return;
-    if (normalizedTravelerNames.some(existing => existing.toLocaleLowerCase() === name.toLocaleLowerCase())) {
-      setNewTravelerName('');
-      return;
+  const persistTravelerNames = async (nextNames: string[], oldName?: string, replacementName?: string) => {
+    const names = uniqueTravelerNames(nextNames);
+    setSavingTravelers(true);
+    try {
+      const result = await api.updateTrip(trip.Trip_ID, { Traveler_Names: names });
+      if (!result.success) throw new Error(result.error);
+      if (oldName && replacementName && oldName !== replacementName) {
+        const referenced = expenses.filter(expense => {
+          const oldKey = oldName.toLocaleLowerCase();
+          const memberIds = tripMembers.filter(member => member.Member_Name.trim().toLocaleLowerCase() === oldKey).map(member => member.Member_ID);
+          const payerMatches = expense.Payer.trim().toLocaleLowerCase() === oldKey;
+          const splitterMatches = (expense.Splitters || '').split(',').map(item => item.trim()).some(item => item.toLocaleLowerCase() === oldKey);
+          return payerMatches || splitterMatches || memberIds.includes(expense.Payer_ID || '') || (expense.Splitter_IDs || []).some(id => memberIds.includes(id));
+        });
+        for (const expense of referenced) {
+          const oldKey = oldName.toLocaleLowerCase();
+          const memberIds = tripMembers.filter(member => member.Member_Name.trim().toLocaleLowerCase() === oldKey).map(member => member.Member_ID);
+          const payerNameMatches = expense.Payer.trim().toLocaleLowerCase() === oldKey;
+          const payerIdMatches = memberIds.includes(expense.Payer_ID || '');
+          const splitterNameMatches = (expense.Splitters || '').split(',').map(item => item.trim()).some(item => item.toLocaleLowerCase() === oldKey);
+          const splitterIdMatches = (expense.Splitter_IDs || []).some(id => memberIds.includes(id));
+          const nextSplitters = (expense.Splitters || '').split(',').map(item => item.trim()).filter(Boolean).map(item => item.toLocaleLowerCase() === oldKey ? replacementName : item);
+          if (splitterIdMatches && !nextSplitters.some(item => item.toLocaleLowerCase() === replacementName.toLocaleLowerCase())) nextSplitters.push(replacementName);
+          const expenseResult = await api.updateExpense(expense.Expense_ID, {
+            Payer: payerNameMatches || payerIdMatches ? replacementName : expense.Payer,
+            Payer_ID: payerNameMatches || payerIdMatches ? null : expense.Payer_ID,
+            Splitters: nextSplitters.join(', '),
+            Splitter_IDs: splitterNameMatches || splitterIdMatches ? [] : expense.Splitter_IDs,
+          });
+          if (!expenseResult.success) throw new Error(expenseResult.error);
+        }
+      }
+      setTravelerNames(names);
+      await fetchAll();
+      await onTripUpdated?.();
+      showToast('同行者清單已更新');
+      return true;
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '同行者清單更新失敗', 'error');
+      return false;
+    } finally {
+      setSavingTravelers(false);
     }
-    setTravelerNames([...normalizedTravelerNames, name]);
-    setNewTravelerName('');
   };
 
-  const removeTraveler = (name: string) => {
+  const addTraveler = async () => {
+    const name = newTravelerName.trim();
+    if (!name) {
+      showToast('請輸入同行者姓名或名稱', 'error');
+      return;
+    }
+    if (normalizedTravelerNames.some(existing => existing.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      showToast('不能新增同名同行者', 'error');
+      return;
+    }
+    const saved = await persistTravelerNames([...normalizedTravelerNames, name]);
+    if (saved) setNewTravelerName('');
+  };
+
+  const beginRenameTraveler = (name: string) => {
+    setEditingTraveler(name);
+    setEditingTravelerName(name);
+  };
+
+  const commitRenameTraveler = async () => {
+    if (!editingTraveler) return;
+    const nextName = editingTravelerName.trim();
+    if (!nextName) {
+      showToast('同行者姓名不能留空', 'error');
+      return;
+    }
+    if (normalizedTravelerNames.some(existing => existing !== editingTraveler && existing.toLocaleLowerCase() === nextName.toLocaleLowerCase())) {
+      showToast('不能修改為已存在的同名同行者', 'error');
+      return;
+    }
+    const nextNames = normalizedTravelerNames.map(name => name === editingTraveler ? nextName : name);
+    const saved = await persistTravelerNames(nextNames, editingTraveler, nextName);
+    if (saved) {
+      setEditingTraveler(null);
+      setEditingTravelerName('');
+    }
+  };
+
+  const removeTraveler = async (name: string) => {
     if (name === creatorName) {
       showToast('創建者必須保留在同行者清單中', 'info');
       return;
     }
-    setTravelerNames(current => current.filter(item => item !== name));
-  };
-
-  const saveTravelerNames = async () => {
-    setSavingTravelers(true);
-    try {
-      const result = await api.updateTrip(trip.Trip_ID, { Traveler_Names: normalizedTravelerNames });
-      if (!result.success) throw new Error(result.error);
-      setTravelerNames(normalizedTravelerNames);
-      setPersistedTravelerKey(normalizedTravelerNames.join('|'));
-      showToast('同行者清單已更新');
-    } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : '同行者清單更新失敗', 'error');
-    } finally {
-      setSavingTravelers(false);
+    const key = name.toLocaleLowerCase();
+    const memberIds = tripMembers.filter(member => member.Member_Name.trim().toLocaleLowerCase() === key).map(member => member.Member_ID);
+    const referenced = expenses.some(expense =>
+      expense.Payer.trim().toLocaleLowerCase() === key ||
+      (expense.Splitters || '').split(',').map(item => item.trim().toLocaleLowerCase()).includes(key) ||
+      memberIds.includes(expense.Payer_ID || '') ||
+      (expense.Splitter_IDs || []).some(id => memberIds.includes(id)),
+    );
+    if (referenced) {
+      showToast('此同行者仍被支出使用，請先修改相關付款人或分帳成員後再刪除', 'error');
+      return;
     }
+    await persistTravelerNames(normalizedTravelerNames.filter(item => item !== name));
   };
 
   // Filter expenses by category
@@ -159,12 +229,21 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
               <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${index === 0 ? 'bg-[#111111]' : 'bg-[#9a7100]'}`}>
                 {name.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-medium text-slate-700">{name}</span>
+              {editingTraveler === name ? (
+                <div className="flex items-center gap-1">
+                  <input value={editingTravelerName} onChange={event => setEditingTravelerName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void commitRenameTraveler(); } if (event.key === 'Escape') setEditingTraveler(null); }} className="h-8 w-32 rounded-lg border border-slate-200 px-2 text-sm" aria-label={`修改${name}`} autoFocus />
+                  <button type="button" onClick={() => void commitRenameTraveler()} disabled={savingTravelers} className="rounded-md p-1 text-emerald-600 hover:bg-emerald-50" aria-label="確認修改"><Check size={15} /></button>
+                  <button type="button" onClick={() => setEditingTraveler(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="取消修改"><X size={15} /></button>
+                </div>
+              ) : (
+                <span className="text-sm font-medium text-slate-700">{name}</span>
+              )}
               {index === 0 && <span className="rounded-full bg-[#fff3c4] px-1.5 py-0.5 text-xs text-[#8a6500]">創建者</span>}
-              {isOwner && index > 0 && (
-                <button type="button" onClick={() => removeTraveler(name)} className="rounded-md px-1 text-slate-400 hover:bg-red-50 hover:text-red-500" aria-label={`移除${name}`}>
-                  ×
-                </button>
+              {isOwner && index > 0 && editingTraveler !== name && (
+                <>
+                  <button type="button" onClick={() => beginRenameTraveler(name)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`修改${name}`}><Pencil size={14} /></button>
+                  <button type="button" onClick={() => void removeTraveler(name)} disabled={savingTravelers} className="rounded-md px-1 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50" aria-label={`移除${name}`}>×</button>
+                </>
               )}
             </div>
           ))}
@@ -175,16 +254,15 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
               <input
                 value={newTravelerName}
                 onChange={event => setNewTravelerName(event.target.value)}
-                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addTraveler(); } }}
+                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void addTraveler(); } }}
                 placeholder="輸入同行者姓名／名稱"
                 className="min-h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-[#111111] focus:ring-2 focus:ring-[#ffc91a]"
                 aria-label="同行者姓名或名稱"
+                disabled={savingTravelers}
               />
-              <button type="button" onClick={addTraveler} className="min-h-10 rounded-xl border border-[#111111] bg-[#111111] px-4 text-sm font-bold text-[#ffc91a] hover:bg-[#252525]">加入</button>
+              <button type="button" onClick={() => void addTraveler()} disabled={savingTravelers} className="min-h-10 rounded-xl border border-[#111111] bg-[#111111] px-4 text-sm font-bold text-[#ffc91a] hover:bg-[#252525] disabled:cursor-not-allowed disabled:opacity-50">加入</button>
             </div>
-            {travelerListChanged && (
-              <Button size="sm" onClick={saveTravelerNames} loading={savingTravelers}>儲存同行者清單</Button>
-            )}
+            <p className="text-xs text-slate-400">新增後會立即同步至付款人、分帳成員及分賬結算。</p>
           </div>
         ) : (
           <p className="mt-3 text-xs text-slate-400">同行者清單由行程創建者管理；協作者只能查看。</p>

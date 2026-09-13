@@ -4,6 +4,7 @@ import { Spinner, EmptyState } from '../../components/ui';
 import { DollarSign, RefreshCw } from 'lucide-react';
 import { api } from '../../api/supabaseApi';
 import { formatCurrencyAmount, isFiniteRate, normalizeCurrency, SUPPORTED_CURRENCIES, resolveDisplayAmount } from '../../lib/currency';
+import { inclusiveDateRange, allocateInclusiveAmount } from '../../lib/expenseAllocation';
 
 interface Props {
   trip: Trip;
@@ -229,21 +230,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     const toDateStr = (d: string) => d?.includes('T') ? d.slice(0, 10) : (d || '');
 
     // 產生從 start 到 end（含頭尾）的每一天
-    const spreadDates = (start: string, end: string): string[] => {
-      if (!start || !end) return start ? [start] : [];
-      const dates: string[] = [];
-      const s = parseLocalDate(start);
-      const e2 = parseLocalDate(end);
-      let cur = new Date(s);
-      while (cur <= e2) {
-        const y = cur.getFullYear();
-        const m = String(cur.getMonth() + 1).padStart(2, '0');
-        const d2 = String(cur.getDate()).padStart(2, '0');
-        dates.push(`${y}-${m}-${d2}`);
-        cur.setDate(cur.getDate() + 1);
-      }
-      return dates;
-    };
+    const spreadDates = (start: string, end: string): string[] => inclusiveDateRange(start, end);
 
     if (isRentalCar) {
       const start = toDateStr(e.Rental_Pickup_Date || e.Date || '');
@@ -308,11 +295,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
         map[main][sub][''] = (map[main][sub][''] || 0) + amt;
       } else {
         // 以分為單位分配，最後一天吸收四捨五入餘數，確保每日總和等於原支出。
-        const totalCents = Math.round(amt * 100);
-        const baseCents = Math.floor(totalCents / dates.length);
-        const remainderCents = totalCents - baseCents * dates.length;
-        dates.forEach((date, index) => {
-          const dayAmount = (baseCents + (index === dates.length - 1 ? remainderCents : 0)) / 100;
+        allocateInclusiveAmount(amt, dates).forEach((dayAmount, index) => {
+          const date = dates[index];
           map[main][sub][date] = (map[main][sub][date] || 0) + dayAmount;
         });
       }

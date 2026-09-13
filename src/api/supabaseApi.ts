@@ -718,7 +718,13 @@ export const api = {
     if (body.Base_Currency !== undefined) updates.base_currency = body.Base_Currency;
     if (body.Owner_Display_Name !== undefined) updates.owner_display_name = body.Owner_Display_Name || null;
     if (body.Traveler_Names !== undefined) {
-      const names = Array.from(new Set((body.Traveler_Names || []).map(name => String(name).trim()).filter(Boolean)));
+      const seen = new Set<string>();
+      const names = (body.Traveler_Names || []).map(name => String(name).trim()).filter(Boolean).filter(name => {
+        const key = name.toLocaleLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       updates.traveler_names = names;
     }
     if (body.Deleted_At !== undefined) updates.deleted_at = body.Deleted_At || null;

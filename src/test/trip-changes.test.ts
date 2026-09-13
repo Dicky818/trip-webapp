@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveDisplayAmount } from '../lib/currency';
 import { calculateFlightDuration } from '../api/supabaseApi';
+import { inclusiveDateRange, allocateInclusiveAmount } from '../lib/expenseAllocation';
 
 describe('trip changes', () => {
   it('uses an original amount when it already matches the requested currency', () => {
@@ -37,5 +38,14 @@ describe('trip changes', () => {
   it('subtracts the time-zone difference and handles a cross-midnight segment', () => {
     expect(calculateFlightDuration('2027-01-13', '09:10', '2027-01-13', '15:00', 8, 9)).toBe('4h50m');
     expect(calculateFlightDuration('2027-01-13', '23:30', '2027-01-14', '02:00', 8, 9)).toBe('1h30m');
+  });
+
+  it('includes both rental-car or insurance boundary dates', () => {
+    expect(inclusiveDateRange('2027-01-13', '2027-01-15')).toEqual(['2027-01-13', '2027-01-14', '2027-01-15']);
+    expect(inclusiveDateRange('2027-01-13', '2027-01-13')).toEqual(['2027-01-13']);
+  });
+
+  it('puts rounding cents on the final allocated day', () => {
+    expect(allocateInclusiveAmount(100, ['2027-01-13', '2027-01-14', '2027-01-15'])).toEqual([33.33, 33.33, 33.34]);
   });
 });

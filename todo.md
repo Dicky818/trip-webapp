@@ -242,3 +242,22 @@
 - [x] Missing historical rates show `—` and an explicit warning; never mislabeled fallback values.
 - [x] One flight expense contains multiple segments; cross-midnight adds 24 hours and user-entered time-zone offset is applied.
 - [x] Return date is read from the edited expense; the example year is not written as data.
+
+
+## Traveler consistency and item-date allocation — implementation pending
+- [ ] Use one canonical creator-managed traveler list for Overview, payer options, split members, and settlement members.
+- [ ] Add creator-only name input plus Add action; persist immediately and reload from the database.
+- [ ] Reject blank names, trimmed-name changes, and case-insensitive duplicates with clear inline errors.
+- [ ] Keep creator permanently present and prevent deletion of the creator.
+- [ ] Block deletion of any traveler still referenced by an expense payer or splitter, with a clear instruction to update those expenses first.
+- [ ] Keep collaborator traveler controls read-only.
+- [ ] Allocate rental-car and insurance totals across each item's own inclusive start/end dates, not the full trip duration.
+- [ ] Confirm the remaining rounding and settlement-scope rules before implementation.
+- [ ] Run typecheck, unit tests, build, and authenticated no-write desktop validation before publication.
+
+## Confirmed rules
+- [x] New travelers immediately become payer choices, split members, and settlement members.
+- [x] Renames synchronize all four views immediately.
+- [x] Only the trip creator can add, rename, or delete travelers.
+- [x] New traveler names use an input field plus an Add button.
+- [x] Rental-car and insurance allocation uses each item's own date range, inclusive of both endpoints.
