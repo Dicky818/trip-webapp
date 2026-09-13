@@ -56,6 +56,15 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
   const [persistedTravelerKey, setPersistedTravelerKey] = useState('');
   const isOwner = trip.Is_Owner !== false;
   const savedTravelerKey = (trip.Traveler_Names || []).join('|');
+  const uniqueTravelerNames = (names: string[]) => {
+    const seen = new Set<string>();
+    return names.map(name => name.trim()).filter(Boolean).filter(name => {
+      const key = name.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
 
   const fetchAll = async () => {
     setLoading(true);
@@ -71,13 +80,14 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
   useEffect(() => {
     const saved = (trip.Traveler_Names || []).map(name => name.trim()).filter(Boolean);
     const creator = trip.Owner_Display_Name?.trim() || saved[0] || '創建者';
-    setTravelerNames(Array.from(new Set([creator, ...saved])));
-    setPersistedTravelerKey(Array.from(new Set([creator, ...saved])).join('|'));
+    const names = uniqueTravelerNames([creator, ...saved]);
+    setTravelerNames(names);
+    setPersistedTravelerKey(names.join('|'));
   }, [trip.Trip_ID, trip.Owner_Display_Name, savedTravelerKey]);
 
   const creatorName = trip.Owner_Display_Name?.trim() || travelerNames[0] || '創建者';
   const normalizedTravelerNames = useMemo(
-    () => Array.from(new Set([creatorName, ...travelerNames.map(name => name.trim()).filter(Boolean)])),
+    () => uniqueTravelerNames([creatorName, ...travelerNames]),
     [creatorName, travelerNames],
   );
   const travelerListChanged = normalizedTravelerNames.join('|') !== persistedTravelerKey;
@@ -85,7 +95,7 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
   const addTraveler = () => {
     const name = newTravelerName.trim();
     if (!name) return;
-    if (normalizedTravelerNames.includes(name)) {
+    if (normalizedTravelerNames.some(existing => existing.toLocaleLowerCase() === name.toLocaleLowerCase())) {
       setNewTravelerName('');
       return;
     }
@@ -216,47 +226,25 @@ export default function InfoTab({ trip, onNavigate, onExportPdf }: Props) {
                     {exp.Note && <span className="text-xs text-slate-400 italic ml-auto">— {exp.Note}</span>}
                   </div>
 
-                  {/* Main info grid: Route | Dep Time | Return Time */}
-                  <div className="grid grid-cols-3 gap-2 text-sm mb-3">
-                    {/* Route */}
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">航線</span>
-                      <span className="font-semibold text-slate-800">
-                        {exp.Departure_Location || 'HKG'}
-                        <span className="text-slate-400 mx-1">→</span>
-                        {exp.Arrival_Location || 'KIX'}
-                      </span>
-                      {(exp.Flight_Date || exp.Date) && (
-                        <span className="text-xs text-slate-400">{formatDateOnly(exp.Flight_Date || exp.Date)}</span>
-                      )}
-                    </div>
-                    {/* Outbound time */}
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">去程</span>
-                      {(exp.Departure_Time || exp.Landing_Time) ? (
-                        <span className="font-mono text-slate-800">
-                          {exp.Departure_Time ? formatTime(exp.Departure_Time) : '—'}
-                          <span className="text-slate-400 mx-1">→</span>
-                          {exp.Landing_Time ? formatTime(exp.Landing_Time) : '—'}
-                        </span>
-                      ) : <span className="text-slate-300 text-xs">未填</span>}
-                    </div>
-                    {/* Return time */}
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs text-slate-400 uppercase tracking-wide">回程</span>
-                      {(exp.Arrival_Time || exp.Return_Landing_Time) ? (
-                        <>
-                          {exp.Arrival_Date && (
-                            <span className="text-xs text-slate-400">{formatDateOnly(exp.Arrival_Date)}</span>
-                          )}
-                          <span className="font-mono text-slate-800">
-                            {exp.Arrival_Time ? formatTime(exp.Arrival_Time) : '—'}
-                            <span className="text-slate-400 mx-1">→</span>
-                            {exp.Return_Landing_Time ? formatTime(exp.Return_Landing_Time) : '—'}
-                          </span>
-                        </>
-                      ) : <span className="text-slate-300 text-xs">未填</span>}
-                    </div>
+                  {/* Flight segments table: Direction | Route | Date | Time | Duration | Flight No */}
+                  <div className="overflow-x-auto rounded-lg border border-[#e5dfd1] bg-white/70">
+                    <table className="min-w-[720px] w-full text-left text-sm">
+                      <thead className="border-b border-[#e5dfd1] bg-[#fbfaf5] text-xs uppercase tracking-wide text-slate-400">
+                        <tr><th className="px-3 py-2">方向</th><th className="px-3 py-2">航線</th><th className="px-3 py-2">日期</th><th className="px-3 py-2">時間</th><th className="px-3 py-2">飛行小時</th><th className="px-3 py-2">航班編號</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#eee9de]">
+                        {(exp.Flight_Segments || []).map((segment, segmentIndex) => (
+                          <tr key={`${exp.Expense_ID}-segment-${segmentIndex}`} className="text-slate-800">
+                            <td className="px-3 py-2 font-semibold">{segment.direction || (segmentIndex === 0 ? '去程' : '轉機')}</td>
+                            <td className="px-3 py-2 font-semibold">{segment.route || '—'}</td>
+                            <td className="px-3 py-2 text-xs text-slate-600">{segment.date ? formatDateOnly(segment.date) : '—'}{segment.arrivalDate && segment.arrivalDate !== segment.date ? ` → ${formatDateOnly(segment.arrivalDate)}` : ''}</td>
+                            <td className="px-3 py-2 font-mono text-xs">{segment.departureTime ? formatTime(segment.departureTime) : '—'} <span className="text-slate-400">→</span> {segment.arrivalTime ? formatTime(segment.arrivalTime) : '—'}</td>
+                            <td className="px-3 py-2 font-semibold">{segment.duration || '—'}</td>
+                            <td className="px-3 py-2 font-bold tracking-wide text-[#8a6500]">{segment.flightNo || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
 
                   {/* Footer: Amount + payer */}

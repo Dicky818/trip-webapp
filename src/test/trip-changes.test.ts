@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import { resolveDisplayAmount } from '../lib/currency';
+import { calculateFlightDuration } from '../api/supabaseApi';
+
+describe('trip changes', () => {
+  it('uses an original amount when it already matches the requested currency', () => {
+    expect(resolveDisplayAmount({
+      originalAmount: 2200,
+      originalCurrency: 'TWD',
+      baseAmount: 500,
+      baseCurrency: 'HKD',
+      displayCurrency: 'TWD',
+    })).toBe(2200);
+  });
+
+  it('uses a supplied historical rate for a missing target currency amount', () => {
+    expect(resolveDisplayAmount({
+      originalAmount: 100,
+      originalCurrency: 'JPY',
+      baseAmount: 5,
+      baseCurrency: 'HKD',
+      displayCurrency: 'TWD',
+      rate: 0.22,
+    })).toBeCloseTo(22);
+  });
+
+  it('returns null instead of mislabeling a base amount when the rate is missing', () => {
+    expect(resolveDisplayAmount({
+      originalAmount: 100,
+      originalCurrency: 'JPY',
+      baseAmount: 5,
+      baseCurrency: 'HKD',
+      displayCurrency: 'TWD',
+    })).toBeNull();
+  });
+
+  it('subtracts the time-zone difference and handles a cross-midnight segment', () => {
+    expect(calculateFlightDuration('2027-01-13', '09:10', '2027-01-13', '15:00', 8, 9)).toBe('4h50m');
+    expect(calculateFlightDuration('2027-01-13', '23:30', '2027-01-14', '02:00', 8, 9)).toBe('1h30m');
+  });
+});

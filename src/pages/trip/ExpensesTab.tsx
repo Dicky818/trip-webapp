@@ -11,7 +11,7 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { api, Trip, Expense, TripMember, Settlement, Category, ReceiptAnalysis } from '../../api/supabaseApi';
+import { api, Trip, Expense, TripMember, Settlement, Category, ReceiptAnalysis, FlightSegment, calculateFlightDuration } from '../../api/supabaseApi';
 import { Button, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner, Badge, Card } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -182,7 +182,7 @@ export default function ExpensesTab({ trip }: Props) {
     Original_Amount: '', Currency: trip.Base_Currency,
     Exchange_Rate: '1', Payer: '', splitterIds: [],
     Flight_No: '', Airline: '', Departure_Location: '', Arrival_Location: '',
-    Flight_Date: '', Departure_Time: '', Landing_Time: '', Arrival_Date: '', Arrival_Time: '', Return_Landing_Time: '', Flight_Status: '',
+    Flight_Date: '', Departure_Time: '', Landing_Time: '', Arrival_Date: '', Arrival_Time: '', Return_Landing_Time: '', Flight_Status: '', Flight_Segments: [],
     Accommodation_Name: '', Accommodation_Address: '', Check_In_Date: '', Check_Out_Date: '',
     Rail_Start_Date: '', Rail_End_Date: '', Rail_Order_No: '', Rail_Platform: '',
     Rental_Pickup_Date: '', Rental_Return_Date: '',
@@ -272,10 +272,10 @@ export default function ExpensesTab({ trip }: Props) {
     };
   }, [activeSubTab, recentSavedExpenseId]);
 
-  const fetchSettlement = async () => {
+  const fetchSettlement = async (currency = trip.Base_Currency) => {
     setSettlementLoading(true);
     try {
-      const result = await api.getSettlement(trip.Trip_ID);
+      const result = await api.getSettlement(trip.Trip_ID, currency);
       setSettlement((result as any).data);
     } catch (e: unknown) { showToast(e instanceof Error ? e.message : '計算失敗', 'error'); }
     finally { setSettlementLoading(false); }
@@ -312,6 +312,13 @@ export default function ExpensesTab({ trip }: Props) {
   const currentTripMember = useMemo(
     () => tripMembers.find(member => member.Member_ID === currentUser?.id) || null,
     [tripMembers, currentUser?.id],
+  );
+  const participantNames = useMemo(
+    () => Array.from(new Set([
+      ...tripMembers.map(member => member.Member_Name || ''),
+      ...(trip.Traveler_Names || []),
+    ].map(name => name.trim()).filter(Boolean))),
+    [tripMembers, trip.Traveler_Names],
   );
 
   const getReceiptCategorySuggestion = (analysis: ReceiptAnalysis) => {
@@ -501,6 +508,7 @@ export default function ExpensesTab({ trip }: Props) {
         Arrival_Time: expense.Arrival_Time || '',
         Return_Landing_Time: expense.Return_Landing_Time || '',
         Flight_Status: expense.Flight_Status || '',
+        Flight_Segments: expense.Flight_Segments || [],
         Accommodation_Name: expense.Accommodation_Name || '',
         Accommodation_Address: expense.Accommodation_Address || '',
         Check_In_Date: expense.Check_In_Date || '',
@@ -524,13 +532,35 @@ export default function ExpensesTab({ trip }: Props) {
         Original_Amount: '',
         Currency: trip.Base_Currency,
         Exchange_Rate: '1',
-        Payer: tripMembers[0]?.Member_Name || '',
+        Payer: currentTripMember?.Member_Name || participantNames[0] || '',
         splitterIds: currentTripMember
           ? [currentTripMember.Member_Name]
-          : tripMembers[0] ? [tripMembers[0].Member_Name] : [],
+          : participantNames[0] ? [participantNames[0]] : [],
+        Flight_Segments: [{ direction: '去程', route: '', date: new Date().toISOString().slice(0, 10), arrivalDate: new Date().toISOString().slice(0, 10), departureTime: '', arrivalTime: '', departureTimeZoneOffset: 0, arrivalTimeZoneOffset: 0, duration: '', flightNo: '' }],
       });
     }
     setShowExpenseModal(true);
+  };
+
+  const updateFlightSegment = (index: number, patch: Partial<FlightSegment>) => {
+    setExpenseForm(current => {
+      const segments = [...(current.Flight_Segments || [])];
+      const next = { ...(segments[index] || { direction: index === 0 ? '去程' : '轉機', route: '', date: '', arrivalDate: '', departureTime: '', arrivalTime: '', departureTimeZoneOffset: 0, arrivalTimeZoneOffset: 0, duration: '', flightNo: '' }), ...patch };
+      next.duration = calculateFlightDuration(next.date, next.departureTime, next.arrivalDate || next.date, next.arrivalTime, Number(next.departureTimeZoneOffset || 0), Number(next.arrivalTimeZoneOffset || 0));
+      segments[index] = next;
+      return { ...current, Flight_Segments: segments };
+    });
+  };
+
+  const addFlightSegment = () => {
+    setExpenseForm(current => ({
+      ...current,
+      Flight_Segments: [...(current.Flight_Segments || []), { direction: '轉機', route: '', date: '', arrivalDate: '', departureTime: '', arrivalTime: '', departureTimeZoneOffset: 0, arrivalTimeZoneOffset: 0, duration: '', flightNo: '' }],
+    }));
+  };
+
+  const removeFlightSegment = (index: number) => {
+    setExpenseForm(current => ({ ...current, Flight_Segments: (current.Flight_Segments || []).filter((_, itemIndex) => itemIndex !== index) }));
   };
 
   const handleSaveExpense = async () => {
@@ -559,6 +589,11 @@ export default function ExpensesTab({ trip }: Props) {
       };
       if (isRentalCarCategory && !validateRange(String(expenseForm.Rental_Pickup_Date || ''), String(expenseForm.Rental_Return_Date || ''), '租賃汽車')) return;
       if (isInsuranceCategory && !validateRange(String(expenseForm.Insurance_Start_Date || ''), String(expenseForm.Insurance_End_Date || ''), '保險')) return;
+      const segments = (expenseForm.Flight_Segments || []).filter(segment => segment.route || segment.date || segment.flightNo || segment.departureTime || segment.arrivalTime);
+      const firstSegment = segments[0];
+      const secondSegment = segments[1];
+      const firstRoute = (firstSegment?.route || '').split('→');
+      const secondRoute = (secondSegment?.route || '').split('→');
       const payload: Partial<Expense> = {
         Trip_ID: trip.Trip_ID,
         Date: expenseForm.Date,
@@ -574,17 +609,18 @@ export default function ExpensesTab({ trip }: Props) {
         Splitters: expenseForm.splitterIds?.join(',') || '',
         Splitter_IDs: (expenseForm.splitterIds || []).map(name => tripMembers.find(m => m.Member_Name === name)?.Member_ID).filter(Boolean) as string[],
         ...(isFlightCategory ? {
-          Flight_No: expenseForm.Flight_No,
+          Flight_No: firstSegment?.flightNo || expenseForm.Flight_No,
           Airline: expenseForm.Airline,
-          Departure_Location: expenseForm.Departure_Location,
-          Arrival_Location: expenseForm.Arrival_Location,
-          Flight_Date: expenseForm.Flight_Date,
-          Departure_Time: expenseForm.Departure_Time,
-          Landing_Time: expenseForm.Landing_Time,
-          Arrival_Date: expenseForm.Arrival_Date,
-          Arrival_Time: expenseForm.Arrival_Time,
-          Return_Landing_Time: expenseForm.Return_Landing_Time,
+          Departure_Location: firstRoute[0] || expenseForm.Departure_Location,
+          Arrival_Location: firstRoute[1] || expenseForm.Arrival_Location,
+          Flight_Date: firstSegment?.date || expenseForm.Flight_Date,
+          Departure_Time: firstSegment?.departureTime || expenseForm.Departure_Time,
+          Landing_Time: firstSegment?.arrivalTime || expenseForm.Landing_Time,
+          Arrival_Date: secondSegment?.date || expenseForm.Arrival_Date,
+          Arrival_Time: secondSegment?.departureTime || expenseForm.Arrival_Time,
+          Return_Landing_Time: secondSegment?.arrivalTime || expenseForm.Return_Landing_Time,
           Flight_Status: expenseForm.Flight_Status,
+          Flight_Segments: segments,
         } : {}),
         ...(isAccommodationCategory ? {
           Accommodation_Name: expenseForm.Accommodation_Name,
@@ -1025,7 +1061,7 @@ export default function ExpensesTab({ trip }: Props) {
               <Select label="貨幣" value={expenseForm.Currency || trip.Base_Currency} onChange={e => setExpenseForm(f => ({ ...f, Currency: e.target.value }))} options={CURRENCIES.map(c => ({ value: c, label: c }))} />
               <Input label="金額" type="number" required placeholder="0.00" step="0.01" min="0" value={String(expenseForm.Original_Amount || '')} onChange={e => setExpenseForm(f => ({ ...f, Original_Amount: e.target.value }))} />
               <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between"><div><p className="text-xs text-slate-500">換算後基礎金額</p><p className="mt-0.5 text-lg font-bold text-slate-950">{trip.Base_Currency} {parseFloat(baseAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div><p className="text-xs text-slate-500">匯率 {String(expenseForm.Exchange_Rate ?? '1')}</p></div>
-              <div className="sm:col-span-2"><label className="text-sm font-bold text-slate-800 block mb-2">付款人 <span className="text-red-500">*</span></label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => setExpenseForm(f => ({ ...f, Payer: m.Member_Name }))} className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-colors ${expenseForm.Payer === m.Member_Name ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-400'}`}>{m.Member_Name}</button>)}</div></div>
+              <div className="sm:col-span-2"><label className="text-sm font-bold text-slate-800 block mb-2">付款人 <span className="text-red-500">*</span></label><div className="flex flex-wrap gap-2">{participantNames.map(name => <button key={name} type="button" onClick={() => setExpenseForm(f => ({ ...f, Payer: name }))} className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-colors ${expenseForm.Payer === name ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-400'}`}>{name}</button>)}</div></div>
             </div>
           </section>
 
@@ -1033,7 +1069,7 @@ export default function ExpensesTab({ trip }: Props) {
             <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-700 flex items-center justify-between">需要分帳、調整匯率或標記預訂嗎？<span className="text-slate-400 transition-transform group-open:rotate-45">+</span></summary>
             <div className="border-t border-slate-200 p-4 space-y-4">
               <div className="flex gap-2 items-end"><Input label={`匯率 (→ ${trip.Base_Currency})`} type="text" inputMode="decimal" value={String(expenseForm.Exchange_Rate ?? '1')} onChange={e => setExpenseForm(f => ({ ...f, Exchange_Rate: e.target.value }))} className="flex-1" /><Button size="sm" variant="outline" onClick={fetchExchangeRate} loading={exchangeRateLoading} className="mb-0.5"><RefreshCw size={13} /> 更新</Button></div>
-              <div><label className="mb-2 block text-sm font-semibold text-slate-700">分帳成員 {!editExpense && <span className="ml-1 text-xs font-normal text-slate-400">預設：你本人</span>}</label><div className="flex flex-wrap gap-2">{tripMembers.map(m => <button key={m.Member_ID} type="button" onClick={() => toggleSplitter(m.Member_Name)} className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${expenseForm.splitterIds?.includes(m.Member_Name) ? 'border-[#111111] bg-[#111111] text-[#ffc91a]' : 'border-[#c9c1af] bg-white text-slate-600 hover:border-[#111111]'}`}>{m.Member_Name}</button>)}{tripMembers.length === 0 && <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>}</div></div>
+              <div><label className="mb-2 block text-sm font-semibold text-slate-700">分帳成員 {!editExpense && <span className="ml-1 text-xs font-normal text-slate-400">預設：你本人</span>}</label><div className="flex flex-wrap gap-2">{participantNames.map(name => <button key={name} type="button" onClick={() => toggleSplitter(name)} className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${expenseForm.splitterIds?.includes(name) ? 'border-[#111111] bg-[#111111] text-[#ffc91a]' : 'border-[#c9c1af] bg-white text-slate-600 hover:border-[#111111]'}`}>{name}</button>)}{participantNames.length === 0 && <p className="text-xs text-slate-400">尚無成員，請先加入行程</p>}</div></div>
             </div>
           </details>
 
@@ -1043,16 +1079,8 @@ export default function ExpensesTab({ trip }: Props) {
               <div className="col-span-2 border-t border-slate-100 pt-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">機票資訊</p>
               </div>
-              <Input label="航班號" placeholder="例如：CX543" value={expenseForm.Flight_No || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Flight_No: e.target.value }))} />
               <Input label="航空公司" placeholder="例如：國泰航空" value={expenseForm.Airline || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Airline: e.target.value }))} />
-              <Input label="出發地" placeholder="例如：香港 (HKG)" value={expenseForm.Departure_Location || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Departure_Location: e.target.value }))} />
-              <Input label="目的地" placeholder="例如：東京成田 (NRT)" value={expenseForm.Arrival_Location || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Arrival_Location: e.target.value }))} />
-              <Input label="航班日期（出發）" type="date" value={expenseForm.Flight_Date || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Flight_Date: e.target.value }))} />
               <Select label="狀態" value={expenseForm.Flight_Status || ''}
                 onChange={e => setExpenseForm(f => ({ ...f, Flight_Status: e.target.value }))}
                 options={[
@@ -1061,16 +1089,30 @@ export default function ExpensesTab({ trip }: Props) {
                   { value: 'pending', label: '待確認' },
                   { value: 'cancelled', label: '已取消' },
                 ]} />
-              <Input label="出發時間" type="time" value={expenseForm.Departure_Time || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Departure_Time: e.target.value }))} />
-              <Input label="到達時間" type="time" value={expenseForm.Landing_Time || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Landing_Time: e.target.value }))} />
-              <Input label="回程日期" type="date" value={expenseForm.Arrival_Date || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Arrival_Date: e.target.value }))} />
-              <Input label="回程時間" type="time" value={expenseForm.Arrival_Time || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Arrival_Time: e.target.value }))} />
-              <Input label="到港時間" type="time" value={expenseForm.Return_Landing_Time || ''}
-                onChange={e => setExpenseForm(f => ({ ...f, Return_Landing_Time: e.target.value }))} />
+              <div className="col-span-2 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div><p className="text-sm font-bold text-slate-800">航班段</p><p className="text-xs text-slate-500">支援去程、回程及轉機；飛行時間按抵達−出發−時差計算。</p></div>
+                  <Button type="button" size="sm" variant="outline" onClick={addFlightSegment}><Plus size={13} /> 新增航班段</Button>
+                </div>
+                {(expenseForm.Flight_Segments || []).map((segment, index) => (
+                  <div key={`flight-segment-${index}`} className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+                    <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wide text-slate-500">Segment {index + 1}</span>{(expenseForm.Flight_Segments || []).length > 1 && <button type="button" onClick={() => removeFlightSegment(index)} className="text-xs font-semibold text-red-600 hover:text-red-700">移除</button>}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Select label="方向" value={segment.direction || (index === 0 ? '去程' : '轉機')} onChange={e => updateFlightSegment(index, { direction: e.target.value })} options={[{ value: '去程', label: '去程' }, { value: '回程', label: '回程' }, { value: '轉機', label: '轉機' }]} />
+                      <Input label="航班編號" placeholder="例如：HX692" value={segment.flightNo || ''} onChange={e => updateFlightSegment(index, { flightNo: e.target.value })} />
+                      <Input label="航線" placeholder="例如：HKG→CTS" value={segment.route || ''} onChange={e => updateFlightSegment(index, { route: e.target.value })} />
+                      <Input label="出發日期" type="date" value={segment.date || ''} onChange={e => updateFlightSegment(index, { date: e.target.value })} />
+                      <Input label="抵達日期" type="date" value={segment.arrivalDate || segment.date || ''} onChange={e => updateFlightSegment(index, { arrivalDate: e.target.value })} />
+                      <Input label="出發時間" type="time" value={segment.departureTime || ''} onChange={e => updateFlightSegment(index, { departureTime: e.target.value })} />
+                      <Input label="抵達時間" type="time" value={segment.arrivalTime || ''} onChange={e => updateFlightSegment(index, { arrivalTime: e.target.value })} />
+                      <Input label="出發時差（小時）" type="number" step="1" value={String(segment.departureTimeZoneOffset ?? 0)} onChange={e => updateFlightSegment(index, { departureTimeZoneOffset: e.target.value })} />
+                      <Input label="抵達時差（小時）" type="number" step="1" value={String(segment.arrivalTimeZoneOffset ?? 0)} onChange={e => updateFlightSegment(index, { arrivalTimeZoneOffset: e.target.value })} />
+                      <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"><span className="text-xs text-slate-500">飛行小時</span><p className="font-bold">{segment.duration || '—'}</p></div>
+                    </div>
+                  </div>
+                ))}
+                {(expenseForm.Flight_Segments || []).length === 0 && <p className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-xs text-slate-500">尚未加入航班段，請按「新增航班段」。</p>}
+              </div>
             </>
           )}
 

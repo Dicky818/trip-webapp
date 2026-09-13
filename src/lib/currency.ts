@@ -25,3 +25,30 @@ export function formatCurrencyAmount(value: unknown, currency: string, options?:
   const safeCurrency = normalizeCurrency(currency, 'HKD');
   return `${safeCurrency} ${amount.toLocaleString('zh-TW', { minimumFractionDigits, maximumFractionDigits })}`;
 }
+
+/**
+ * Resolve one expense into a requested display currency.
+ * A stored amount in the requested currency wins; otherwise the stored base
+ * amount is used for base display, and only then is the original amount
+ * multiplied by a rate for the expense date. Missing rates never become 1.
+ */
+export function resolveDisplayAmount(input: {
+  originalAmount: unknown;
+  originalCurrency: unknown;
+  baseAmount: unknown;
+  baseCurrency: unknown;
+  displayCurrency: unknown;
+  rate?: unknown;
+}): number | null {
+  const originalAmount = Number(input.originalAmount);
+  const baseAmount = Number(input.baseAmount);
+  const originalCurrency = normalizeCurrency(input.originalCurrency, normalizeCurrency(input.baseCurrency, 'HKD'));
+  const baseCurrency = normalizeCurrency(input.baseCurrency, 'HKD');
+  const displayCurrency = normalizeCurrency(input.displayCurrency, baseCurrency);
+
+  if (displayCurrency === originalCurrency && Number.isFinite(originalAmount)) return originalAmount;
+  if (displayCurrency === baseCurrency && Number.isFinite(baseAmount)) return baseAmount;
+  const rate = Number(input.rate);
+  if (!Number.isFinite(originalAmount) || !isFiniteRate(rate)) return null;
+  return originalAmount * rate;
+}

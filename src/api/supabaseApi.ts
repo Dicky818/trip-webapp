@@ -39,6 +39,73 @@ export interface UserProfile {
   Updated_At: string;
 }
 
+export interface FlightSegment {
+  direction?: string;
+  route: string;
+  date: string;
+  departureTime: string;
+  arrivalTime: string;
+  arrivalDate?: string;
+  departureTimeZoneOffset?: number | string;
+  arrivalTimeZoneOffset?: number | string;
+  duration: string;
+  flightNo: string;
+}
+
+export function calculateFlightDuration(departureDate: string, departureTime: string, arrivalDate: string, arrivalTime: string, departureOffset = 0, arrivalOffset = 0): string {
+  if (!departureTime || !arrivalTime) return '';
+  const start = new Date(`${departureDate || '1970-01-01'}T${departureTime}:00`).getTime();
+  let end = new Date(`${arrivalDate || departureDate || '1970-01-01'}T${arrivalTime}:00`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return '';
+  if (end < start) end += 24 * 60 * 60 * 1000;
+  const offsetHours = Number(arrivalOffset || 0) - Number(departureOffset || 0);
+  const minutes = Math.max(0, Math.round((end - start) / 60000 - offsetHours * 60));
+  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`;
+}
+
+function normalizeFlightSegments(detail: Record<string, unknown>): FlightSegment[] {
+  const rawSegments = Array.isArray(detail.segments) ? detail.segments : [];
+  if (rawSegments.length > 0) return rawSegments.map((segment: any, index) => ({
+    direction: String(segment.direction || (index === 0 ? '去程' : '轉機')),
+    route: String(segment.route || ''),
+    date: String(segment.date || detail.flight_date || ''),
+    arrivalDate: String(segment.arrivalDate || segment.arrival_date || segment.date || detail.flight_date || ''),
+    departureTime: String(segment.departureTime || segment.departure_time || ''),
+    arrivalTime: String(segment.arrivalTime || segment.arrival_time || ''),
+    departureTimeZoneOffset: segment.departureTimeZoneOffset ?? segment.departure_offset ?? 0,
+    arrivalTimeZoneOffset: segment.arrivalTimeZoneOffset ?? segment.arrival_offset ?? 0,
+    duration: String(segment.duration || ''),
+    flightNo: String(segment.flightNo || segment.flight_no || ''),
+  }));
+  if (!detail.flight_no && !detail.departure_location && !detail.arrival_location) return [];
+  const firstDate = String(detail.flight_date || '');
+  const segments: FlightSegment[] = [{
+    direction: '去程',
+    route: [detail.departure_location, detail.arrival_location].filter(Boolean).join('→'),
+    date: firstDate,
+    arrivalDate: firstDate,
+    departureTime: String(detail.departure_time || ''),
+    arrivalTime: String(detail.landing_time || detail.arrival_time || ''),
+    departureTimeZoneOffset: 0,
+    arrivalTimeZoneOffset: 0,
+    duration: '',
+    flightNo: String(detail.flight_no || ''),
+  }];
+  if (detail.arrival_date || detail.arrival_time || detail.return_landing_time) segments.push({
+    direction: '回程',
+    route: [detail.arrival_location, detail.departure_location].filter(Boolean).join('→'),
+    date: String(detail.arrival_date || ''),
+    arrivalDate: String(detail.arrival_date || ''),
+    departureTime: String(detail.arrival_time || ''),
+    arrivalTime: String(detail.return_landing_time || ''),
+    departureTimeZoneOffset: 0,
+    arrivalTimeZoneOffset: 0,
+    duration: '',
+    flightNo: String(detail.flight_no || ''),
+  });
+  return segments.map(segment => ({ ...segment, duration: calculateFlightDuration(segment.date, segment.departureTime, segment.arrivalDate || segment.date, segment.arrivalTime, Number(segment.departureTimeZoneOffset || 0), Number(segment.arrivalTimeZoneOffset || 0)) }));
+}
+
 export interface Flight {
   Flight_ID: string;
   Trip_ID: string;
@@ -153,6 +220,7 @@ export interface Expense {
   Arrival_Time?: string;
   Return_Landing_Time?: string;
   Flight_Status?: string;
+  Flight_Segments?: FlightSegment[];
   // Accommodation-specific fields
   Accommodation_Name?: string;
   Accommodation_Address?: string;
@@ -215,6 +283,8 @@ export interface TripMember {
 }
 
 export interface Settlement {
+  displayCurrency?: string;
+  missingRateExpenses?: Array<{ expenseId: string; date: string; from: string; to: string }>;
   totalBase: number;
   categoryStats: Record<string, number>;
   memberBalances: Record<string, number>;
@@ -393,8 +463,9 @@ function err(msg: string): { success: false; error: string } {
 }
 
 // ── Settlement calculation (client-side) ───────────────────
-function calcSettlement(expenses: Expense[], members: string[], memberIdToName?: Record<string, string>): Settlement {
-  const totalBase = expenses.reduce((s, e) => s + Number(e.Base_Amount || 0), 0);
+function calcSettlement(expenses: Expense[], members: string[], memberIdToName?: Record<string, string>, amountOverrides?: Map<string, number>, displayCurrency?: string, missingRateExpenses: Settlement['missingRateExpenses'] = []): Settlement {
+  const amountFor = (expense: Expense) => amountOverrides?.get(expense.Expense_ID) ?? Number(expense.Base_Amount || 0);
+  const totalBase = expenses.reduce((s, e) => s + amountFor(e), 0);
   const categoryStats: Record<string, number> = {};
   const memberPaid: Record<string, number> = {};
   const memberOwed: Record<string, number> = {};
@@ -416,11 +487,11 @@ function calcSettlement(expenses: Expense[], members: string[], memberIdToName?:
 
   expenses.forEach(e => {
     const cat = e.Main_Category || '其他';
-    categoryStats[cat] = (categoryStats[cat] || 0) + Number(e.Base_Amount || 0);
+    categoryStats[cat] = (categoryStats[cat] || 0) + amountFor(e);
 
     // Prefer UUID-based payer/splitters for accuracy (no name collision)
     const payer = e.Payer_ID ? resolveName(e.Payer_ID) : e.Payer;
-    const amt = Number(e.Base_Amount || 0);
+    const amt = amountFor(e);
     if (payer) memberPaid[payer] = (memberPaid[payer] || 0) + amt;
 
     let splitterList: string[];
@@ -468,10 +539,42 @@ function calcSettlement(expenses: Expense[], members: string[], memberIdToName?:
     if (Math.abs(creditors[ci][1]) < 0.01) ci++;
   }
 
-  return { totalBase, categoryStats, memberBalances, memberPaid, memberOwed, settlements, rawDebts };
+  return { displayCurrency, missingRateExpenses, totalBase, categoryStats, memberBalances, memberPaid, memberOwed, settlements, rawDebts };
 }
 
 // ── Exchange Rate ──────────────────────────────────────────
+const historicalRateCache = new Map<string, number | null>();
+
+async function fetchHistoricalExchangeRate(from: string, to: string, date: string, externalSignal?: AbortSignal): Promise<number | null> {
+  if (from === to) return 1;
+  const safeDate = String(date || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(safeDate)) return null;
+  const key = `${from.toUpperCase()}-${to.toUpperCase()}-${safeDate}`;
+  if (historicalRateCache.has(key)) return historicalRateCache.get(key) ?? null;
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  if (externalSignal?.aborted) return null;
+  externalSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  const timeout = setTimeout(() => controller.abort(), 6500);
+  try {
+    const response = await fetch(`https://api.frankfurter.app/${safeDate}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { signal: controller.signal });
+    if (!response.ok) {
+      historicalRateCache.set(key, null);
+      return null;
+    }
+    const data = await response.json();
+    const rate = Number(data?.rates?.[to.toUpperCase()]);
+    const safeRate = Number.isFinite(rate) && rate > 0 ? rate : null;
+    historicalRateCache.set(key, safeRate);
+    return safeRate;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', abortFromCaller);
+  }
+}
+
 async function fetchLiveExchangeRate(from: string, to: string, externalSignal?: AbortSignal): Promise<number | null> {
   if (from === to) return 1;
   const controller = new AbortController();
@@ -1108,6 +1211,7 @@ export const api = {
           if (dd.arrival_time !== undefined) base.Arrival_Time = dd.arrival_time || '';
           if (dd.return_landing_time !== undefined) base.Return_Landing_Time = dd.return_landing_time || '';
           if (dd.flight_status !== undefined) base.Flight_Status = dd.flight_status || '';
+          base.Flight_Segments = normalizeFlightSegments(dd);
         } else if (d.detail_type === 'accommodation') {
           if (dd.accommodation_name !== undefined) base.Accommodation_Name = dd.accommodation_name || '';
           if (dd.accommodation_address !== undefined) base.Accommodation_Address = dd.accommodation_address || '';
@@ -1189,6 +1293,7 @@ export const api = {
           arrival_time: body.Arrival_Time || '',
           return_landing_time: body.Return_Landing_Time || '',
           flight_status: body.Flight_Status || '',
+          segments: body.Flight_Segments || [],
         },
       });
     } else if (isAccomCat && (body.Accommodation_Name || body.Accommodation_Address || body.Check_In_Date)) {
@@ -1288,7 +1393,7 @@ export const api = {
       body.Flight_Date !== undefined || body.Departure_Time !== undefined ||
       body.Landing_Time !== undefined || body.Arrival_Date !== undefined ||
       body.Arrival_Time !== undefined || body.Return_Landing_Time !== undefined ||
-      body.Flight_Status !== undefined;
+      body.Flight_Status !== undefined || body.Flight_Segments !== undefined;
     const hasAccomFields = body.Accommodation_Name !== undefined || body.Accommodation_Address !== undefined ||
       body.Check_In_Date !== undefined || body.Check_Out_Date !== undefined;
     const hasRailFields = body.Rail_Start_Date !== undefined || body.Rail_End_Date !== undefined ||
@@ -1316,6 +1421,7 @@ export const api = {
       if (body.Arrival_Time !== undefined) newData.arrival_time = body.Arrival_Time;
       if (body.Return_Landing_Time !== undefined) newData.return_landing_time = body.Return_Landing_Time;
       if (body.Flight_Status !== undefined) newData.flight_status = body.Flight_Status;
+      if (body.Flight_Segments !== undefined) newData.segments = body.Flight_Segments;
       if (existingDetail) {
         await supabase.from('expense_details').update({ detail_data: newData }).eq('id', existingDetail.id);
       } else {
@@ -1404,27 +1510,53 @@ export const api = {
     return ok(null);
   },
 
-  getSettlement: async (tripId: string) => {
-    const [expRes, memberRes] = await Promise.all([
+  getSettlement: async (tripId: string, displayCurrency?: string) => {
+    const [expRes, memberRes, tripRes] = await Promise.all([
       api.getExpenses(tripId),
       api.getTripMembers(tripId),
+      api.getTripById(tripId),
     ]);
     if (!expRes.success) return err((expRes as { success: false; error: string }).error);
 
+    const trip = tripRes.success ? (tripRes as { success: true; data: Trip }).data : null;
+    const baseCurrency = trip?.Base_Currency || 'HKD';
+    const targetCurrency = displayCurrency || baseCurrency;
     const expenses = (expRes as { success: true; data: Expense[] }).data.filter(
       e => String(e.Is_Settled).toUpperCase() !== 'TRUE' && e.Is_Settled !== true
     );
     const tripMembers = memberRes.success
       ? (memberRes as { success: true; data: TripMember[] }).data
       : [];
-    const members = tripMembers.map(m => m.Member_Name || '');
+    const memberNames = [
+      ...tripMembers.map(m => m.Member_Name || ''),
+      ...(trip?.Traveler_Names || []),
+    ].map(name => String(name).trim()).filter(Boolean);
+    const members = Array.from(new Set(memberNames));
     // Build UUID→display_name map for accurate settlement (avoids name collision)
     const memberIdToName: Record<string, string> = {};
     tripMembers.forEach(m => {
       if (m.Member_ID) memberIdToName[m.Member_ID] = m.Member_Name || '';
     });
 
-    return ok(calcSettlement(expenses, members, memberIdToName));
+    const amountOverrides = new Map<string, number>();
+    const missingRateExpenses: NonNullable<Settlement['missingRateExpenses']> = [];
+    for (const expense of expenses) {
+      const expenseCurrency = String(expense.Currency || baseCurrency).toUpperCase();
+      let amount: number | null = null;
+      if (targetCurrency.toUpperCase() === expenseCurrency) {
+        amount = Number(expense.Original_Amount);
+      } else if (targetCurrency.toUpperCase() === baseCurrency.toUpperCase()) {
+        amount = Number(expense.Base_Amount);
+      } else {
+        const rateResult = await fetchHistoricalExchangeRate(expenseCurrency, targetCurrency, expense.Date);
+        if (rateResult !== null) amount = Number(expense.Original_Amount) * rateResult;
+      }
+      if (Number.isFinite(amount)) amountOverrides.set(expense.Expense_ID, Math.round((amount as number) * 100) / 100);
+      else missingRateExpenses.push({ expenseId: expense.Expense_ID, date: expense.Date || '', from: expenseCurrency, to: targetCurrency });
+    }
+
+    const calculableExpenses = expenses.filter(expense => amountOverrides.has(expense.Expense_ID));
+    return ok(calcSettlement(calculableExpenses, members, memberIdToName, amountOverrides, targetCurrency, missingRateExpenses));
   },
 
   // ── Categories ───────────────────────────────────────────
@@ -1743,6 +1875,12 @@ export const api = {
     const rate = await fetchLiveExchangeRate(from, to, signal);
     if (rate === null) return err('暫時無法取得匯率，請稍後重試或手動輸入');
     return ok({ rate, from, to });
+  },
+
+  getHistoricalExchangeRate: async (from: string, to: string, date: string, signal?: AbortSignal): Promise<Result<{ rate: number; from: string; to: string; date: string }>> => {
+    const rate = await fetchHistoricalExchangeRate(from, to, date, signal);
+    if (rate === null) return err(`${date || '該日'} 暫時無法取得 ${from} → ${to} 匯率`);
+    return ok({ rate, from, to, date: String(date || '').slice(0, 10) });
   },
 };
 

@@ -3,7 +3,7 @@ import { Trip, Expense, TripMember, Category } from '../../api/supabaseApi';
 import { Spinner, EmptyState } from '../../components/ui';
 import { DollarSign, RefreshCw } from 'lucide-react';
 import { api } from '../../api/supabaseApi';
-import { formatCurrencyAmount, isFiniteRate, normalizeCurrency, SUPPORTED_CURRENCIES } from '../../lib/currency';
+import { formatCurrencyAmount, isFiniteRate, normalizeCurrency, SUPPORTED_CURRENCIES, resolveDisplayAmount } from '../../lib/currency';
 
 interface Props {
   trip: Trip;
@@ -60,9 +60,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     }
     return normalizeCurrency(savedCurrency, normalizeCurrency(trip.Base_Currency, 'HKD'));
   });
-  const [exchangeRate, setExchangeRate] = useState<number | null>(() => (
-    displayCurrency === normalizeCurrency(trip.Base_Currency, 'HKD') ? 1 : null
-  )); // base → display
+  const [resolvedAmounts, setResolvedAmounts] = useState<Map<string, number>>(new Map());
+  const [missingRateExpenses, setMissingRateExpenses] = useState<Array<{ expenseId: string; date: string; from: string; to: string }>>([]);
   const [rateLoading, setRateLoading] = useState(false);
   const [rateError, setRateError] = useState<string | null>(null);
 
@@ -70,7 +69,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   const handleCurrencyChange = (newCurrency: string) => {
     const safeCurrency = normalizeCurrency(newCurrency, normalizeCurrency(trip.Base_Currency, 'HKD'));
     setDisplayCurrency(safeCurrency);
-    setExchangeRate(safeCurrency === normalizeCurrency(trip.Base_Currency, 'HKD') ? 1 : null);
+    setResolvedAmounts(new Map());
+    setMissingRateExpenses([]);
     setRateError(null);
     try {
       localStorage.setItem(DISPLAY_CURRENCY_KEY, safeCurrency);
@@ -79,52 +79,82 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     }
   };
 
-  // 取得匯率（base → display）；失敗時回退基礎貨幣並保留分析內容。
+  // 逐筆以支出日期取得歷史匯率；已有目標外幣原始金額時直接使用。
   useEffect(() => {
-    const baseCurrency = normalizeCurrency(trip.Base_Currency, 'HKD');
-    if (displayCurrency === baseCurrency) {
-      setExchangeRate(1);
-      setRateError(null);
-      setRateLoading(false);
-      return;
-    }
-
     const controller = new AbortController();
     let active = true;
-    setRateLoading(true);
+    const baseCurrency = normalizeCurrency(trip.Base_Currency, 'HKD');
+    const targetCurrency = normalizeCurrency(displayCurrency, baseCurrency);
+    setRateLoading(targetCurrency !== baseCurrency && expenses.length > 0);
     setRateError(null);
-    api.getExchangeRate(baseCurrency, displayCurrency, controller.signal)
-      .then(result => {
-        if (!active) return;
-        if (result.success && isFiniteRate(result.rate)) {
-          setExchangeRate(result.rate);
-          setRateError(null);
-        } else {
-          setExchangeRate(null);
-          setRateError('匯率暫時無法取得，分析先以旅程基礎貨幣顯示。');
-        }
-      })
-      .catch(() => {
-        if (!active) return;
-        setExchangeRate(null);
-        setRateError('匯率暫時無法取得，分析先以旅程基礎貨幣顯示。');
-      })
-      .finally(() => {
-        if (active) setRateLoading(false);
+
+    const direct = new Map<string, number>();
+    const pending = expenses.filter(expense => {
+      const amount = resolveDisplayAmount({
+        originalAmount: expense.Original_Amount,
+        originalCurrency: expense.Currency,
+        baseAmount: expense.Base_Amount,
+        baseCurrency,
+        displayCurrency: targetCurrency,
       });
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [displayCurrency, trip.Base_Currency]);
+      if (amount !== null) {
+        direct.set(expense.Expense_ID, amount);
+        return false;
+      }
+      return true;
+    });
+    setResolvedAmounts(direct);
+    setMissingRateExpenses([]);
 
-  const effectiveDisplayCurrency = exchangeRate === null ? normalizeCurrency(trip.Base_Currency, 'HKD') : displayCurrency;
+    if (pending.length === 0) {
+      setRateLoading(false);
+      return () => { active = false; controller.abort(); };
+    }
 
-  // 轉換金額（base → display）；無匯率時只回退數值，不把基礎金額誤標成 TWD。
-  const convertAmt = (baseAmt: number) => baseAmt * (exchangeRate ?? 1);
+    Promise.all(pending.map(async expense => {
+      const from = normalizeCurrency(expense.Currency, baseCurrency);
+      const result = await api.getHistoricalExchangeRate(from, targetCurrency, expense.Date, controller.signal);
+      return { expense, from, result };
+    })).then(results => {
+      if (!active) return;
+      const next = new Map(direct);
+      const missing: Array<{ expenseId: string; date: string; from: string; to: string }> = [];
+      results.forEach(({ expense, from, result }) => {
+        if (result.success && isFiniteRate(result.rate)) {
+          next.set(expense.Expense_ID, Number(expense.Original_Amount) * result.rate);
+        } else {
+          missing.push({ expenseId: expense.Expense_ID, date: expense.Date || '', from, to: targetCurrency });
+        }
+      });
+      setResolvedAmounts(next);
+      setMissingRateExpenses(missing);
+      setRateError(missing.length > 0 ? `${missing.length} 筆支出缺少當日匯率，已顯示 —，未把 HKD 數值誤標成 ${targetCurrency}。` : null);
+    }).catch(() => {
+      if (active) setRateError('部分支出暫時無法取得當日匯率，已顯示 —。');
+    }).finally(() => {
+      if (active) setRateLoading(false);
+    });
 
-  // 行程成員（直接使用 tripMembers，已包含擁有者和協作者）
-  const tripMemberObjects = tripMembers;
+    return () => { active = false; controller.abort(); };
+  }, [displayCurrency, trip.Base_Currency, expenses]);
+
+  const effectiveDisplayCurrency = normalizeCurrency(displayCurrency, normalizeCurrency(trip.Base_Currency, 'HKD'));
+
+  // 行程成員包含登入協作者與創建者輸入的姓名同行者；姓名型同行者使用穩定的本地 key。
+  const tripMemberObjects = useMemo(() => {
+    const names = Array.from(new Set([
+      ...tripMembers.map(member => member.Member_Name || ''),
+      ...(trip.Traveler_Names || []),
+    ].map(name => name.trim()).filter(Boolean)));
+    return names.map(name => tripMembers.find(member => member.Member_Name === name) || {
+      Trip_Member_ID: `traveler-${name}`,
+      Trip_ID: trip.Trip_ID,
+      Member_ID: `traveler-${name}`,
+      Member_Name: name,
+      Is_Owner: false,
+      Created_At: '',
+    });
+  }, [tripMembers, trip.Traveler_Names, trip.Trip_ID]);
 
   // 行程日期列表
   const tripDates = useMemo(() => getTripDates(trip.Start_Date, trip.End_Date), [trip.Start_Date, trip.End_Date]);
@@ -145,7 +175,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
       if (splitters.length === 0) return true;
       return splitters.includes(selectedSplitter);
     });
-  }, [expenses, selectedSplitter, tripMemberObjects]);
+  }, [expenses, selectedSplitter, tripMemberObjects, trip.Traveler_Names]);
 
   // 建立分類結構
   const activeCategories = categories.filter(c => String(c.Is_Active).toUpperCase() === 'TRUE');
@@ -169,7 +199,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   // 計算每筆支出的分攤金額（base currency）
   // Fix: 當 Splitters 為空時，代表全體成員平分，應除以全部成員數
   const getEffectiveAmount = (e: Expense): number => {
-    const total = parseFloat(String(e.Base_Amount)) || 0;
+    const total = resolvedAmounts.get(e.Expense_ID) ?? 0;
     if (selectedSplitter === 'ALL') return total;
     // Prefer UUID-based count for accuracy
     if (e.Splitter_IDs && e.Splitter_IDs.length > 0) {
@@ -288,12 +318,25 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
       }
     });
     return map;
-  }, [filteredExpenses, selectedSplitter]);
+  }, [filteredExpenses, selectedSplitter, resolvedAmounts]);
 
   // 總支出
   const grandTotal = useMemo(() =>
     filteredExpenses.reduce((sum, e) => sum + getEffectiveAmount(e), 0),
-    [filteredExpenses, selectedSplitter]
+    [filteredExpenses, selectedSplitter, resolvedAmounts]
+  );
+
+  const getEffectiveBaseAmount = (e: Expense): number => {
+    const total = Number(e.Base_Amount || 0);
+    if (selectedSplitter === 'ALL') return total;
+    if (e.Splitter_IDs && e.Splitter_IDs.length > 0) return total / e.Splitter_IDs.length;
+    const splitters = (e.Splitters || '').split(',').map(s => s.trim()).filter(Boolean);
+    return splitters.length > 0 ? total / splitters.length : total / (tripMemberObjects.length || 1);
+  };
+
+  const grandTotalBase = useMemo(() =>
+    filteredExpenses.reduce((sum, e) => sum + getEffectiveBaseAmount(e), 0),
+    [filteredExpenses, selectedSplitter, tripMemberObjects]
   );
 
   // 每個主分類的小計（按日期）
@@ -346,9 +389,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   }, [amountMap]);
 
   // 格式化顯示金額
-  const fmtAmt = (baseAmt: number, showCurrency = false): string => {
-    if (baseAmt === 0) return '';
-    const displayAmt = convertAmt(baseAmt);
+  const fmtAmt = (displayAmt: number, showCurrency = false): string => {
+    if (displayAmt === 0) return '';
     const formatted = formatCurrencyAmount(displayAmt, effectiveDisplayCurrency);
     return showCurrency ? formatted : formatted.replace(`${effectiveDisplayCurrency} `, '');
   };
@@ -358,7 +400,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     <EmptyState icon={<DollarSign size={32} />} title="尚無支出記錄" description="請先在「支出列表」新增支出" />
   );
 
-  const grandTotalDisplay = convertAmt(grandTotal);
+  const grandTotalDisplay = grandTotal;
   const hasInclusiveDateExpenses = filteredExpenses.some(exp =>
     (exp.Rental_Pickup_Date && exp.Rental_Return_Date) ||
     (exp.Insurance_Start_Date && exp.Insurance_End_Date)
@@ -393,10 +435,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
             ))}
           </select>
           {rateLoading && <RefreshCw size={13} className="animate-spin text-blue-500" />}
-          {displayCurrency !== trip.Base_Currency && !rateLoading && exchangeRate !== null && (
-            <span className="text-xs text-slate-400">
-              1 {normalizeCurrency(trip.Base_Currency, 'HKD')} = {exchangeRate.toFixed(4)} {displayCurrency}
-            </span>
+          {displayCurrency !== trip.Base_Currency && !rateLoading && missingRateExpenses.length === 0 && (
+            <span className="text-xs text-slate-400">按每筆支出日期匯率</span>
           )}
         </div>
       </div>
@@ -416,7 +456,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
         </span>
         {displayCurrency !== trip.Base_Currency && (
           <span className="text-xs text-slate-400">
-            ({formatCurrencyAmount(grandTotal, normalizeCurrency(trip.Base_Currency, 'HKD'))})
+            ({formatCurrencyAmount(grandTotalBase, normalizeCurrency(trip.Base_Currency, 'HKD'))})
           </span>
         )}
       </div>

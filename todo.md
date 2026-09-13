@@ -224,3 +224,21 @@
 - [x] Add null-safe multi-currency formatting and analysis guards without changing stored expense values or settlement logic.
 - [x] Verify TWD amounts render in the analysis chart and summary table, then run typecheck, build, and production read-only validation.
 - [x] Publish the fix only after the existing TWD trip data and all four trip cards remain intact.
+
+
+## New requested changes — pending clarification before implementation
+- [x] Add creator-only inline creation of traveler names in Overview; new names participate in settlement while collaborators remain view-only for traveler settings.
+- [x] Define how name-only travelers map to payer/beneficiary records and how existing authenticated members remain represented.
+- [x] Use a stored original foreign-currency amount for summary and settlement when the requested display currency exists; otherwise use the expense-date exchange rate, with no mislabeled fallback.
+- [x] Add date-based historical exchange-rate lookup and caching shared by expense summary and settlement.
+- [x] Support multi-segment flights/transfers with route, date, departure/arrival time, time-zone offset, duration, and flight number fields sourced from expense editing.
+- [x] Render the requested flight table format and preserve existing flight data during migration.
+- [ ] Reproduce the recovery page and isolate whether it is caused by traveler editing, exchange-rate lookup, settlement aggregation, or flight data parsing.
+- [x] Confirm all outstanding data-model and time-zone rules before schema or UI changes.
+
+## Questions to confirm before implementation
+- [x] For a newly entered traveler name, the creator can assign the name as payer and split beneficiary immediately.
+- [x] Duplicate names are not allowed; names are not auto-linked to accounts.
+- [x] Missing historical rates show `—` and an explicit warning; never mislabeled fallback values.
+- [x] One flight expense contains multiple segments; cross-midnight adds 24 hours and user-entered time-zone offset is applied.
+- [x] Return date is read from the edited expense; the example year is not written as data.

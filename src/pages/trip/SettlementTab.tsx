@@ -10,7 +10,7 @@ interface Props {
   trip: Trip;
   settlement: Settlement | null;
   settlementLoading: boolean;
-  fetchSettlement: () => void;
+  fetchSettlement: (currency?: string) => void;
 }
 
 export default function SettlementTab({ trip, settlement, settlementLoading, fetchSettlement }: Props) {
@@ -18,33 +18,21 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
   const [displayCurrency, setDisplayCurrency] = useState<string>(() => {
     return localStorage.getItem(SETTLEMENT_CURRENCY_KEY) || trip.Base_Currency;
   });
-  const [exchangeRate, setExchangeRate] = useState<number>(1);
-  const [rateLoading, setRateLoading] = useState(false);
-
   // Matrix mode: 'optimised' = minimum transfers | 'raw' = per-person actual debts
   const [matrixMode, setMatrixMode] = useState<'optimised' | 'raw'>('optimised');
 
   const handleCurrencyChange = (newCurrency: string) => {
     setDisplayCurrency(newCurrency);
-    localStorage.setItem(SETTLEMENT_CURRENCY_KEY, newCurrency);
+    try { localStorage.setItem(SETTLEMENT_CURRENCY_KEY, newCurrency); } catch { /* storage is optional */ }
+    fetchSettlement(newCurrency);
   };
 
   useEffect(() => {
-    if (displayCurrency === trip.Base_Currency) {
-      setExchangeRate(1);
-      return;
-    }
-    setRateLoading(true);
-    api.getExchangeRate(trip.Base_Currency, displayCurrency)
-      .then(result => {
-        if (result.success) setExchangeRate(result.rate);
-      })
-      .finally(() => setRateLoading(false));
-  }, [displayCurrency, trip.Base_Currency]);
+    fetchSettlement(displayCurrency);
+  }, [displayCurrency]);
 
-  const convert = (baseAmt: number) => baseAmt * exchangeRate;
   const fmt = (amt: number) =>
-    `${displayCurrency} ${convert(amt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${settlement?.displayCurrency || displayCurrency} ${Number(amt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div>
@@ -52,7 +40,7 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h3 className="font-semibold text-slate-900">分帳結算</h3>
         <div className="flex items-center gap-2">
-          {rateLoading && <Spinner />}
+          {settlementLoading && <Spinner />}
           <Select
             label=""
             value={displayCurrency}
@@ -71,12 +59,17 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
         <EmptyState icon={<Table2 size={32} />} title="尚未計算" description="點擊「重新計算」開始分帳" />
       ) : (
         <div className="space-y-4">
+          {settlement.missingRateExpenses && settlement.missingRateExpenses.length > 0 && (
+            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+              {settlement.missingRateExpenses.length} 筆支出缺少支出日期的歷史匯率，已顯示 — 並暫不納入本次結算；不會把 HKD 數值誤標為 {displayCurrency}。
+            </p>
+          )}
           {/* 成員餘額 */}
           <Card className="p-4">
             <h4 className="text-sm font-semibold text-slate-700 mb-3">
               成員餘額
               {displayCurrency !== trip.Base_Currency && (
-                <span className="ml-2 text-xs font-normal text-slate-400">（以 {displayCurrency} 顯示）</span>
+                <span className="ml-2 text-xs font-normal text-slate-400">（按每筆支出日期匯率，以 {displayCurrency} 顯示）</span>
               )}
             </h4>
             <div className="space-y-2">

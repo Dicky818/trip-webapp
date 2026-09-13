@@ -84,7 +84,7 @@ define(['./workbox-4ae8b2d7'], (function (workbox) { 'use strict';
     "revision": "db6f82a4f109cd29d90bec86b7932f90"
   }, {
     "url": "index.html",
-    "revision": "fac59cfad6d5862143b4d6311c2ac627"
+    "revision": "3d362683303a82c959f99b22d64a1ce9"
   }, {
     "url": "icons.svg",
     "revision": "3b4fcfcf393eca4d264dca4a4663bc37"
@@ -98,115 +98,115 @@ define(['./workbox-4ae8b2d7'], (function (workbox) { 'use strict';
     "url": "404.html",
     "revision": "921f0c88b4dd6f4a0399dbe6b70d82ac"
   }, {
-    "url": "assets/users-On24_Kqh.js",
+    "url": "assets/users-Dut_b_2I.js",
     "revision": null
   }, {
-    "url": "assets/ui-C6NmVFxw.js",
+    "url": "assets/ui-UDeqonyS.js",
     "revision": null
   }, {
     "url": "assets/typeof-Ck1lrlJ6.js",
     "revision": null
   }, {
-    "url": "assets/trash-2-D9uktuNP.js",
+    "url": "assets/trash-2-BXrCqzHS.js",
     "revision": null
   }, {
-    "url": "assets/tag-DSDYwAOU.js",
+    "url": "assets/tag-Ck1aqcaX.js",
     "revision": null
   }, {
-    "url": "assets/square--9Smgkii.js",
+    "url": "assets/square-DooiUQYV.js",
     "revision": null
   }, {
-    "url": "assets/sparkles-Bk3IZQeR.js",
+    "url": "assets/sparkles-BI0ay2mG.js",
     "revision": null
   }, {
-    "url": "assets/sortable.esm-BSbasxBu.js",
+    "url": "assets/sortable.esm-DkwzDHO0.js",
     "revision": null
   }, {
-    "url": "assets/route-DFDp9AMh.js",
+    "url": "assets/route-C-WXUBSS.js",
     "revision": null
   }, {
-    "url": "assets/receipt-text-DNkZuOQh.js",
+    "url": "assets/receipt-text-D-PjRFzk.js",
     "revision": null
   }, {
     "url": "assets/purify.es-Bf9Bfr-F.js",
     "revision": null
   }, {
-    "url": "assets/plus-DH9QnckT.js",
+    "url": "assets/plus-Bb-d4OSW.js",
     "revision": null
   }, {
-    "url": "assets/pen-CWJCnlL3.js",
+    "url": "assets/pen-DzpwCuiL.js",
     "revision": null
   }, {
-    "url": "assets/pdfExport-CJCMgKRU.js",
+    "url": "assets/pdfExport-BWsguzCh.js",
     "revision": null
   }, {
-    "url": "assets/package-iECcvyN5.js",
+    "url": "assets/package-CnX4AI5L.js",
     "revision": null
   }, {
-    "url": "assets/map-pin-DVg2iWzU.js",
+    "url": "assets/map-pin-CCBAFZTp.js",
     "revision": null
   }, {
-    "url": "assets/index.es-Cp6cA8LY.js",
+    "url": "assets/index.es-DtNbCezN.js",
     "revision": null
   }, {
-    "url": "assets/index-BsZN0bf3.js",
+    "url": "assets/index-BeApDna3.css",
     "revision": null
   }, {
-    "url": "assets/index-6FlvxC-Q.css",
+    "url": "assets/index-3sQlYM5d.js",
     "revision": null
   }, {
-    "url": "assets/html2canvas-DYNdLiBh.js",
+    "url": "assets/html2canvas-aMFmFKAS.js",
     "revision": null
   }, {
-    "url": "assets/file-down-CnHfXDn7.js",
+    "url": "assets/file-down-CftRMiHn.js",
     "revision": null
   }, {
-    "url": "assets/dollar-sign-BGuTgEn0.js",
+    "url": "assets/dollar-sign-CTdBCTOO.js",
     "revision": null
   }, {
-    "url": "assets/dayFeasibility-CvrKLSO3.js",
+    "url": "assets/dayFeasibility-bvoIBNVI.js",
     "revision": null
   }, {
-    "url": "assets/copy-BU3utGlc.js",
+    "url": "assets/copy-DjvqJN23.js",
     "revision": null
   }, {
-    "url": "assets/circle-check-Da1N8vkh.js",
+    "url": "assets/circle-check-C0_co8bW.js",
     "revision": null
   }, {
-    "url": "assets/circle-alert-DVk6HTE3.js",
+    "url": "assets/circle-alert-B63JH1LI.js",
     "revision": null
   }, {
-    "url": "assets/chevron-right-DU9XlVie.js",
+    "url": "assets/chevron-right-BvG4lp-8.js",
     "revision": null
   }, {
-    "url": "assets/arrow-right-DfuD82pI.js",
+    "url": "assets/arrow-right-_Tv_Y4Fw.js",
     "revision": null
   }, {
-    "url": "assets/TripDetailPage-DEBAdXSN.js",
+    "url": "assets/TripDetailPage-Dc1jga-8.js",
     "revision": null
   }, {
-    "url": "assets/SettingsPage-CRxxN5Po.js",
+    "url": "assets/SettingsPage-BbZMDPZ4.js",
     "revision": null
   }, {
-    "url": "assets/PackingListTab-BxxiuQgB.js",
+    "url": "assets/PackingListTab-tDGFCJxR.js",
     "revision": null
   }, {
-    "url": "assets/LoginPage-D01XnQwW.js",
+    "url": "assets/LoginPage-DyasOV5h.js",
     "revision": null
   }, {
-    "url": "assets/ItineraryTab-DzpMCa5k.js",
+    "url": "assets/ItineraryTab-D8-aBcdn.js",
     "revision": null
   }, {
-    "url": "assets/InfoTab-B0Z5bwYU.js",
+    "url": "assets/InfoTab-ghS2BJKw.js",
     "revision": null
   }, {
-    "url": "assets/HomePage-D3cxM9RU.js",
+    "url": "assets/HomePage-DRMtVZan.js",
     "revision": null
   }, {
-    "url": "assets/ExpensesTab-FIRQzdCD.js",
+    "url": "assets/ExpensesTab-ClG9FYuG.js",
     "revision": null
   }, {
-    "url": "assets/AITab-CAFrorZt.js",
+    "url": "assets/AITab-Bejc0GOV.js",
     "revision": null
   }, {
     "url": "favicon.svg",
