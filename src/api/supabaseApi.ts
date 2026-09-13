@@ -52,8 +52,8 @@ export interface FlightSegment {
   flightNo: string;
 }
 
-export function calculateFlightDuration(departureDate: string, departureTime: string, arrivalDate: string, arrivalTime: string, departureOffset = 0, arrivalOffset = 0): string {
-  if (!departureTime || !arrivalTime) return '';
+export function calculateFlightDuration(departureDate: string, departureTime: string, arrivalDate: string, arrivalTime: string, departureOffset?: number | string, arrivalOffset?: number | string): string {
+  if (!departureTime || !arrivalTime || departureOffset === undefined || departureOffset === '' || arrivalOffset === undefined || arrivalOffset === '') return '';
   const start = new Date(`${departureDate || '1970-01-01'}T${departureTime}:00`).getTime();
   let end = new Date(`${arrivalDate || departureDate || '1970-01-01'}T${arrivalTime}:00`).getTime();
   if (!Number.isFinite(start) || !Number.isFinite(end)) return '';
@@ -72,8 +72,8 @@ function normalizeFlightSegments(detail: Record<string, unknown>): FlightSegment
     arrivalDate: String(segment.arrivalDate || segment.arrival_date || segment.date || detail.flight_date || ''),
     departureTime: String(segment.departureTime || segment.departure_time || ''),
     arrivalTime: String(segment.arrivalTime || segment.arrival_time || ''),
-    departureTimeZoneOffset: segment.departureTimeZoneOffset ?? segment.departure_offset ?? 0,
-    arrivalTimeZoneOffset: segment.arrivalTimeZoneOffset ?? segment.arrival_offset ?? 0,
+    departureTimeZoneOffset: segment.departureTimeZoneOffset ?? segment.departure_offset,
+    arrivalTimeZoneOffset: segment.arrivalTimeZoneOffset ?? segment.arrival_offset,
     duration: String(segment.duration || ''),
     flightNo: String(segment.flightNo || segment.flight_no || ''),
   }));
@@ -86,8 +86,8 @@ function normalizeFlightSegments(detail: Record<string, unknown>): FlightSegment
     arrivalDate: firstDate,
     departureTime: String(detail.departure_time || ''),
     arrivalTime: String(detail.landing_time || detail.arrival_time || ''),
-    departureTimeZoneOffset: 0,
-    arrivalTimeZoneOffset: 0,
+    departureTimeZoneOffset: undefined,
+    arrivalTimeZoneOffset: undefined,
     duration: '',
     flightNo: String(detail.flight_no || ''),
   }];
@@ -98,12 +98,12 @@ function normalizeFlightSegments(detail: Record<string, unknown>): FlightSegment
     arrivalDate: String(detail.arrival_date || ''),
     departureTime: String(detail.arrival_time || ''),
     arrivalTime: String(detail.return_landing_time || ''),
-    departureTimeZoneOffset: 0,
-    arrivalTimeZoneOffset: 0,
+    departureTimeZoneOffset: undefined,
+    arrivalTimeZoneOffset: undefined,
     duration: '',
     flightNo: String(detail.flight_no || ''),
   });
-  return segments.map(segment => ({ ...segment, duration: calculateFlightDuration(segment.date, segment.departureTime, segment.arrivalDate || segment.date, segment.arrivalTime, Number(segment.departureTimeZoneOffset || 0), Number(segment.arrivalTimeZoneOffset || 0)) }));
+  return segments.map(segment => ({ ...segment, duration: calculateFlightDuration(segment.date, segment.departureTime, segment.arrivalDate || segment.date, segment.arrivalTime, segment.departureTimeZoneOffset, segment.arrivalTimeZoneOffset) }));
 }
 
 export interface Flight {
