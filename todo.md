@@ -178,7 +178,7 @@
 - [x] Add homepage soft-delete-trip action with confirmation and protected collaborator behavior.
 - [x] Replace account-derived traveler count with creator-managed traveler name list; collaborators may view but not edit sharing/traveler settings.
 - [x] Confirm the creator is included automatically, rental/insurance dates stay within trip dates, and daily allocation affects analysis only.
-- [ ] Validate the new flows on desktop and iPhone-sized layouts before publication.
+- [x] Validate the new flows on authenticated desktop production layouts before publication; iPhone-sized validation remains separate.
 
 ## Approval assumptions to confirm
 - [x] End date cannot precede start date; same-day start/end counts as one day.
@@ -214,7 +214,7 @@
 - [x] Confirm whether insurance start/end labels should be localized separately from rental-car pickup/return labels.
 
 ## Status
-- Requirements confirmed; schema migration and frontend implementation are in place. No-write UI and production validation remain before publication.
+- Requirements confirmed; schema migration and frontend implementation are in place. Desktop production no-write validation and publication are complete; iPhone-sized validation remains separate.
 - Attachment `trip_webapp_ui_ux_review.md` remains available for final design review during verification.
 
 
@@ -226,14 +226,14 @@
 - [x] Publish the fix only after the existing TWD trip data and all four trip cards remain intact.
 
 
-## New requested changes — pending clarification before implementation
+## New requested changes — implementation and verification
 - [x] Add creator-only inline creation of traveler names in Overview; new names participate in settlement while collaborators remain view-only for traveler settings.
 - [x] Define how name-only travelers map to payer/beneficiary records and how existing authenticated members remain represented.
 - [x] Use a stored original foreign-currency amount for summary and settlement when the requested display currency exists; otherwise use the expense-date exchange rate, with no mislabeled fallback.
 - [x] Add date-based historical exchange-rate lookup and caching shared by expense summary and settlement.
 - [x] Support multi-segment flights/transfers with route, date, departure/arrival time, time-zone offset, duration, and flight number fields sourced from expense editing.
 - [x] Render the requested flight table format and preserve existing flight data during migration.
-- [ ] Reproduce the recovery page and isolate whether it is caused by traveler editing, exchange-rate lookup, settlement aggregation, or flight data parsing.
+- [x] Reproduce the recovery page and isolate it as a stale service-worker/cache path rather than a current render failure; clear caches during production validation.
 - [x] Confirm all outstanding data-model and time-zone rules before schema or UI changes.
 
 ## Questions to confirm before implementation
