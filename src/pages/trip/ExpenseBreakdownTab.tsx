@@ -401,6 +401,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
   );
 
   const grandTotalDisplay = grandTotal;
+  const noResolvedAmounts = missingRateExpenses.length > 0 && resolvedAmounts.size === 0;
+  const grandTotalLabel = noResolvedAmounts ? '—' : formatCurrencyAmount(grandTotalDisplay, effectiveDisplayCurrency);
   const hasInclusiveDateExpenses = filteredExpenses.some(exp =>
     (exp.Rental_Pickup_Date && exp.Rental_Return_Date) ||
     (exp.Insurance_Start_Date && exp.Insurance_End_Date)
@@ -450,8 +452,8 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
       {/* 總計 */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm text-slate-500">
-          總計：<span className="font-semibold text-slate-900">
-            {formatCurrencyAmount(grandTotalDisplay, effectiveDisplayCurrency)}
+          總計：              <span className="font-semibold text-slate-900">
+            {grandTotalLabel}
           </span>
         </span>
         {displayCurrency !== trip.Base_Currency && (

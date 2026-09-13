@@ -31,8 +31,8 @@ export default function SettlementTab({ trip, settlement, settlementLoading, fet
     fetchSettlement(displayCurrency);
   }, [displayCurrency]);
 
-  const fmt = (amt: number) =>
-    `${settlement?.displayCurrency || displayCurrency} ${Number(amt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const noResolvedAmounts = Boolean(settlement?.totalExpenseCount && settlement.totalExpenseCount > 0 && settlement.resolvedExpenseCount === 0 && settlement.missingRateExpenses && settlement.missingRateExpenses.length > 0);
+  const fmt = (amt: number) => noResolvedAmounts ? '—' : `${settlement?.displayCurrency || displayCurrency} ${Number(amt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div>

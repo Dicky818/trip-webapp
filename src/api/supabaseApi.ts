@@ -285,6 +285,8 @@ export interface TripMember {
 export interface Settlement {
   displayCurrency?: string;
   missingRateExpenses?: Array<{ expenseId: string; date: string; from: string; to: string }>;
+  totalExpenseCount?: number;
+  resolvedExpenseCount?: number;
   totalBase: number;
   categoryStats: Record<string, number>;
   memberBalances: Record<string, number>;
@@ -1556,7 +1558,8 @@ export const api = {
     }
 
     const calculableExpenses = expenses.filter(expense => amountOverrides.has(expense.Expense_ID));
-    return ok(calcSettlement(calculableExpenses, members, memberIdToName, amountOverrides, targetCurrency, missingRateExpenses));
+    const settlement = calcSettlement(calculableExpenses, members, memberIdToName, amountOverrides, targetCurrency, missingRateExpenses);
+    return ok({ ...settlement, totalExpenseCount: expenses.length, resolvedExpenseCount: calculableExpenses.length });
   },
 
   // ── Categories ───────────────────────────────────────────
