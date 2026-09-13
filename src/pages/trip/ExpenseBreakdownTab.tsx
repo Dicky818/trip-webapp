@@ -594,7 +594,7 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
                 );
               })}
               <td className="px-3 py-2 text-right border-r border-blue-500 whitespace-nowrap">
-                {formatCurrencyAmount(grandTotalDisplay, effectiveDisplayCurrency)}
+                {grandTotalLabel}
               </td>
               <td className="px-3 py-2 text-right whitespace-nowrap">100%</td>
             </tr>
