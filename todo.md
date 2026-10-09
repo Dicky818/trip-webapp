@@ -172,6 +172,9 @@
 
 
 ## New requested changes — implementation and verification
+- [x] Add a visible edit action to every owner trip card on the home page.
+- [x] Reuse validated trip-name, date, and base-currency validation before saving a card edit.
+- [x] Verify card editing refreshes the displayed name, dates, duration, status, and currency without changing sharing or deletion permissions.
 - [x] Add rental-car pickup and return dates; validate same-day as one billable day and include both endpoints in daily allocation.
 - [x] Add insurance start and end dates with the same inclusive daily allocation and expose results in charts and summary totals.
 - [x] Add homepage share-trip action using the existing share-code/password mechanism.
@@ -260,4 +263,4 @@
 - [x] Renames synchronize all four views immediately.
 - [x] Only the trip creator can add, rename, or delete travelers.
 - [x] New traveler names use an input field plus an Add button.
-- [x] Rental-car and insurance allocation uses each item's own date range, inclusive of both endpoints.
+- [x] Rental-car and insurance allocation in analysis uses the complete inclusive trip period; each item's own dates remain recorded metadata.

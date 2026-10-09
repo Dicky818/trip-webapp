@@ -250,7 +250,7 @@ export default function TripDetailPage() {
             <div><p className="portal-eyebrow text-[#9b907c]">{selectedTool?.number || activeSection.number} / {selectedTool?.eyebrow || 'SECTION'}</p><h2 className="mt-0.5 text-base font-bold text-slate-950">{selectedTool?.title || activeSection.label}</h2></div>
             </div>
 
-          <div className="min-h-[32rem] overflow-hidden rounded-[1.5rem] border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
+          <div className="min-h-[32rem] min-w-0 overflow-visible rounded-[1.5rem] border border-[#e3ddcf] bg-white shadow-[0_12px_28px_rgba(17,17,17,0.06)]">
             <Suspense fallback={<TabSpinner />}>
               {activeTab === 'info' && <InfoTab trip={trip} onTripUpdated={fetchTrip} onExportPdf={exportBooklet} onNavigate={(target, focusToday, openLens, focusItemIds) => navigate(`/trip/${trip.Trip_ID}?tab=${target}${focusToday ? '&focus=today' : ''}${openLens ? '&lens=load' : ''}${focusItemIds?.length ? `&focusItems=${encodeURIComponent(focusItemIds.join(','))}` : ''}`)} />}
               {activeTab === 'itinerary' && <ItineraryTab trip={trip} focusToday={searchParams.get('focus') === 'today'} focusLens={searchParams.get('lens') === 'load'} focusItemIds={(searchParams.get('focusItems') || '').split(',').filter(Boolean)} />}

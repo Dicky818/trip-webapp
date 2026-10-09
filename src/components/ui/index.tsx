@@ -183,7 +183,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`relative w-full ${sizes[size]} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[90vh] outline-none`}
+        className={`relative w-full ${sizes[size]} min-h-0 bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[90vh] outline-none`}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -192,8 +192,8 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             <X size={18} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
-        {footer && <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">{children}</div>
+        {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-100 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">{footer}</div>}
       </div>
     </div>
   );

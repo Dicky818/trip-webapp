@@ -45,6 +45,14 @@ describe('trip changes', () => {
     expect(inclusiveDateRange('2027-01-13', '2027-01-13')).toEqual(['2027-01-13']);
   });
 
+  it('allocates a trip-period item over the complete inclusive trip period', () => {
+    const tripDates = inclusiveDateRange('2027-01-13', '2027-01-20');
+    expect(tripDates).toHaveLength(8);
+    expect(tripDates[0]).toBe('2027-01-13');
+    expect(tripDates.at(-1)).toBe('2027-01-20');
+    expect(allocateInclusiveAmount(800, tripDates)).toEqual([100, 100, 100, 100, 100, 100, 100, 100]);
+  });
+
   it('puts rounding cents on the final allocated day', () => {
     expect(allocateInclusiveAmount(100, ['2027-01-13', '2027-01-14', '2027-01-15'])).toEqual([33.33, 33.33, 33.34]);
   });

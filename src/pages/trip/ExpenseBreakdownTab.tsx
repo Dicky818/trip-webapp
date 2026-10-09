@@ -232,15 +232,13 @@ export default function ExpenseBreakdownTab({ trip, expenses, tripMembers, categ
     // 產生從 start 到 end（含頭尾）的每一天
     const spreadDates = (start: string, end: string): string[] => inclusiveDateRange(start, end);
 
-    if (isRentalCar) {
-      const start = toDateStr(e.Rental_Pickup_Date || e.Date || '');
-      const end = toDateStr(e.Rental_Return_Date || e.Date || '');
-      return spreadDates(start, end);
-    }
-    if (isInsurance) {
-      const start = toDateStr(e.Insurance_Start_Date || e.Date || '');
-      const end = toDateStr(e.Insurance_End_Date || e.Date || '');
-      return spreadDates(start, end);
+    if (isRentalCar || isInsurance) {
+      // Analysis allocation follows the trip period, inclusive of both the
+      // first and last day. Item-specific pickup/return or policy dates stay
+      // available as metadata, but must not shorten the daily analysis view.
+      return tripDates.length > 0
+        ? tripDates
+        : spreadDates(toDateStr(e.Date || ''), toDateStr(e.Date || ''));
     }
     if (isRailPass) {
       // 鐵路套票：用 Check_In_Date / Check_Out_Date 或 Flight_Date / Arrival_Date 或 Date

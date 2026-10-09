@@ -5,12 +5,20 @@ import { useNavigate } from 'react-router-dom';
  * trip pass returned by the authenticated source of truth. All operational
  * tools appear after a trip is opened.
  */
-import { Plane, Calendar, Trash2, MapPin, Share2, Users, Link2, Copy, Check, ArrowRight, CirclePlus } from 'lucide-react';
+import { Plane, Calendar, Trash2, MapPin, Share2, Users, Link2, Copy, Check, ArrowRight, CirclePlus, Pencil } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { api, Trip } from '../api/supabaseApi';
 import { Button, Card, Modal, Input, Select, EmptyState, ConfirmDialog, Spinner } from '../components/ui';
 
 const CURRENCIES = ['HKD','TWD','JPY','KRW','USD','EUR','GBP','CNY','SGD','THB','MYR'];
+
+type TripForm = Pick<Trip, 'Trip_Name' | 'Start_Date' | 'End_Date' | 'Base_Currency'>;
+
+const EMPTY_TRIP_FORM: TripForm = { Trip_Name: '', Start_Date: '', End_Date: '', Base_Currency: 'HKD' };
+
+function dateOnly(value: string) {
+  return String(value || '').slice(0, 10);
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -19,9 +27,16 @@ export default function HomePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [form, setForm] = useState({ Trip_Name: '', Start_Date: '', End_Date: '', Base_Currency: 'HKD' });
+  const [form, setForm] = useState<TripForm>(EMPTY_TRIP_FORM);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Keep card editing separate from creation so existing sharing settings
+  // and data records remain untouched by a simple trip-detail revision.
+  const [editTrip, setEditTrip] = useState<Trip | null>(null);
+  const [editForm, setEditForm] = useState<TripForm>(EMPTY_TRIP_FORM);
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Share modal
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
@@ -52,7 +67,7 @@ export default function HomePage() {
       if (result.success) {
         showToast('行程已建立！');
         setShowCreate(false);
-        setForm({ Trip_Name: '', Start_Date: '', End_Date: '', Base_Currency: 'HKD' });
+        setForm(EMPTY_TRIP_FORM);
         await fetchTrips();
         navigate(`/trip/${result.data.Trip_ID}`);
       }
@@ -60,6 +75,47 @@ export default function HomePage() {
       setFormError(e instanceof Error ? e.message : '建立失敗');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openEditTrip = (trip: Trip) => {
+    setEditTrip(trip);
+    setEditForm({
+      Trip_Name: trip.Trip_Name || '',
+      Start_Date: dateOnly(trip.Start_Date),
+      End_Date: dateOnly(trip.End_Date),
+      Base_Currency: trip.Base_Currency || 'HKD',
+    });
+    setEditError('');
+  };
+
+  const closeEditTrip = () => {
+    if (savingEdit) return;
+    setEditTrip(null);
+    setEditError('');
+  };
+
+  const handleEditTrip = async () => {
+    if (!editTrip) return;
+    if (!editForm.Trip_Name.trim()) { setEditError('請輸入行程名稱'); return; }
+    if (!editForm.Start_Date || !editForm.End_Date) { setEditError('請選擇出發和結束日期'); return; }
+    if (editForm.Start_Date > editForm.End_Date) { setEditError('出發日期不能晚於結束日期'); return; }
+
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const result = await api.updateTrip(editTrip.Trip_ID, {
+        ...editForm,
+        Trip_Name: editForm.Trip_Name.trim(),
+      });
+      if (!result.success) throw new Error(result.error || '更新失敗');
+      await fetchTrips();
+      setEditTrip(null);
+      showToast('行程卡已更新');
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : '更新失敗，請稍後再試');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -184,6 +240,7 @@ export default function HomePage() {
                   formatDate={formatDate}
                   getDuration={getDuration}
                   onNavigate={() => navigate(`/trip/${trip.Trip_ID}`)}
+                  onEdit={trip.Is_Owner !== false ? () => openEditTrip(trip) : null}
                   onDelete={trip.Is_Owner !== false ? () => setDeleteTarget(trip) : null}
                   onShare={trip.Is_Owner !== false ? () => { void handleOpenShare(trip); } : null}
                 />
@@ -218,6 +275,37 @@ export default function HomePage() {
             onChange={e => setForm(f => ({ ...f, Base_Currency: e.target.value }))}
             options={CURRENCIES.map(c => ({ value: c, label: c }))} />
           {formError && <p className="text-sm text-red-500">{formError}</p>}
+        </div>
+      </Modal>
+
+      {/* 行程卡編輯 Modal（只限行程建立者） */}
+      <Modal
+        open={!!editTrip}
+        onClose={closeEditTrip}
+        title={editTrip ? `修改「${editTrip.Trip_Name}」` : '修改行程'}
+        footer={
+          <>
+            <Button variant="outline" onClick={closeEditTrip} disabled={savingEdit}>取消</Button>
+            <Button onClick={handleEditTrip} loading={savingEdit}>儲存變更</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="rounded-xl bg-[#faf8f2] px-3 py-2 text-xs leading-5 text-slate-600">
+            修改後會立即更新這張行程卡的名稱、日期、旅程天數、狀態及基礎貨幣；分享碼與行程內容不會改變。
+          </p>
+          <Input label="行程名稱" required placeholder="例如：東京五日遊" value={editForm.Trip_Name}
+            onChange={e => setEditForm(f => ({ ...f, Trip_Name: e.target.value }))} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input label="出發日期" required type="date" value={editForm.Start_Date}
+              onChange={e => setEditForm(f => ({ ...f, Start_Date: e.target.value }))} />
+            <Input label="結束日期" required type="date" value={editForm.End_Date}
+              onChange={e => setEditForm(f => ({ ...f, End_Date: e.target.value }))} />
+          </div>
+          <Select label="基礎貨幣" required value={editForm.Base_Currency}
+            onChange={e => setEditForm(f => ({ ...f, Base_Currency: e.target.value }))}
+            options={CURRENCIES.map(c => ({ value: c, label: c }))} />
+          {editError && <p className="text-sm text-red-500" role="alert">{editError}</p>}
         </div>
       </Modal>
 
@@ -337,6 +425,7 @@ interface TripCardProps {
   formatDate: (d: string) => string;
   getDuration: (start: string, end: string) => string;
   onNavigate: () => void;
+  onEdit: (() => void) | null;
   onDelete: (() => void) | null;
   onShare: (() => void) | null;
 }
@@ -358,11 +447,11 @@ function getTripStatus(start: string, end: string): { label: string; color: stri
   }
 }
 
-function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete, onShare }: TripCardProps) {
+function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onEdit, onDelete, onShare }: TripCardProps) {
   const status = getTripStatus(trip.Start_Date, trip.End_Date);
   return (
     <Card className="group cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(17,17,17,0.10)]">
-      <div onClick={onNavigate} className="p-5" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onNavigate(); }}>
+      <div onClick={onNavigate} className="p-5" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigate(); } }}>
         <div className="flex items-start justify-between mb-3">
           <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isOwner ? 'bg-[#fff3c4]' : 'bg-[#ece7da]'}`}>
             {isOwner ? <Plane size={20} className="-rotate-12 text-[#9a7100]" /> : <Users size={20} className="text-slate-600" />}
@@ -396,6 +485,17 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onDelete
         <div className="px-5 pb-4 flex justify-between items-center gap-2">
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status.color}`}>{status.daysText}</span>
           <div className="flex gap-1">
+          {onEdit && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-[#ece7da] hover:text-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]"
+              title="修改行程"
+              aria-label={`修改行程：${trip.Trip_Name}`}
+            >
+              <Pencil size={14} />
+              <span>修改</span>
+            </button>
+          )}
           {onShare && (
             <button
               onClick={(e) => { e.stopPropagation(); onShare(); }}

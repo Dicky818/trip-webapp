@@ -84,7 +84,7 @@ export default function Layout() {
       </header>
 
       {/* Shared workspace: pages provide their own task hierarchy. */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-24 sm:pb-8">
+      <main className="min-w-0 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-8">
         <Outlet />
       </main>
     </div>
