@@ -488,12 +488,11 @@ function TripCard({ trip, isOwner, formatDate, getDuration, onNavigate, onEdit, 
           {onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-[#ece7da] hover:text-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[#ece7da] hover:text-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111111]"
               title="修改行程"
               aria-label={`修改行程：${trip.Trip_Name}`}
             >
-              <Pencil size={14} />
-              <span>修改</span>
+              <Pencil size={15} />
             </button>
           )}
           {onShare && (
